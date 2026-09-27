@@ -274,6 +274,24 @@ loudly if the fixture has drifted out from under it.
 The cache and the `pixi-sbom` symlink live *beside* the recorded directory rather than in it, so
 `ls` shows a workspace and not the scaffolding.
 
+`pixi run demo <name>` re-records one clip; `pixi run demo` does all of them. One tape per clip,
+each sizing its own terminal to what its command prints — a table that scrolls loses its header,
+which is the half that explains it.
+
+**Two clips need the network.** `report-outdated` and `report-scorecard` ask live services, and
+the responses are far too large to stage as fixtures — the anaconda.org project documents behind
+`outdated` alone are 19 MB. Their tapes `unset PIXI_SBOM_OFFLINE` in the hidden block and say so
+at the top.
+
+That costs connectivity when re-recording, and nothing else: the committed artifact is the GIF,
+not the cache. What those two show was true on the day they were recorded, the way any screenshot
+of live data is; scores and release counts drift, and the prose beside them does not depend on the
+exact numbers.
+
+Both warm the cache inside the hidden block before filming, so the network wait — about nine
+seconds for `outdated` — happens off camera, and what is filmed is a warm run. That is also what
+the second run of anything looks like.
+
 ## Releasing
 
 Two workflows. `release.yml` is run by hand from the Actions tab (*Release* → *Run workflow* on `main`) and ends at
