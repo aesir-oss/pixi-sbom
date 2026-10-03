@@ -580,7 +580,22 @@ any one project, the user-level file is usually the right place for it:
 conda-index-kind = "prefix"
 ```
 
-prefix.dev is asked with one GraphQL request per package, the same request count as the anaconda.org API: the
+prefix.dev is asked about **ten packages per request**, as GraphQL aliases in one document. On a
+52-package workspace that is 6 requests where there were 52, and 19 in total against 65 once the
+dates of newer releases are counted. The saving grows with latency: a link where each round trip
+costs most of a second is exactly where making a third as many of them matters.
+
+**Batched queries are throttled below the ordinary request concurrency**, to four at a time. Asking
+about ten packages at once does not change how much work the index does for a workspace — the same
+packages, the same fields — and it strictly reduces the connections, handshakes and parses it pays
+for. What it could raise is how much of that work arrives at once, so that is held near what one
+request per package already placed rather than left to multiply.
+
+Every package still asks for precisely what it would have asked alone, and the batch is a pre-pass
+that fills the cache the ordinary path then reads — so a batch that fails, is rejected, or comes back
+missing one package costs nothing, and that package is fetched on its own as before.
+
+prefix.dev is otherwise asked with one GraphQL request per package, the same request count as the anaconda.org API: the
 query carries the version list, the newest builds across versions (where the latest release's date comes from) and
 the builds of the installed version by name, so its date is exact however far behind it is.
 
