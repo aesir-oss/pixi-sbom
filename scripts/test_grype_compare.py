@@ -40,6 +40,25 @@ class GrypeCompareTest(unittest.TestCase):
         self.assertEqual(g.default_gap({django, openssl}, {openssl}), {django})
         self.assertEqual(g.default_gap({openssl}, {openssl, django}), set())
 
+    def test_only_the_npm_environment_turns_on_syfts_package_json_cataloger(self) -> None:
+        names = [name for name, _, _ in g.CORPUS]
+        self.assertIn("node-tools", names)
+        self.assertEqual(set(g.SYFT_EXTRA), {"node-tools"})
+        self.assertIn("npm", g.COMPARED_TYPES)
+
+    def test_npm_lockfile_entries_are_not_compared(self) -> None:
+        syft = {"artifacts": [
+            {"id": "a", "type": "npm", "foundBy": "javascript-package-cataloger"},
+            {"id": "b", "type": "npm", "foundBy": "javascript-lock-cataloger"},
+            {"id": "c", "type": "python", "foundBy": "python-installed-package-cataloger"},
+        ]}
+        self.assertEqual(g.not_installed(syft), {"b"})
+        grype = {"matches": [
+            {"vulnerability": {"id": "GHSA-1"}, "artifact": {"id": "a", "type": "npm", "name": "x", "version": "1"}},
+            {"vulnerability": {"id": "GHSA-2"}, "artifact": {"id": "b", "type": "npm", "name": "y", "version": "1"}},
+        ]}
+        self.assertEqual(g.findings(grype, {"npm"}, g.not_installed(syft)), {g.Finding("GHSA-1", "x", "1")})
+
     def test_every_exception_needs_a_reason(self) -> None:
         good = '[[exception]]\nenvironment = "django"\nvulnerability = "CVE-1"\npackage = "Lib_X"\nreason = "why"\n'
         self.assertEqual(g.load_exceptions(good), {("django", "CVE-1", "lib-x"): "why"})
