@@ -23,7 +23,7 @@ Since 1.0, pixi-sbom has:
   credentials are used, and `--doctor` says which host is the problem.
 - **Learned tab completion** in bash, zsh, fish and PowerShell, for `pixi-sbom` and `pixi sbom`.
 
-## Unreleased
+## 1.9.0
 
 **Tab completion.** Flags, the values they take (`--report <TAB>` lists the report kinds,
 `--format <TAB>` the formats) and file paths complete after one line in your shell's startup file:
