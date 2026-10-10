@@ -23,7 +23,7 @@ Since 1.0, pixi-sbom has:
   credentials are used, and `--doctor` says which host is the problem.
 - **Learned tab completion** in bash, zsh, fish and PowerShell, for `pixi-sbom` and `pixi sbom`.
 
-## Unreleased
+## 1.11.0
 
 1.11.0 looks past Python inside a conda environment. R packages, the Go modules compiled into Go programs and the
 npm packages under `node_modules` now get identities an advisory database can match. The Grype comparison CI runs
