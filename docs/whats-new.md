@@ -23,7 +23,7 @@ Since 1.0, pixi-sbom has:
   credentials are used, and `--doctor` says which host is the problem.
 - **Learned tab completion** in bash, zsh, fish and PowerShell, for `pixi-sbom` and `pixi sbom`.
 
-## Unreleased
+## 1.10.0
 
 1.10.0 is about what a scanner can do with pixi-sbom's documents. Describing an installed environment offline,
 pixi-sbom now gives Grype everything syft's document does and more: on the installed Django example, with
