@@ -299,7 +299,9 @@ jobs:
   build:
     name: Build (${{ matrix.os }})
     needs: changes
-    if: ${{ github.event_name != 'pull_request' || needs.changes.outputs.code == 'true' }}
+    # The release profile (LTO, one codegen unit) on main only (#91): a pull request's tests already compile and
+    # run on all three, and the release workflow builds every platform again before anything ships.
+    if: ${{ github.event_name != 'pull_request' }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false

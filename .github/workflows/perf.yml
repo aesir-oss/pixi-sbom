@@ -13,7 +13,8 @@ name: Performance
 #   * wall time     — reported in the job summary, never fails: even back to back it moves
 #                     enough on a shared runner to cry wolf
 #
-# It does not run on pull requests: each platform builds the binary twice with LTO. Run it by
+# It runs weekly, for each release candidate (its tag push, measured against the last final release) and on
+# demand, not on pull requests or pushes to main (#91): each platform builds the binary twice with LTO. Run it by
 # hand on the pull requests where performance is the point.
 
 on:
@@ -27,15 +28,8 @@ on:
     # Mondays, early: drift since the last release, without anyone remembering to look.
     - cron: "17 5 * * 1"
   push:
-    branches: ["main"]
-    paths:
-      - "crates/pixi-sbom/src/**"
-      - "crates/pixi-sbom/benches/**"
-      - "scripts/perf.py"
-      - "Cargo.toml"
-      - "crates/pixi-sbom/Cargo.toml"
-      - "Cargo.lock"
-      - ".github/workflows/perf.yml"
+    # A release candidate, before its final is cut: what the release would cost against the last one.
+    tags: ["pixi-sbom-v*-rc.*"]
 
 concurrency:
   group: perf-${{ github.ref }}
@@ -78,7 +72,9 @@ jobs:
         run: |
           base="${{ inputs.base }}"
           if [ -z "$base" ]; then
-            base=$(git describe --tags --abbrev=0 --match 'pixi-sbom-v[0-9]*.[0-9]*.[0-9]*' --match 'v[0-9]*.[0-9]*.[0-9]*' 2>/dev/null || echo "")
+            # The last final release: a release candidate's own tag, or an earlier one's, is not a base.
+            base=$(git describe --tags --abbrev=0 --match 'pixi-sbom-v[0-9]*.[0-9]*.[0-9]*' --match 'v[0-9]*.[0-9]*.[0-9]*' \
+              --exclude '*-rc.*' 2>/dev/null || echo "")
           fi
           if [ -z "$base" ]; then
             echo "::notice::no release tag to compare against; measuring this ref only"

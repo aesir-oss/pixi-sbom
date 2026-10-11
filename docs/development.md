@@ -323,7 +323,7 @@ must pass:
 
 | Pull request changes | Runs |
 |---|---|
-| Rust code, any `Cargo.toml`, `Cargo.lock`, `pixi.toml`, `pixi.lock`, `rustfmt.toml`, `ci.yml` | Tests on Linux, macOS and Windows; coverage, MSRV, benchmarks, release build |
+| Rust code, any `Cargo.toml`, `Cargo.lock`, `pixi.toml`, `pixi.lock`, `rustfmt.toml`, `ci.yml` | Tests on Linux, macOS and Windows; coverage, MSRV, benchmarks |
 | Files the tests read: `docs/`, `examples/`, `README.md`, `mkdocs.yml`, `actions/pixi-sbom/action.yml`, the release workflows, `scripts/whats_new.py` | Tests on Linux only |
 | `docs/`, `mkdocs.yml`, the hook, the changelogs, `SECURITY.md` | The docs build |
 | `Cargo.lock`, any `Cargo.toml`, `deny.toml` | Dependency advisories and licenses |
@@ -342,8 +342,8 @@ A newer push to a pull request cancels its running CI; on `main` every commit's 
 | Builds on the MSRV | ubuntu | `pixi run -e msrv msrv-check`: the oldest toolchain `crates/pixi-sbom/Cargo.toml` claims |
 | Benchmarks compile and run | ubuntu | `pixi run bench-test`: every benchmark runs once, untimed, in a debug build |
 | Script tests | ubuntu | The Python scripts' own tests: `action-test`, `perf-test`, `whats-new-test`, `repo-release-test`, `changelog-test` and the rest |
-| Performance (separate workflow) | all five release platforms | `pixi run perf`: builds two refs on one runner and compares them; fails on binary size or peak memory, reports wall time. On demand, weekly and on pushes to `main` — not on pull requests. See [benchmarks.md](benchmarks.md) |
-| Build | same three | `pixi run build` and `--version` smoke test |
+| Performance (separate workflow) | all five release platforms | `pixi run perf`: builds two refs on one runner and compares them; fails on binary size or peak memory, reports wall time. On demand, weekly and for each release candidate (its tag, against the last final release); not on pull requests or pushes to `main` (#91). See [benchmarks.md](benchmarks.md) |
+| Build | same three | `pixi run build` and `--version` smoke test, with the release profile; on `main` only, not on pull requests (#91) |
 | Docs | ubuntu | `pixi run docs-build`: the site must build with `--strict` |
 | SBOM via action | all five release platforms | The repository's own action against its own lockfile; SARIF and the attestation from the linux-64 leg only. See [The GitHub Action](#the-github-action) |
 | Action on a uv project, without pixi | ubuntu-latest | The action on `examples/projects/uv/01-django/uv.lock` and on a venv built in the job (`prefix`), on a runner with no pixi; refuses `lockfile` with `prefix`. It runs the head binary, built by `action-head-binary` and placed where the action reuses an install, so it tests what the next release does rather than what the last one did |

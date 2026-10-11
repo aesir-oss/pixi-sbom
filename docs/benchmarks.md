@@ -218,9 +218,10 @@ tables and Linux counts those pages against it — which reported the measuring 
 binary's peak for every scenario smaller than it. The script records its own resident size beside the results so
 that mistake is visible if it ever comes back.
 
-It runs on demand (`workflow_dispatch`, with an optional base ref), weekly, and on pushes to `main` that touch
-the source, comparing against the latest release tag. It deliberately does **not** run on pull requests: each
-platform builds the binary twice with LTO. Run it by hand on the pull requests where performance is the point.
+It runs on demand (`workflow_dispatch`, with an optional base ref), weekly, and for each release candidate (its
+tag push), comparing against the latest final release: a release candidate's tag is never the base. It
+deliberately does **not** run on pull requests or pushes to `main` (#91): each platform builds the binary twice
+with LTO, and a regression found at the next release candidate is found before it ships. Run it by hand on the pull requests where performance is the point.
 
 The same measurement runs locally, against any two builds:
 
