@@ -316,7 +316,22 @@ release containing them exists; keep `action.yml` inputs and the CLI in step at 
 
 ## Continuous integration
 
-`.github/workflows/ci.yml` runs on pushes to `main` and on pull requests:
+`.github/workflows/ci.yml` runs on pushes to `main` and on pull requests. On `main` every job runs. On a pull
+request, a `What changed` job decides which jobs the change needs (#90), and a final `CI result` job passes when
+every job that ran passed. A job a filter skipped counts as passed, so `CI result` is the one check a pull request
+must pass:
+
+| Pull request changes | Runs |
+|---|---|
+| Rust code, any `Cargo.toml`, `Cargo.lock`, `pixi.toml`, `pixi.lock`, `rustfmt.toml`, `ci.yml` | Tests on Linux, macOS and Windows; coverage, MSRV, benchmarks, release build |
+| Files the tests read: `docs/`, `examples/`, `README.md`, `mkdocs.yml`, `actions/pixi-sbom/action.yml`, the release workflows, `scripts/whats_new.py` | Tests on Linux only |
+| `docs/`, `mkdocs.yml`, the hook, the changelogs, `SECURITY.md` | The docs build |
+| `Cargo.lock`, any `Cargo.toml`, `deny.toml` | Dependency advisories and licenses |
+| `cli.rs`, `main.rs`, `Cargo.lock`, `docs/completion/`, `scripts/completion_e2e.py` | Shell completion on all three |
+| `actions/`, `cli.rs`, `main.rs` | SBOM via action on all five, and the action on a uv project |
+| Anything | Lint and the script tests |
+
+A newer push to a pull request cancels its running CI; on `main` every commit's run completes.
 
 | Job | Runs on | Does |
 |---|---|---|
@@ -326,6 +341,7 @@ release containing them exists; keep `action.yml` inputs and the CLI in step at 
 | Dependency advisories and licenses | ubuntu | `pixi run -e lint deny`: RUSTSEC advisories, license terms, banned crates and unexpected sources |
 | Builds on the MSRV | ubuntu | `pixi run -e msrv msrv-check`: the oldest toolchain `crates/pixi-sbom/Cargo.toml` claims |
 | Benchmarks compile and run | ubuntu | `pixi run bench-test`: every benchmark runs once, untimed, in a debug build |
+| Script tests | ubuntu | The Python scripts' own tests: `action-test`, `perf-test`, `whats-new-test`, `repo-release-test`, `changelog-test` and the rest |
 | Performance (separate workflow) | all five release platforms | `pixi run perf`: builds two refs on one runner and compares them; fails on binary size or peak memory, reports wall time. On demand, weekly and on pushes to `main` — not on pull requests. See [benchmarks.md](benchmarks.md) |
 | Build | same three | `pixi run build` and `--version` smoke test |
 | Docs | ubuntu | `pixi run docs-build`: the site must build with `--strict` |
@@ -352,8 +368,10 @@ The `github-pages` environment's deployment branch policy must allow the `v*` ta
 with "Branch ... is not allowed to deploy to github-pages".
 
 All jobs use `prefix-dev/setup-pixi` with caching, so they run the same pinned toolchain as local development. Every
-CI job that compiles also restores the compiled dependencies with `Swatinem/rust-cache` (#89), keyed by job,
-operating system, toolchain and `Cargo.lock`. Only pushes to `main` save it, so a pull request starts from `main`'s
+CI job that compiles also restores the compiled dependencies with `Swatinem/rust-cache` (#89), keyed by operating
+system, toolchain and `Cargo.lock`. The jobs that compile the same debug build (tests, benchmarks, completion, the
+action's binary) share one cache per operating system; lint, coverage, MSRV and the release build each keep their
+own, since what they compile differs. Only pushes to `main` save it, so a pull request starts from `main`'s
 cache and never writes one of its own: the 10 GB a repository gets holds one set, not one per branch. The release
 workflows use no build cache on purpose: what goes into a signed archive or wheel is compiled from the tag alone. CI
 sticks to the `-latest` labels (x64 Linux and Windows, arm64 macOS) for the jobs that compile and test the code,

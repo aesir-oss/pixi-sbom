@@ -8,9 +8,92 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # A newer push to a pull request replaces the run; every commit on main gets a complete one.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # What a pull request touched, and so which jobs it needs (#90). On main every job runs, whatever
+  # changed. A filter that names .github/workflows/ci.yml runs its jobs whenever this file changes.
+  changes:
+    name: What changed
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+      docs: ${{ steps.filter.outputs.docs }}
+      deps: ${{ steps.filter.outputs.deps }}
+      completion: ${{ steps.filter.outputs.completion }}
+      action: ${{ steps.filter.outputs.action }}
+      test-os: ${{ steps.os.outputs.list }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            code:
+              - "crates/**"
+              - "Cargo.toml"
+              - "Cargo.lock"
+              - "pixi.toml"
+              - "pixi.lock"
+              - "rustfmt.toml"
+              - ".github/workflows/ci.yml"
+            # What the tests read besides code: the pages they run as written, the examples, the release
+            # workflows they check. A change here runs the tests on Linux.
+            read-by-tests:
+              - "docs/**"
+              - "examples/**"
+              - "README.md"
+              - "mkdocs.yml"
+              - "actions/pixi-sbom/action.yml"
+              - ".github/workflows/release.yml"
+              - ".github/workflows/release-artifacts.yml"
+              - "scripts/whats_new.py"
+            docs:
+              - "docs/**"
+              - "mkdocs.yml"
+              - "mkdocs_hooks.py"
+              - "CHANGELOG.md"
+              - "crates/*/CHANGELOG.md"
+              - "SECURITY.md"
+              - ".github/workflows/ci.yml"
+            deps:
+              - "Cargo.lock"
+              - "**/Cargo.toml"
+              - "deny.toml"
+              - ".github/workflows/ci.yml"
+            completion:
+              - "crates/pixi-sbom/src/cli.rs"
+              - "crates/pixi-sbom/src/main.rs"
+              - "Cargo.lock"
+              - "docs/completion/**"
+              - "scripts/completion_e2e.py"
+              - ".github/workflows/ci.yml"
+            action:
+              - "actions/**"
+              - "crates/pixi-sbom/src/cli.rs"
+              - "crates/pixi-sbom/src/main.rs"
+              - ".github/workflows/ci.yml"
+      # On a pull request every OS runs the tests only for code; the files the tests read run them on Linux.
+      - name: Which operating systems test
+        id: os
+        env:
+          ALL: '["ubuntu-latest","macos-latest","windows-latest"]'
+          EVENT: ${{ github.event_name }}
+          CODE: ${{ steps.filter.outputs.code }}
+          READ: ${{ steps.filter.outputs.read-by-tests }}
+        run: |
+          if [ "$EVENT" != "pull_request" ] || [ "$CODE" = "true" ]; then
+            echo "list=$ALL" >> "$GITHUB_OUTPUT"
+          elif [ "$READ" = "true" ]; then
+            echo 'list=["ubuntu-latest"]' >> "$GITHUB_OUTPUT"
+          else
+            echo 'list=[]' >> "$GITHUB_OUTPUT"
+          fi
+
   lint:
     name: Lint
     runs-on: ubuntu-latest
@@ -37,11 +120,13 @@ jobs:
 
   test:
     name: Test (${{ matrix.os }})
+    needs: changes
+    if: ${{ needs.changes.outputs.test-os != '[]' }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: ${{ fromJSON(needs.changes.outputs.test-os) }}
     steps:
       - uses: actions/checkout@v4
       - uses: prefix-dev/setup-pixi@v0.8.1
@@ -53,11 +138,15 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
+          # One debug build per OS, shared by the jobs that compile it: separate copies outgrow the 10 GB.
+          shared-key: debug
       - name: Unit + integration tests
         run: pixi run test
 
   coverage:
     name: Coverage gate
+    needs: changes
+    if: ${{ github.event_name != 'pull_request' || needs.changes.outputs.code == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -78,6 +167,8 @@ jobs:
   # after a merge — supply-chain.yml runs the same check weekly for that.
   deny:
     name: Dependency advisories and licenses
+    needs: changes
+    if: ${{ github.event_name != 'pull_request' || needs.changes.outputs.deps == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -92,6 +183,8 @@ jobs:
   # other job builds on whatever rustc the default environment pins, which is far newer.
   msrv:
     name: Builds on the MSRV
+    needs: changes
+    if: ${{ github.event_name != 'pull_request' || needs.changes.outputs.code == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -112,6 +205,8 @@ jobs:
   # panics on its inputs is a real break and this catches it.
   bench:
     name: Benchmarks compile and run
+    needs: changes
+    if: ${{ github.event_name != 'pull_request' || needs.changes.outputs.code == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -124,8 +219,21 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
+          # One debug build per OS, shared by the jobs that compile it: separate copies outgrow the 10 GB.
+          shared-key: debug
       - name: Every benchmark runs once (debug, test mode)
         run: pixi run bench-test
+
+  # The Python maintenance and release scripts' own tests: no compiling, so every pull request runs them.
+  scripts:
+    name: Script tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: prefix-dev/setup-pixi@v0.8.1
+        with:
+          environments: default
+          cache: true
       # Which release `@v0`, `@v0.12.0` or a branch installs; a wrong answer ships every user the wrong binary.
       - name: The action's version resolution
         run: pixi run action-test
@@ -161,6 +269,8 @@ jobs:
   # runs the shells Windows users have: PowerShell 7 and the Windows PowerShell 5.1 it ships.
   completion:
     name: Shell completion (${{ matrix.os }})
+    needs: changes
+    if: ${{ github.event_name != 'pull_request' || needs.changes.outputs.completion == 'true' }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -177,6 +287,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
+          # One debug build per OS, shared by the jobs that compile it: separate copies outgrow the 10 GB.
+          shared-key: debug
       # conda-forge's zsh is built without zsh/zpty, which driving its completion needs.
       - name: Install zsh
         if: runner.os == 'Linux'
@@ -186,6 +298,8 @@ jobs:
 
   build:
     name: Build (${{ matrix.os }})
+    needs: changes
+    if: ${{ github.event_name != 'pull_request' || needs.changes.outputs.code == 'true' }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -209,6 +323,8 @@ jobs:
 
   docs:
     name: Docs
+    needs: changes
+    if: ${{ github.event_name != 'pull_request' || needs.changes.outputs.docs == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -222,6 +338,8 @@ jobs:
   # Dogfood the GitHub Action: generate this repository's own SBOMs with the released binary.
   sbom:
     name: SBOM via action (${{ matrix.target }})
+    needs: changes
+    if: ${{ github.event_name != 'pull_request' || needs.changes.outputs.action == 'true' }}
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
@@ -307,6 +425,8 @@ jobs:
   # release has. Everything after the download is the action exactly as a user runs it.
   action-head-binary:
     name: Build the binary for the action tests
+    needs: changes
+    if: ${{ github.event_name != 'pull_request' || needs.changes.outputs.action == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -319,6 +439,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
+          # One debug build per OS, shared by the jobs that compile it: separate copies outgrow the 10 GB.
+          shared-key: debug
       # A debug build: what the action is tested with here is its handling of a binary, not the binary's speed.
       - run: pixi run cargo build
       - uses: actions/upload-artifact@v4
@@ -328,7 +450,8 @@ jobs:
 
   action-uv:
     name: Action on a uv project, without pixi
-    needs: action-head-binary
+    needs: [changes, action-head-binary]
+    if: ${{ github.event_name != 'pull_request' || needs.changes.outputs.action == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -398,3 +521,23 @@ jobs:
         run: |
           echo "::error::lockfile and prefix together should have failed"
           exit 1
+
+  # The one check a pull request has to pass: every job that ran passed, and a job a filter skipped
+  # counts as passed. A required status check points here, so a skipped job never leaves one pending.
+  result:
+    name: CI result
+    if: ${{ always() }}
+    needs: [changes, lint, test, coverage, deny, msrv, bench, scripts, completion, build, docs, sbom, action-head-binary, action-uv]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Every job that ran passed
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "$RESULTS"
+          for result in $RESULTS; do
+            case "$result" in
+              success|skipped) ;;
+              *) echo "::error::a job ended $result"; exit 1 ;;
+            esac
+          done
