@@ -62,6 +62,10 @@ Fixed:
 - **A closed pipe is not an error.** `pixi sbom --doctor | head -12`, or any document or report piped into a reader
   that stops early, no longer ends with `Broken pipe` and exit 1: the rest of the output is dropped quietly and the
   exit code is the run's own. ([Exit codes and errors](cli.md#exit-codes-and-errors))
+- **A path or editable package is no longer drift.** pixi locks one with no version and the installed environment
+  knows it, so `--prefix --against pixi.lock` reported a version change for a package that had not changed. A version
+  one side does not know is now no change, as an unknown license already was.
+  ([Does this venv still match its lock?](cli.md#does-this-venv-still-match-its-lock))
 
 ## 1.11.0
 

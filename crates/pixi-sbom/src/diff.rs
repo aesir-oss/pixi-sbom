@@ -521,7 +521,9 @@ pub fn compare(sbom: &Sbom, previous: &Previous, against: &Path) -> Diff {
                     old_build: old_build.clone(),
                     new_build: new_build.clone(),
                 };
-                if before.version != entry.version {
+                if before.version.is_some() && entry.version.is_some() && before.version != entry.version {
+                    // A version one side does not know is not a change either: pixi locks a path
+                    // or editable package with none, its installed dist-info has one (#47).
                     diff.version_changed.push(change);
                 } else if old_build.is_some() && new_build.is_some() && old_build != new_build {
                     diff.build_changed.push(change);
@@ -786,6 +788,31 @@ mod tests {
         // An unchanged environment never fires, whatever was asked for.
         let same = compare(&sample_sbom(), &previous, Path::new("old.cdx.json"));
         assert!(same.gate_hits(&[Any]).is_empty());
+    }
+
+    #[test]
+    fn an_unknown_version_is_no_change_but_two_known_ones_that_differ_are() {
+        // The sample's mylib is a source package: locked with no version, like pixi's path and
+        // editable packages, while the installed environment knows it (#47).
+        let locked = previous_from_sbom(&sample_sbom());
+        assert_eq!(locked.entries.iter().find(|e| e.name == "mylib").unwrap().version, None);
+        let mut installed = sample_sbom();
+        let mylib = installed.packages.iter().position(|p| p.name == "mylib").unwrap();
+        installed.packages[mylib].version = Some("0.1.0".into());
+        let diff = compare(&installed, &locked, Path::new("pixi.lock"));
+        assert!(diff.version_changed.is_empty(), "{:?}", diff.version_changed);
+        assert!(diff.is_empty());
+        assert_eq!(diff.unchanged, 4);
+        // Either side may be the one that does not know.
+        let diff = compare(&sample_sbom(), &previous_from_sbom(&installed), Path::new("x"));
+        assert!(diff.version_changed.is_empty());
+
+        // Two known versions that differ are still a change.
+        let mut newer = installed.clone();
+        newer.packages[mylib].version = Some("0.2.0".into());
+        let diff = compare(&newer, &previous_from_sbom(&installed), Path::new("x"));
+        assert_eq!(diff.version_changed.len(), 1);
+        assert_eq!(diff.version_changed[0].name, "mylib");
     }
 
     #[test]

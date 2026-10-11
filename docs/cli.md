@@ -1626,8 +1626,10 @@ The lockfile is read for the platform the venv was described for (its wheels' pl
 
 - **Seeded tools.** `python -m venv` seeds `pip` (and older Pythons `setuptools`), which no lockfile lists, so they
   show up as `pip` installed; leave them out with `--exclude pip`. A venv `uv` made has none.
-- **Unknown licenses.** A license one side does not know is not a change: a lockfile records none for a PyPI
-  package, while the installed `METADATA` does. Only two known, different licenses are a license change.
+- **Unknown licenses and versions.** A license one side does not know is not a change: a lockfile records none for
+  a PyPI package, while the installed `METADATA` does. Only two known, different licenses are a license change. The
+  same goes for versions: pixi locks a path or editable package (`{ path = "libs/mylib", editable = true }`) with no
+  version, its installed dist-info has one, and only two known, different versions are a version change.
 - **Conda packages.** A side read from something that can only hold PyPI packages — a `uv.lock`, `pylock.toml`,
   `poetry.lock` or `pdm.lock`, a venv, a plain Python installation — says nothing about conda packages. Compared
   with a conda environment or a `pixi.lock`, the comparison covers the PyPI packages, and the conda ones are counted
