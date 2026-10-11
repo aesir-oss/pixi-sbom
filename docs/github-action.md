@@ -1,7 +1,7 @@
 # GitHub Action
 
 Listed on the [GitHub Marketplace](https://github.com/marketplace/actions/pixi-sbom); the source is `action.yml` at
-the root of the [repository](https://github.com/millsks/pixi-sbom).
+the root of the [repository](https://github.com/aesir-oss/pixi-ext-contrib).
 
 This repository doubles as a GitHub Action. It downloads the pinned release binary for the runner (verifying the
 checksum), runs it, and uploads the documents as a workflow artifact; pixi itself is not needed, and neither is
@@ -113,7 +113,7 @@ The `from-sbom` input takes one file; to merge several documents into one, give 
 ## Without the action
 
 The binary has no runtime dependencies, so any job can download it from the
-[releases page](https://github.com/millsks/pixi-sbom/releases) and run it, or install it with pixi:
+[releases page](https://github.com/aesir-oss/pixi-ext-contrib/releases) and run it, or install it with pixi:
 
 ```yaml
 - uses: prefix-dev/setup-pixi@v0.8.1
@@ -183,7 +183,7 @@ steps:
 Each environment and platform is submitted under its own correlator, so a run with `all-environments` keeps every
 environment in the graph. This repository submits its own environments this way, on every push to `main` that
 changes the lockfile or the action:
-[`dependency-graph.yml`](https://github.com/millsks/pixi-sbom/blob/main/.github/workflows/dependency-graph.yml). The submission is a second run of the same inputs with `--format github`; the document,
+[`dependency-graph.yml`](https://github.com/aesir-oss/pixi-ext-contrib/blob/main/.github/workflows/dependency-graph.yml). The submission is a second run of the same inputs with `--format github`; the document,
 gates and artifact of the first are unchanged.
 
 ## Signed SBOMs

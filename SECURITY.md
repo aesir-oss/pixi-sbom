@@ -3,7 +3,7 @@
 ## Reporting a vulnerability
 
 Report it privately through GitHub:
-**[Report a vulnerability](https://github.com/millsks/pixi-sbom/security/advisories/new)**
+**[Report a vulnerability](https://github.com/aesir-oss/pixi-ext-contrib/security/advisories/new)**
 (Security → Advisories → Report a vulnerability). The report is visible only to the maintainers until an advisory
 is published.
 
@@ -98,11 +98,15 @@ came from this repository's release workflow, built from that release's tag on a
 later):
 
 ```sh
-gh attestation verify pixi-sbom-<version>-<platform>.tar.gz --repo millsks/pixi-sbom \
-  --signer-workflow millsks/pixi-sbom/.github/workflows/release-artifacts.yml \
-  --source-ref refs/tags/v<version> \
+gh attestation verify pixi-sbom-<version>-<platform>.tar.gz --repo aesir-oss/pixi-ext-contrib \
+  --signer-workflow aesir-oss/pixi-ext-contrib/.github/workflows/release-artifacts.yml \
+  --source-ref refs/tags/pixi-sbom-v<version> \
   --deny-self-hosted-runners
 ```
 
-See [installation](https://millsks.github.io/pixi-sbom/latest/installation/#checking-where-a-binary-came-from) for
+Releases up to 1.11.x were built in `millsks/pixi-sbom` and tagged `v<version>`: verify those with
+`--repo millsks/pixi-sbom`, and in the strict form `--signer-workflow millsks/pixi-sbom/.github/workflows/release-artifacts.yml`
+and `--source-ref refs/tags/v<version>`.
+
+See [installation](https://aesir-oss.github.io/pixi-ext-contrib/latest/installation/#checking-where-a-binary-came-from) for
 the offline form and why 0.11.0 only passes the plain `--repo` check.

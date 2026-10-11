@@ -10,8 +10,8 @@ Nothing needs installing beyond pixi-sbom itself ([Installation](installation.md
 with a clone:
 
 ```sh
-git clone https://github.com/millsks/pixi-sbom
-cd pixi-sbom
+git clone https://github.com/aesir-oss/pixi-ext-contrib
+cd pixi-ext-contrib
 ```
 
 Every command below runs from there. A test runs each one as written, so they work. The commands marked

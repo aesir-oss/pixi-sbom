@@ -391,7 +391,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   # Trusted publishing: no token, PyPI checks this workflow's OIDC identity against the
-  # publisher registered for the project (repository millsks/pixi-sbom, workflow
+  # publisher registered for the project (repository aesir-oss/pixi-ext-contrib, workflow
   # release-artifacts.yml, and the environment named here). A release candidate goes to
   # TestPyPI, a final release to PyPI, and either only once the GitHub Release is out.
   testpypi:
@@ -440,7 +440,7 @@ jobs:
           attestations: true
           skip-existing: true
 
-  # The pre-commit hooks live in a mirror repository, millsks/pixi-sbom-pre-commit, the way ruff's
+  # The pre-commit hooks live in a mirror repository, aesir-oss/pixi-sbom-pre-commit, the way ruff's
   # do: pre-commit installs a `language: python` hook by `pip install .` of the hook repository,
   # which here would compile pixi-sbom from Rust. The mirror holds only the hooks and a
   # pyproject.toml pinning the wheel of the same version, rendered from crates/pixi-sbom/pre-commit-mirror/ and

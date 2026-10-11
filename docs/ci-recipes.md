@@ -147,13 +147,13 @@ See [reproducibility](output-format.md#reproducibility) for what the guarantee c
 
 ## pre-commit
 
-Two hooks, from the mirror repository [`millsks/pixi-sbom-pre-commit`](https://github.com/millsks/pixi-sbom-pre-commit):
+Two hooks, from the mirror repository [`aesir-oss/pixi-sbom-pre-commit`](https://github.com/aesir-oss/pixi-sbom-pre-commit):
 each of its tags installs the pixi-sbom wheel of the same version from PyPI, so nothing is compiled.
 
 ```yaml
 # .pre-commit-config.yaml
 repos:
-  - repo: https://github.com/millsks/pixi-sbom-pre-commit
+  - repo: https://github.com/aesir-oss/pixi-sbom-pre-commit
     rev: v1.7.0
     hooks:
       # Write sbom.cdx.json next to the lockfile whenever a lockfile changes.

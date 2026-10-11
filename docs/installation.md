@@ -9,7 +9,7 @@ runs it when you type `pixi <name>`. There is no plugin registration; installing
 | Method | Command |
 |---|---|
 | pixi global (recommended) | `pixi global install pixi-sbom` |
-| Prebuilt binary | Download `pixi-sbom-<version>-<platform>.tar.gz` (or `.zip` on Windows) from the [releases page](https://github.com/millsks/pixi-sbom/releases), check its provenance (below), and put `pixi-sbom` on your `PATH` |
+| Prebuilt binary | Download `pixi-sbom-<version>-<platform>.tar.gz` (or `.zip` on Windows) from the [releases page](https://github.com/aesir-oss/pixi-ext-contrib/releases), check its provenance (below), and put `pixi-sbom` on your `PATH` |
 | PyPI | `uvx pixi-sbom` runs it without installing; `uv tool install pixi-sbom` or `pip install pixi-sbom` installs it. The wheels hold the same binary as the release archives (no Python code), for Linux (glibc and musl) x86_64/aarch64, macOS x86_64/arm64 and Windows x86_64, from 1.7.0 on |
 | cargo binstall | `cargo binstall pixi-sbom` downloads the release binary for your platform from GitHub (no compiler needed); `cargo install pixi-sbom` builds it from crates.io instead |
 | From source | `pixi run build` in a clone, then copy `target/release/pixi-sbom` to `~/.pixi/bin/` |
@@ -34,11 +34,11 @@ built by this repository's release workflow, from a named commit, in a named wor
 **0.11.0 onward**; earlier archives have a checksum and nothing else.
 
 ```sh
-gh attestation verify pixi-sbom-<version>-linux-64.tar.gz --repo millsks/pixi-sbom
+gh attestation verify pixi-sbom-<version>-linux-64.tar.gz --repo aesir-oss/pixi-ext-contrib
 ```
 
 The PyPI wheels are attested the same way, from 1.7.0 on: `gh attestation verify pixi_sbom-<version>-py3-none-<platform>.whl
---repo millsks/pixi-sbom` checks a downloaded wheel (`pip download pixi-sbom --no-deps` fetches one), and PyPI shows
+--repo aesir-oss/pixi-ext-contrib` checks a downloaded wheel (`pip download pixi-sbom --no-deps` fetches one), and PyPI shows
 its own publish attestation beside each file.
 
 ```console
@@ -47,8 +47,8 @@ Loaded 1 attestation from GitHub API
 
 The following policy criteria will be enforced:
 - Predicate type must match:................ https://slsa.dev/provenance/v1
-- Source Repository Owner URI must match:... https://github.com/millsks
-- Source Repository URI must match:......... https://github.com/millsks/pixi-sbom
+- Source Repository Owner URI must match:... https://github.com/aesir-oss
+- Source Repository URI must match:......... https://github.com/aesir-oss/pixi-ext-contrib
 
 ✓ Verification succeeded!
 ```
@@ -59,7 +59,7 @@ machine that cannot, pass the bundle that ships with the archive and the check r
 ```sh
 gh attestation verify pixi-sbom-<version>-linux-64.tar.gz \
   --bundle pixi-sbom-<version>-linux-64.tar.gz.sigstore.json \
-  --repo millsks/pixi-sbom
+  --repo aesir-oss/pixi-ext-contrib
 ```
 
 ### The strict form
@@ -68,11 +68,15 @@ gh attestation verify pixi-sbom-<version>-linux-64.tar.gz \
 it came from the release workflow, run on the tag of the version you downloaded, on a GitHub-hosted runner:
 
 ```sh
-gh attestation verify pixi-sbom-<version>-linux-64.tar.gz --repo millsks/pixi-sbom \
-  --signer-workflow millsks/pixi-sbom/.github/workflows/release-artifacts.yml \
-  --source-ref refs/tags/v<version> \
+gh attestation verify pixi-sbom-<version>-linux-64.tar.gz --repo aesir-oss/pixi-ext-contrib \
+  --signer-workflow aesir-oss/pixi-ext-contrib/.github/workflows/release-artifacts.yml \
+  --source-ref refs/tags/pixi-sbom-v<version> \
   --deny-self-hosted-runners
 ```
+
+Releases up to 1.11.x were built in `millsks/pixi-sbom` and tagged `v<version>`: verify those with
+`--repo millsks/pixi-sbom`, and in the strict form `--signer-workflow millsks/pixi-sbom/.github/workflows/release-artifacts.yml`
+and `--source-ref refs/tags/v<version>`.
 
 | Flag | Refuses |
 |---|---|

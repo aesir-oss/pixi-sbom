@@ -9,8 +9,8 @@ Everything runs through [pixi](https://pixi.sh). `pixi.toml` pins the Rust toolc
 every task; `crates/pixi-sbom/Cargo.toml` describes the crate. You do not need rustup or a system Rust.
 
 ```sh
-git clone https://github.com/millsks/pixi-sbom
-cd pixi-sbom
+git clone https://github.com/aesir-oss/pixi-ext-contrib
+cd pixi-ext-contrib
 pixi install          # rust, cargo-llvm-cov, pre-commit, taplo, typos, git-cliff, ...
 pixi run bootstrap    # installs the git pre-commit and commit-msg hooks
 ```
@@ -311,7 +311,7 @@ release containing them exists; keep `action.yml` inputs and the CLI in step at 
 The per-pull-request run cannot see an advisory published after a merge, and the weekly one is what catches it:
 nothing about the repository changes and one day the answer is different.
 
-`.github/workflows/docs.yml` publishes the site to GitHub Pages (https://millsks.github.io/pixi-sbom/) every time
+`.github/workflows/docs.yml` publishes the site to GitHub Pages (https://aesir-oss.github.io/pixi-ext-contrib/) every time
 a release is published, building from the release tag so the site matches the released binary. The site is
 versioned with [mike](https://github.com/jimporter/mike) the way pixi's own docs are: each release deploys under
 its tag (`/v0.5.5/`), `latest` is an alias of the newest non-pre-release version and the root redirects to it, so

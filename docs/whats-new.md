@@ -23,6 +23,20 @@ Since 1.0, pixi-sbom has:
   credentials are used, and `--doctor` says which host is the problem.
 - **Learned tab completion** in bash, zsh, fish and PowerShell, for `pixi-sbom` and `pixi sbom`.
 
+## Unreleased
+
+pixi-sbom has a new home, [aesir-oss/pixi-ext-contrib](https://github.com/aesir-oss/pixi-ext-contrib), a
+workspace for pixi extensions it now shares with the tools to come. Nothing about running it changes.
+
+- **Releases** come from the new repository, tagged `pixi-sbom-v1.12.0` and so on. The archive names, the
+  PyPI and crates.io packages and the conda-forge package are unchanged.
+- **The tool URL in every SBOM** (CycloneDX `metadata.tools`, SPDX 3 `Tool`, the GitHub dependency
+  snapshot's detector) now points at the new repository.
+- **The docs** live at [aesir-oss.github.io/pixi-ext-contrib](https://aesir-oss.github.io/pixi-ext-contrib/).
+- **pre-commit**: point `repo:` at `https://github.com/aesir-oss/pixi-sbom-pre-commit`. The old mirror
+  keeps its existing tags.
+- **The GitHub Action**: `uses: millsks/pixi-sbom@v1` keeps working, and installs releases from either repository.
+
 ## 1.11.0
 
 1.11.0 looks past Python inside a conda environment. R packages, the Go modules compiled into Go programs and the
