@@ -59,6 +59,9 @@ confidence-threshold = 0.9
 # a warning; it stays visible without failing an unrelated pull request.
 multiple-versions = "warn"
 wildcards = "deny"
+# The extensions depend on the shared crate by path with no version (#106): nothing here is published, so there is no
+# registry version to pin. cargo-deny allows that only for crates that are `publish = false`, which all of ours are.
+allow-wildcard-paths = true
 # `deny` here is for a crate we have decided against on purpose. Empty is the honest state:
 # nothing has been ruled out yet.
 deny = []
