@@ -83,16 +83,18 @@ jobs:
           if git show-ref --verify --quiet refs/remotes/origin/gh-pages; then
             git branch --force gh-pages origin/gh-pages
           fi
-          if [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+          # mike versions keep their vX.Y.Z names whichever tag format the release used.
+          VERSION="${TAG#pixi-sbom-}"
+          if [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+ ]]; then
             if [ "$PRERELEASE" = "true" ]; then
-              pixi run -e docs mike deploy "$TAG"
+              pixi run -e docs mike deploy "$VERSION"
               echo "alias=" >> "$GITHUB_OUTPUT"
             else
-              pixi run -e docs mike deploy --update-aliases "$TAG" latest
+              pixi run -e docs mike deploy --update-aliases "$VERSION" latest
               pixi run -e docs mike set-default latest
               echo "alias=latest" >> "$GITHUB_OUTPUT"
             fi
-            echo "version=$TAG" >> "$GITHUB_OUTPUT"
+            echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           else
             pixi run -e docs mike deploy dev
             echo "version=dev" >> "$GITHUB_OUTPUT"

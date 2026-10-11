@@ -59,6 +59,27 @@ class ActionVersionTest(unittest.TestCase):
         # inputs. Nothing in the script is hardcoded to a major, and this is what says so.
         self.assertEqual(self.version(ACTION_REF="v1"), "1.0.0")
 
+    def test_prefixed_exact_tag_pins_that_release(self) -> None:
+        # Releases from the workspace repository are tagged pixi-sbom-vX.Y.Z.
+        self.assertEqual(self.version(ACTION_REF="pixi-sbom-v0.12.0"), "0.12.0")
+
+    def test_prefixed_input_is_accepted(self) -> None:
+        self.assertEqual(self.version(INPUT_VERSION="pixi-sbom-v0.9.5"), "0.9.5")
+
+    def test_prefixed_major_tag_resolves_within_its_major(self) -> None:
+        self.assertEqual(self.version(ACTION_REF="pixi-sbom-v0"), "0.12.0")
+
+    def test_both_release_lists_and_tag_formats_are_read(self) -> None:
+        # 1.11.x and older live in millsks/pixi-sbom as vX.Y.Z; 1.12.0 and newer in the workspace
+        # repository as pixi-sbom-vX.Y.Z. The newest across both wins, in either format.
+        workspace = Path(self.api.removeprefix("file://")).with_name("workspace")
+        workspace.write_text(json.dumps([{"tag_name": "pixi-sbom-v1.2.0"}, {"tag_name": "pixi-sbom-v1.3.0-rc.1"}]))
+        both = f"file://{workspace} {self.api}"
+        self.assertEqual(self.version(RELEASES_API=both, ACTION_REF="v1"), "1.2.0")
+        self.assertEqual(self.version(RELEASES_API=both, ACTION_REF="pixi-sbom-v1"), "1.2.0")
+        self.assertEqual(self.version(RELEASES_API=both, ACTION_REF="v0"), "0.12.0")
+        self.assertEqual(self.version(RELEASES_API=both), "1.2.0")
+
     def test_branch_takes_latest(self) -> None:
         self.assertEqual(self.version(ACTION_REF="main"), "1.0.0")
 

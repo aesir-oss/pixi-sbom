@@ -412,32 +412,35 @@ That is what semver already means by the suffix, and a flag could contradict the
 
 What the two do, in order:
 
-1. **Version and guard.** Finds the latest `v*` tag, computes the next version, and exits quietly (no release) if
+1. **Version and guard.** Finds the latest release tag (`pixi-sbom-vX.Y.Z`; releases up to 1.11.x were tagged
+   plain `vX.Y.Z` and still count), computes the next version, and exits quietly (no release) if
    nothing changed on `main` since that tag. Validates the version and refuses to reuse an existing tag unless
    `force_recreate` is set. For a final release, refuses to go on unless `docs/whats-new.md` has a non-empty
    `## Unreleased` section.
-2. **Bump.** Writes the version into `Cargo.toml`, `Cargo.lock` (via `cargo update --workspace`) and `pixi.toml`.
+2. **Bump.** Writes the version into `crates/pixi-sbom/Cargo.toml`, `Cargo.lock` (via `cargo update --workspace`) and `pixi.toml`.
 3. **Gate.** Runs `pixi run ci` on the bumped tree; a red gate stops the release before anything is pushed.
-4. **Changelog.** Regenerates `CHANGELOG.md` with `git-cliff --tag vX.Y.Z` (`cliff.toml`), renames What's new's
-   `## Unreleased` to `## X.Y.Z` (final releases only), commits the bump, changelog and page as
-   `chore(release): vX.Y.Z`, tags that commit, and pushes both to `main`. It then waits until
+4. **Changelog.** Regenerates `CHANGELOG.md` with `git-cliff --tag pixi-sbom-vX.Y.Z` (`cliff.toml`), renames What's
+   new's `## Unreleased` to `## X.Y.Z` (final releases only), commits the bump, changelog and page as
+   `chore(release): pixi-sbom-vX.Y.Z`, tags that commit, and pushes both to `main`. It then waits until
    `release-artifacts.yml` is visibly running for that tag before going green: a tag that pushed but started
    nothing would otherwise look like a successful release with no binaries behind it.
 
    *`release-artifacts.yml` takes over here, triggered by the tag.*
 
 5. **Build.** Checks out the tag on five runners and builds `pixi-sbom` for linux-64, linux-aarch64, osx-64,
-   osx-arm64 and win-64, packaged with `LICENSE`, `README.md`, `CHANGELOG.md` and a `.sha256` each.
+   osx-arm64 and win-64, packaged with `LICENSE`, pixi-sbom's `README.md`, `CHANGELOG.md` and a `.sha256` each. Archives
+   keep their names, `pixi-sbom-vX.Y.Z-<platform>`, which is now also the tag.
 6. **Attest.** `actions/attest-build-provenance` signs a provenance statement for each archive: what built it, from
    which commit, in which workflow run. It runs on the build runner, before the artifact upload, so the claim covers
    the round trip through artifact storage as well. The statement goes to the repository's attestation store, and
    the Sigstore bundle also ships beside the archive as `.sigstore.json` for anyone verifying offline.
 7. **Publish.** Creates the GitHub release with this version's changelog section (from `git-cliff --latest`) plus an
    artifact table as the notes and the packages as assets, marked pre-release when the tag carries a suffix.
-   A final release then moves the floating major tag (`v0`, later `v1`) to itself, which is what
-   `uses: millsks/pixi-sbom@v1` follows; a rebuild of an older release leaves it alone. `release-artifacts.yml`
-   only triggers on `vX.Y.Z` tags and the version lookups match `vX.Y.Z` only, so the floating tag starts nothing
-   and is never taken for the latest release.
+   A final release then moves the floating major tag (`pixi-sbom-v1`) to itself; a rebuild of an older release
+   leaves it alone. `release-artifacts.yml` only triggers on `pixi-sbom-vX.Y.Z` tags and the version lookups match
+   full versions only, so the floating tag starts nothing and is never taken for the latest release. The action
+   reads releases from both this repository and `millsks/pixi-sbom` (1.11.x and older, tagged `vX.Y.Z`), and
+   downloads each version from the repository that published it.
 8. **Crate.** `publish-crate.yml` (reusable, also dispatchable by hand with a `tag` input to republish) checks the
    tag out clean and runs `cargo publish -p pixi-sbom --locked` with a short-lived token from crates.io trusted
    publishing (`rust-lang/crates-io-auth-action`); no API token is stored. The crate's crates.io settings list
@@ -456,7 +459,8 @@ What the two do, in order:
 
 10. **pre-commit mirror.** After a final release's wheels are on PyPI, the `pre-commit-mirror` job renders
     `pre-commit-mirror/` (the hooks, and a `pyproject.toml` pinning `pixi-sbom==X.Y.Z`) into
-    [`millsks/pixi-sbom-pre-commit`](https://github.com/millsks/pixi-sbom-pre-commit), commits and tags it `vX.Y.Z`.
+    the `pixi-sbom-pre-commit` repository of the same owner, commits and tags it `vX.Y.Z` (the mirror holds
+    pixi-sbom alone, so its tags keep the plain form).
     The hooks cannot live here: pre-commit installs a `language: python` hook by `pip install .` of its repository,
     which here would compile the binary. The mirror repository must exist with the release GitHub App installed on
     it. To try the hooks before a release: `pre-commit-mirror/render.sh 1.7.0 /tmp/mirror`, commit that in a git
@@ -482,7 +486,7 @@ run, the provenance named `refs/heads/main` at the commit the release was dispat
 `chore(release):` bump that the build job then checked out. The v0.11.0 archives are attested to `05fc3c8` although
 they were built from `4029b71` (#218). Following the recorded commit gets you a tree whose `Cargo.toml` still says
 the previous version, which is precisely the question an attestation exists to answer. Triggered by the tag, the
-run being signed *is* the run that built the binaries, and the provenance names `refs/tags/vX.Y.Z` at the right
+run being signed *is* the run that built the binaries, and the provenance names `refs/tags/pixi-sbom-vX.Y.Z` at the right
 commit.
 
 This works because the tag is pushed with the release GitHub App's token. A push made with the default
