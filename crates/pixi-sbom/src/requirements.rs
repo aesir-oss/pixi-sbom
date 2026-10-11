@@ -527,6 +527,7 @@ pub fn build_sbom(
                 yanked: None,
                 properties,
                 dependencies: edges.remove(name).map(|d| d.into_iter().collect()).unwrap_or_default(),
+                occurrences: Vec::new(),
             }
         })
         .collect();

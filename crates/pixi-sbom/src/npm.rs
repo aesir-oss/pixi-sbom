@@ -15,7 +15,7 @@ use std::path::Path;
 
 use serde::Deserialize;
 
-use crate::embedded::SOURCE_PROPERTY;
+use crate::embedded::{SOURCE_PROPERTY, source_path};
 use crate::model::{Package, PackageKind, Sbom};
 
 /// What `pixi:embedded-sbom` says of a package found in a `node_modules` directory.
@@ -256,6 +256,7 @@ pub fn attach(sbom: &mut Sbom, prefix: &Path) -> Outcome {
             Some(&existing) => {
                 outcome.merged += 1;
                 record_source(&mut sbom.packages[existing], &source);
+                sbom.packages[existing].add_occurrence(source_path(&source));
             }
             None => {
                 by_id.insert(id.clone(), sbom.packages.len());
@@ -345,6 +346,7 @@ fn to_package(installed: &Installed, purl: &str, source: &str) -> Package {
         yanked: None,
         properties,
         dependencies: Vec::new(),
+        occurrences: vec![source_path(source).to_string()],
     }
 }
 
@@ -526,6 +528,14 @@ mod tests {
         assert_eq!((outcome.added, outcome.merged), (4, 1));
         let semver = sbom.packages.iter().find(|p| p.purl == "pkg:npm/semver@7.6.3").unwrap();
         assert_eq!(semver.properties[SOURCE_PROPERTY].split(';').count(), 2);
+        assert_eq!(
+            semver.occurrences,
+            [
+                "lib/node_modules/npm/node_modules/semver",
+                "lib/node_modules/tool/node_modules/semver"
+            ],
+            "every copy, sorted"
+        );
     }
 
     #[test]

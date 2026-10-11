@@ -411,6 +411,7 @@ pub(crate) mod testing {
                         ("pixi:subdir".to_string(), "linux-64".to_string()),
                     ]),
                     dependencies: vec![],
+                    occurrences: Vec::new(),
                 },
                 Package {
                     id: zlib_id.into(),
@@ -445,6 +446,7 @@ pub(crate) mod testing {
                     yanked: None,
                     properties: BTreeMap::from([("pixi:channel".to_string(), "conda-forge".to_string())]),
                     dependencies: vec![libzlib_id.into()],
+                    occurrences: Vec::new(),
                 },
                 Package {
                     id: src_id.into(),
@@ -470,6 +472,7 @@ pub(crate) mod testing {
                     yanked: None,
                     properties: BTreeMap::new(),
                     dependencies: vec![zlib_id.into()],
+                    occurrences: Vec::new(),
                 },
                 Package {
                     id: six_id.into(),
@@ -495,6 +498,7 @@ pub(crate) mod testing {
                     yanked: None,
                     properties: BTreeMap::from([("pixi:requires-python".to_string(), ">=2.7".to_string())]),
                     dependencies: vec![],
+                    occurrences: Vec::new(),
                 },
             ],
             vulnerabilities: Vec::new(),

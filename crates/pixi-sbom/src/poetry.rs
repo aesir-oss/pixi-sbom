@@ -463,6 +463,7 @@ fn convert(locked: &PoetryPackage, platform: &str, python: &str) -> Result<Packa
         yanked: None,
         properties,
         dependencies: Vec::new(),
+        occurrences: Vec::new(),
     };
     purl::identify_pypi_source(&mut package)?;
     Ok(package)

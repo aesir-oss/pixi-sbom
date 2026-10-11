@@ -600,6 +600,7 @@ fn convert(package: &LockedPackage, platform: &str, python: &str) -> Result<Pack
         yanked: None,
         properties,
         dependencies: Vec::new(),
+        occurrences: Vec::new(),
     };
     purl::identify_pypi_source(&mut package)?;
     Ok(package)

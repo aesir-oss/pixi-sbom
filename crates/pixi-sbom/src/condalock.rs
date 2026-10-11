@@ -356,6 +356,7 @@ pub(crate) fn conda_package(
         yanked: None,
         properties,
         dependencies: Vec::new(),
+        occurrences: Vec::new(),
     })
 }
 
@@ -383,6 +384,7 @@ fn pip(entry: &LockedPackage) -> Result<Package, CondaLockError> {
         yanked: None,
         properties: BTreeMap::new(),
         dependencies: Vec::new(),
+        occurrences: Vec::new(),
     })
 }
 

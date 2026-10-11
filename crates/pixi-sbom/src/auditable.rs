@@ -17,7 +17,7 @@ use std::path::Path;
 
 use serde::Deserialize;
 
-use crate::embedded::SOURCE_PROPERTY;
+use crate::embedded::{SOURCE_PROPERTY, source_path};
 use crate::model::{Package, PackageKind, Sbom};
 use crate::progress::Progress;
 
@@ -247,6 +247,7 @@ fn attach(
             Some(&existing) => {
                 outcome.merged += 1;
                 record_source(&mut sbom.packages[existing], source);
+                sbom.packages[existing].add_occurrence(source_path(source));
             }
             None => {
                 let mut package = to_package(crate_, source);
@@ -330,6 +331,7 @@ fn to_package(crate_: &Crate, source: &str) -> Package {
         yanked: None,
         properties,
         dependencies: Vec::new(),
+        occurrences: vec![source_path(source).to_string()],
     }
 }
 
@@ -461,6 +463,11 @@ mod tests {
             by_name("zlib").dependencies
         );
         assert_eq!(by_name("zlib").properties[SOURCE_PROPERTY], "cargo-auditable:bin/rg");
+        assert_eq!(grep.occurrences, ["bin/rg"], "the binary the crate was found in");
+        assert!(
+            by_name("zlib").occurrences.is_empty(),
+            "the package that ships it is not in the binary"
+        );
         assert_eq!(
             by_name("ripgrep").dependencies,
             ["pkg:cargo/grep@0.3.1"],

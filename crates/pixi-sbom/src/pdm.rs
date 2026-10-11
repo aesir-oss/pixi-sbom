@@ -421,6 +421,7 @@ fn convert(locked: &PdmPackage, platform: &str, python: &str) -> Result<Package,
         yanked: None,
         properties,
         dependencies: Vec::new(),
+        occurrences: Vec::new(),
     };
     purl::identify_pypi_source(&mut package)?;
     Ok(package)

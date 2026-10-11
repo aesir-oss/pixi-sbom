@@ -3747,6 +3747,134 @@ fn installed_prefix() -> tempfile::TempDir {
     dir
 }
 
+#[test]
+fn prefix_records_where_each_component_was_found() {
+    let run = |dir: &Path, prefix: &Path, args: &[&str]| -> Vec<u8> {
+        pixi_sbom()
+            .current_dir(dir)
+            .env("SOURCE_DATE_EPOCH", "0")
+            .env("PIXI_SBOM_OFFLINE", "1")
+            .arg("--prefix")
+            .arg(prefix)
+            .args(args)
+            .assert()
+            .success()
+            .get_output()
+            .stdout
+            .clone()
+    };
+    let one = installed_prefix();
+    let one_prefix = one.path().join("envs").join("demo");
+    let two = tempfile::tempdir().unwrap();
+    let two_prefix = two.path().join("somewhere").join("else").join("demo");
+    copy_dir(&one_prefix, &two_prefix);
+
+    let doc: Value = serde_json::from_slice(&run(one.path(), &one_prefix, &["--output", "-"])).unwrap();
+    assert_valid(&cyclonedx_validator(), &doc);
+    let occurrences = |doc: &Value, name: &str| -> Vec<String> {
+        let component = doc["components"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|c| c["name"] == name)
+            .unwrap();
+        component["evidence"]["occurrences"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|o| o["location"].as_str().unwrap().to_string())
+            .collect()
+    };
+    // Relative to the prefix: the conda-meta record of a conda package, the dist-info of a pip one.
+    assert_eq!(
+        occurrences(&doc, "libzlib"),
+        ["conda-meta/libzlib-1.3.2-h25fd6f3_3.json"]
+    );
+    assert_eq!(
+        occurrences(&doc, "six"),
+        ["lib/python3.12/site-packages/six-1.17.0.dist-info"]
+    );
+    let doc_1_7: Value = serde_json::from_slice(&run(
+        one.path(),
+        &one_prefix,
+        &["--output", "-", "--spec-version", "1.7"],
+    ))
+    .unwrap();
+    assert_valid(&cyclonedx_1_7_validator(), &doc_1_7);
+    assert_eq!(occurrences(&doc_1_7, "six"), occurrences(&doc, "six"));
+
+    // The same environment somewhere else is described the same way.
+    let elsewhere: Value = serde_json::from_slice(&run(two.path(), &two_prefix, &["--output", "-"])).unwrap();
+    assert_eq!(elsewhere["components"], doc["components"]);
+
+    // --from-sbom keeps what it reads.
+    let source = one.path().join("installed.cdx.json");
+    std::fs::write(&source, serde_json::to_vec(&doc).unwrap()).unwrap();
+    let read_back: Value = serde_json::from_slice(
+        &pixi_sbom()
+            .current_dir(one.path())
+            .env("SOURCE_DATE_EPOCH", "0")
+            .arg("--from-sbom")
+            .arg(&source)
+            .args(["--output", "-"])
+            .assert()
+            .success()
+            .get_output()
+            .stdout
+            .clone(),
+    )
+    .unwrap();
+    assert_eq!(occurrences(&read_back, "libzlib"), occurrences(&doc, "libzlib"));
+
+    // A package found somewhere else is the same package to --report diff.
+    let mut moved = doc.clone();
+    for component in moved["components"].as_array_mut().unwrap() {
+        component["evidence"] = serde_json::json!({"occurrences": [{"location": "moved/elsewhere"}]});
+    }
+    let previous = one.path().join("previous.cdx.json");
+    std::fs::write(&previous, serde_json::to_vec(&moved).unwrap()).unwrap();
+    let report: Value = serde_json::from_slice(&run(
+        one.path(),
+        &one_prefix,
+        &[
+            "--report",
+            "diff",
+            "--against",
+            previous.to_str().unwrap(),
+            "--report-format",
+            "json",
+        ],
+    ))
+    .unwrap();
+    for section in [
+        "added",
+        "removed",
+        "version_changed",
+        "license_changed",
+        "build_changed",
+        "pip_installed",
+    ] {
+        assert!(report[section].as_array().unwrap().is_empty(), "{section}: {report}");
+    }
+    assert_eq!(report["unchanged"], doc["components"].as_array().unwrap().len());
+
+    // A lockfile has no paths.
+    let dir = workspace("with-pypi");
+    let locked = pixi_sbom()
+        .current_dir(dir.path())
+        .args(["-e", "web", "-p", "linux-64", "--output", "-"])
+        .assert()
+        .success();
+    let locked: Value = serde_json::from_slice(&locked.get_output().stdout).unwrap();
+    assert!(
+        locked["components"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|c| c.get("evidence").is_none())
+    );
+}
+
 fn copy_dir(from: &Path, to: &Path) {
     std::fs::create_dir_all(to).unwrap();
     for entry in std::fs::read_dir(from).unwrap() {

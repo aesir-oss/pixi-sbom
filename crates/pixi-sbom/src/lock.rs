@@ -375,6 +375,7 @@ fn convert_conda(conda: &CondaPackageData) -> Result<Package, LockError> {
         yanked: None,
         properties,
         dependencies: Vec::new(),
+        occurrences: Vec::new(),
     })
 }
 
@@ -500,6 +501,7 @@ fn convert_pypi(pypi: &PypiPackageData) -> Result<Package, LockError> {
         yanked: None,
         properties,
         dependencies: Vec::new(),
+        occurrences: Vec::new(),
     };
     purl::identify_pypi_source(&mut package)?;
     Ok(package)

@@ -83,6 +83,7 @@ conda source, PyPI), then name, then version.
 | License | `licenses[]` (see below) | `licenseDeclared` (see below); `licenseConcluded` and `copyrightText` are `NOASSERTION` |
 | License file names, summary, URLs (`--fetch-licenses`) | `pixi:license-file` properties, `description`, `externalReferences[]` | `licenseComments`, `summary`, `homepage` |
 | License texts (`--license-texts`) | `licenses[].license.text` | `hasExtractedLicensingInfos` for `LicenseRef-` licenses |
+| Where it was found (`--prefix` only) | `evidence.occurrences[].location`, relative to the environment (see [Installed environments](#installed-environments)) | not written: SPDX 2.3 and 3.0.1 have no field for it |
 | Everything else | `properties[]` with `pixi:` names | `comment`: one `key=value` per line |
 | `filesAnalyzed` | | always `false` (no archive is opened) |
 
@@ -375,6 +376,14 @@ CycloneDX metadata property, a line of the SPDX root package's comment). A plain
 `python` at that version, `pkg:generic/python@<version>`, with `pixi:interpreter=true`, and CPython's CPE when the
 full `X.Y.Z` is known (a CPE for a bare `X.Y` would match releases that already have the fix). A venv's interpreter
 lives outside it, and a conda environment lists its `python` package, so neither gets one.
+
+Each component says where the environment holds it, in CycloneDX `evidence.occurrences`, with paths relative to
+the environment and `/` separators. A conda package gives its record, `conda-meta/<name>-<version>-<build>.json`, and
+not its files: the record lists them. A pip-installed package gives its `dist-info` directory, a crate or Go module
+the binary it was read from, a vendored distribution its `dist-info` under `_vendor`, and an npm package its
+directory. A component found in several places lists each. A lockfile has no paths, so a document made from one
+has no occurrences. `--from-sbom` keeps the occurrences it reads, and `--report diff` ignores them: a package that
+moved is the same package. SPDX has no field for this, and the SPDX documents leave it out.
 
 With `--verify-files`, each conda package whose record lists file hashes carries `pixi:verified-files`, the number of
 its files checked, and where they apply `pixi:modified-files` and `pixi:missing-files` (comma-separated paths relative

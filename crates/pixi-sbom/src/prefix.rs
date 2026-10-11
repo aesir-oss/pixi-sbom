@@ -496,6 +496,9 @@ pub fn build_sbom(prefix: &Path, root: Root, platform: Option<&str>) -> Result<S
             *subdirs.entry(subdir.to_string()).or_default() += 1;
         }
         let mut package = conda_package(&record)?;
+        if let Some(occurrence) = relative_to(prefix, &path) {
+            package.add_occurrence(&occurrence);
+        }
         if let Some((purl, dist_info)) = installed_pypi_identity(prefix, &record) {
             if !package.extra_purls.contains(&purl) {
                 package.extra_purls.push(purl);
@@ -517,9 +520,12 @@ pub fn build_sbom(prefix: &Path, root: Root, platform: Option<&str>) -> Result<S
     let dist_infos = dist_infos(prefix);
     for dist_info in &dist_infos {
         // Without conda records, nothing else lists what conda installed: every dist-info counts.
-        let Some((package, requires)) = pypi_package(dist_info, layout == Layout::Conda)? else {
+        let Some((mut package, requires)) = pypi_package(dist_info, layout == Layout::Conda)? else {
             continue;
         };
+        if let Some(occurrence) = relative_to(prefix, dist_info) {
+            package.add_occurrence(&occurrence);
+        }
         packages.push(package);
         declared.push(DeclaredDeps::Pypi(requires));
     }
@@ -551,6 +557,7 @@ pub fn build_sbom(prefix: &Path, root: Root, platform: Option<&str>) -> Result<S
             yanked: None,
             properties: BTreeMap::from([(INTERPRETER_PROPERTY.to_string(), "true".to_string())]),
             dependencies: Vec::new(),
+            occurrences: Vec::new(),
         });
         declared.push(DeclaredDeps::Pypi(Vec::new()));
     }
@@ -695,7 +702,19 @@ fn conda_package(record: &Record) -> Result<Package, PrefixError> {
         yanked: None,
         properties,
         dependencies: Vec::new(),
+        occurrences: Vec::new(),
     })
+}
+
+/// `path` relative to `prefix`, with `/` separators whatever the platform, so a document says the
+/// same of one environment wherever it lives.
+pub fn relative_to(prefix: &Path, path: &Path) -> Option<String> {
+    let rest = path.strip_prefix(prefix).ok()?;
+    let parts: Vec<String> = rest
+        .components()
+        .map(|part| part.as_os_str().to_string_lossy().into_owned())
+        .collect();
+    (!parts.is_empty()).then(|| parts.join("/"))
 }
 
 /// Marks the component a plain Python installation's interpreter is described by.
@@ -877,6 +896,9 @@ pub fn attach_vendored(sbom: &mut Sbom, prefix: &Path) -> VendoredOutcome {
                             sbom.packages.len() - 1
                         }
                     };
+                    if let Some(occurrence) = relative_to(prefix, &dist) {
+                        sbom.packages[index].add_occurrence(&occurrence);
+                    }
                     let id = sbom.packages[index].id.clone();
                     if let Some(&owner) = owners.get(&top_name) {
                         let deps = &mut sbom.packages[owner].dependencies;
@@ -980,6 +1002,7 @@ fn vendored_package(id: &str, purl: &str, name: &str, version: &str, source: &st
         yanked: None,
         properties: BTreeMap::from([(crate::embedded::SOURCE_PROPERTY.to_string(), source.to_string())]),
         dependencies: Vec::new(),
+        occurrences: Vec::new(),
     }
 }
 
@@ -1119,6 +1142,7 @@ fn pypi_package(dist_info: &Path, conda_records: bool) -> Result<Option<(Package
         yanked: None,
         properties,
         dependencies: Vec::new(),
+        occurrences: Vec::new(),
     };
     purl::identify_pypi_source(&mut package)?;
     // PEP 376: pip and uv leave an empty REQUESTED file in what was asked for by name.
@@ -1222,6 +1246,13 @@ mod tests {
 
         let python = sbom.packages.iter().find(|p| p.name == "python").unwrap();
         assert_eq!(python.kind, PackageKind::CondaBinary);
+        assert_eq!(
+            python.occurrences,
+            ["conda-meta/python-3.12.14-h5f976f7_3_cpython.json"],
+            "one path per conda package: its record"
+        );
+        let six = sbom.packages.iter().find(|p| p.name == "six").unwrap();
+        assert_eq!(six.occurrences, ["lib/python3.12/site-packages/six-1.17.0.dist-info"]);
         assert_eq!(
             python.purl,
             "pkg:conda/python@3.12.14?build=h5f976f7_3_cpython&channel=conda-forge&subdir=linux-64&type=conda"
@@ -1380,6 +1411,18 @@ mod tests {
         assert_eq!(
             vendored.properties[crate::embedded::SOURCE_PROPERTY],
             "vendored:pkg_resources/_vendor;vendored:setuptools/_vendor"
+        );
+        assert_eq!(
+            vendored.occurrences.len(),
+            2,
+            "both vendored dist-infos: {:?}",
+            vendored.occurrences
+        );
+        assert!(
+            vendored
+                .occurrences
+                .iter()
+                .all(|o| o.ends_with("_vendor/packaging-26.0.dist-info"))
         );
         assert_eq!(
             find("pkg:pypi/packaging@26.3").kind,

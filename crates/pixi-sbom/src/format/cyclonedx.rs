@@ -202,6 +202,19 @@ struct Component {
     external_references: Vec<ExternalReference>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     properties: Vec<Property>,
+    /// Where an installed environment holds the component (`--prefix`); absent for a lockfile.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    evidence: Option<Evidence>,
+}
+
+#[derive(Debug, Serialize)]
+struct Evidence {
+    occurrences: Vec<Occurrence>,
+}
+
+#[derive(Debug, Serialize)]
+struct Occurrence {
+    location: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -546,6 +559,7 @@ fn tool_component(ctx: &WriteContext) -> Component {
             url: env!("CARGO_PKG_REPOSITORY").into(),
         }],
         properties: vec![],
+        evidence: None,
     }
 }
 
@@ -565,6 +579,7 @@ fn root_component(sbom: &Sbom) -> Component {
         licenses: root.license.as_deref().and_then(license_choice).into_iter().collect(),
         external_references: project_references(root.homepage.as_deref(), root.repository.as_deref(), None),
         properties: vec![],
+        evidence: None,
     }
 }
 
@@ -666,6 +681,15 @@ fn component(package: &Package) -> Component {
             ))
             .collect(),
         properties,
+        evidence: (!package.occurrences.is_empty()).then(|| Evidence {
+            occurrences: package
+                .occurrences
+                .iter()
+                .map(|location| Occurrence {
+                    location: location.clone(),
+                })
+                .collect(),
+        }),
     }
 }
 

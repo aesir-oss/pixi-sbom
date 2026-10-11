@@ -18,6 +18,12 @@ use crate::wheel;
 /// Property naming the wheel and file a component came from.
 pub const SOURCE_PROPERTY: &str = "pixi:embedded-sbom";
 
+/// The path in a `<kind>:<path>` source of an installed environment's reader (`cargo-auditable:bin/rg`),
+/// which is where the environment holds the component.
+pub fn source_path(source: &str) -> &str {
+    source.split_once(':').map_or(source, |(_, path)| path)
+}
+
 /// Counts from one pass.
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct Outcome {
@@ -56,6 +62,9 @@ pub struct Component {
     pub cpe: Option<String>,
     /// References of the components this one depends on.
     pub depends_on: Vec<String>,
+    /// Where the document says an installed environment holds the component (CycloneDX
+    /// `evidence.occurrences`). Read back by `--from-sbom`; a wheel's own fragment's paths are its build's, not ours.
+    pub occurrences: Vec<String>,
     /// The `pixi:*` facts the document records, which is how a document this tool wrote keeps
     /// its channel, build string and declared-dependency marks when it is read back.
     pub properties: BTreeMap<String, String>,
@@ -118,6 +127,19 @@ struct CdxComponent {
     author: Option<String>,
     #[serde(default)]
     cpe: Option<String>,
+    #[serde(default)]
+    evidence: Option<CdxEvidence>,
+}
+
+#[derive(Deserialize)]
+struct CdxEvidence {
+    #[serde(default)]
+    occurrences: Vec<CdxOccurrence>,
+}
+
+#[derive(Deserialize)]
+struct CdxOccurrence {
+    location: String,
 }
 
 #[derive(Deserialize)]
@@ -207,6 +229,11 @@ fn parse_cyclonedx(text: &str) -> Option<Fragment> {
             supplier,
             cpe: c.cpe.clone().filter(|cpe| !cpe.trim().is_empty()),
             depends_on: deps.get(reference.as_str()).map(|d| (*d).clone()).unwrap_or_default(),
+            occurrences: c
+                .evidence
+                .iter()
+                .flat_map(|e| e.occurrences.iter().map(|o| o.location.clone()))
+                .collect(),
             reference,
             name: c.name.clone(),
             version: c.version.clone(),
@@ -406,6 +433,8 @@ fn parse_spdx(text: &str) -> Option<Fragment> {
                 .find(|r| r.reference_type == "cpe23Type" || r.reference_type == "cpe22Type")
                 .map(|r| r.reference_locator.clone()),
             reference: p.spdx_id.clone(),
+            // SPDX has no field for where an installed environment holds a package.
+            occurrences: Vec::new(),
             name: p.name.clone(),
             version: p.version_info.clone(),
             purl: p
@@ -598,6 +627,7 @@ fn to_package(component: &Component, id: String, source: &str) -> Package {
         yanked: None,
         properties: BTreeMap::from([(SOURCE_PROPERTY.to_string(), source.to_string())]),
         dependencies: Vec::new(),
+        occurrences: Vec::new(),
     }
 }
 

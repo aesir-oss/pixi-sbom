@@ -573,6 +573,7 @@ fn convert(locked: &UvPackage, member: bool, platform: &str, python: &str) -> Re
         yanked: None,
         properties,
         dependencies: Vec::new(),
+        occurrences: Vec::new(),
     };
     purl::identify_pypi_source(&mut package)?;
     Ok(package)

@@ -138,6 +138,7 @@ mod tests {
             yanked: None,
             properties: BTreeMap::new(),
             dependencies: Vec::new(),
+            occurrences: Vec::new(),
         }
     }
 

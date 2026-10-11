@@ -17,7 +17,7 @@
 use std::collections::{BTreeMap, HashMap};
 use std::path::Path;
 
-use crate::embedded::SOURCE_PROPERTY;
+use crate::embedded::{SOURCE_PROPERTY, source_path};
 use crate::model::{Package, PackageKind, Sbom};
 use crate::progress::Progress;
 
@@ -216,6 +216,7 @@ fn attach(
             Some(&existing) => {
                 outcome.merged += 1;
                 record_source(&mut sbom.packages[existing], source);
+                sbom.packages[existing].add_occurrence(source_path(source));
             }
             None => {
                 by_id.insert(id.clone(), sbom.packages.len());
@@ -296,6 +297,7 @@ fn to_package(module: &Module, source: &str) -> Package {
         yanked: None,
         properties: BTreeMap::from([(SOURCE_PROPERTY.to_string(), source.to_string())]),
         dependencies: Vec::new(),
+        occurrences: vec![source_path(source).to_string()],
     }
 }
 
@@ -440,5 +442,6 @@ pub(crate) mod tests {
             stdlib.properties[SOURCE_PROPERTY],
             "go-buildinfo:bin/yq;go-buildinfo:bin/yq2"
         );
+        assert_eq!(stdlib.occurrences, ["bin/yq", "bin/yq2"]);
     }
 }

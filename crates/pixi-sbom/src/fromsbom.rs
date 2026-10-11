@@ -349,6 +349,7 @@ fn packages_of(text: &str, value: &serde_json::Value) -> Option<Vec<Package>> {
                             )
                             .collect(),
                         dependencies,
+                        occurrences: c.occurrences.clone(),
                     }
                 })
                 .collect(),
@@ -383,6 +384,7 @@ fn packages_of(text: &str, value: &serde_json::Value) -> Option<Vec<Package>> {
                     yanked: None,
                     properties: std::collections::BTreeMap::new(),
                     dependencies: Vec::new(),
+                    occurrences: Vec::new(),
                 }
             })
             .collect(),

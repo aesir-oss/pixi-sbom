@@ -57,6 +57,7 @@ fn root_package(input: &Input, top_level: Vec<String>) -> Package {
         yanked: None,
         properties,
         dependencies: top_level,
+        occurrences: Vec::new(),
     }
 }
 

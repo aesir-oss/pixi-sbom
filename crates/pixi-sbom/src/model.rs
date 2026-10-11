@@ -460,6 +460,19 @@ pub struct Package {
     pub properties: BTreeMap<String, String>,
     /// Ids of packages in the same [`Sbom`] this package depends on. Sorted, deduplicated.
     pub dependencies: Vec<String>,
+    /// Where an installed environment holds the package, relative to its prefix with `/`
+    /// separators: a conda-meta record, a dist-info directory, a binary. Empty for a lockfile,
+    /// which has no paths. Sorted, deduplicated.
+    pub occurrences: Vec<String>,
+}
+
+impl Package {
+    /// Record one more place the package was found, keeping the list sorted and deduplicated.
+    pub fn add_occurrence(&mut self, path: &str) {
+        if let Err(at) = self.occurrences.binary_search_by(|p| p.as_str().cmp(path)) {
+            self.occurrences.insert(at, path.to_string());
+        }
+    }
 }
 
 impl Package {
@@ -511,6 +524,37 @@ mod tests {
         };
         assert!(!stale.is_empty());
         assert!(stale.step_names().is_empty(), "nothing failed; data was only old");
+    }
+
+    #[test]
+    fn occurrences_stay_sorted_and_unique() {
+        let mut package = Package {
+            id: "pkg:cargo/rg@14.1.0".into(),
+            name: "rg".into(),
+            version: Some("14.1.0".into()),
+            kind: PackageKind::Embedded,
+            purl: "pkg:cargo/rg@14.1.0".into(),
+            supplier: None,
+            extra_purls: Vec::new(),
+            purls_from_lock: true,
+            location: String::new(),
+            sha256: None,
+            md5: None,
+            license: None,
+            license_files: Vec::new(),
+            description: None,
+            homepage: None,
+            repository: None,
+            documentation: None,
+            yanked: None,
+            properties: BTreeMap::new(),
+            dependencies: Vec::new(),
+            occurrences: Vec::new(),
+        };
+        for path in ["bin/b", "bin/a", "bin/b"] {
+            package.add_occurrence(path);
+        }
+        assert_eq!(package.occurrences, ["bin/a", "bin/b"]);
     }
 
     #[test]
