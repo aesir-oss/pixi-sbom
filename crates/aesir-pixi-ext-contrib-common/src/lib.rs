@@ -10,5 +10,7 @@
 
 pub mod license;
 pub mod license_policy;
+pub mod lockfile;
 pub mod pipe;
+pub mod purl;
 pub mod style;

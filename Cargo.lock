@@ -24,6 +24,9 @@ dependencies = [
  "anstyle",
  "clap",
  "comfy-table",
+ "packageurl",
+ "rattler_conda_types",
+ "rattler_lock",
  "spdx",
  "tracing",
 ]

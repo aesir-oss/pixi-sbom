@@ -1,18 +1,23 @@
 //! Converts one environment/platform of a `pixi.lock` into the [`Sbom`] model.
+//!
+//! Reading the lockfile is the shared crate's (`common::lockfile`, #58): what each package is, as the lockfile states
+//! it, and the edges between packages. This module turns those facts into the SBOM model: the `pixi:*` properties,
+//! suppliers, the PyPI source identities and the extras each package was asked for.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::Path;
 
+use common::lockfile::{self as facts, BuildSource, Fact, Kind, ReadError};
 use miette::Diagnostic;
-use rattler_conda_types::{PackageName, PackageRecord};
-use rattler_lock::{
-    CondaPackageData, GitShallowSpec, LockFile, LockedPackage, PackageBuildSource, PackageHashes, PypiPackageData,
-    UrlOrPath,
-};
+use rattler_lock::LockFile;
 use thiserror::Error;
 
 use crate::model::{Package, PackageKind, Root, Sbom, Supplier};
-use crate::purl::{self, CondaPurl};
+use crate::purl;
+
+/// The dependency names one package declares, before they are matched to packages present in the same environment.
+pub(crate) use common::lockfile::Declared as DeclaredDeps;
+pub(crate) use common::lockfile::local_path_reference;
 
 /// The highest `pixi.lock` `version:` this build understands, from the lockfile reader it is
 /// compiled against, so the help text cannot drift from what the reader accepts.
@@ -79,6 +84,25 @@ pub enum LockError {
     Purl(#[from] purl::PurlError),
 }
 
+impl From<ReadError> for LockError {
+    fn from(err: ReadError) -> Self {
+        match err {
+            ReadError::EnvironmentNotFound { name, available } => LockError::EnvironmentNotFound { name, available },
+            ReadError::PlatformNotFound {
+                platform,
+                environment,
+                available,
+            } => LockError::PlatformNotFound {
+                platform,
+                environment,
+                available,
+            },
+            ReadError::UnknownCurrentPlatform => LockError::UnknownCurrentPlatform,
+            ReadError::Purl(err) => LockError::Purl(err.into()),
+        }
+    }
+}
+
 /// What to extract from the lockfile.
 #[derive(Debug, Clone)]
 pub struct Selection<'a> {
@@ -119,22 +143,12 @@ pub fn parse(contents: String, base_dir: Option<&Path>, origin: &str) -> Result<
 
 /// Names of every environment in the lockfile: `default` first, the rest alphabetical.
 pub fn environment_names(lock: &LockFile) -> Vec<String> {
-    let mut names: Vec<String> = lock.environments().map(|(name, _)| name.to_string()).collect();
-    names.sort_by_key(|name| (name != "default", name.clone()));
-    names
+    facts::environment_names(lock)
 }
 
 /// Names of every platform `environment` is locked for, alphabetical.
 pub fn platform_names(lock: &LockFile, environment: &str) -> Result<Vec<String>, LockError> {
-    let environment = lock
-        .environment(environment)
-        .ok_or_else(|| LockError::EnvironmentNotFound {
-            name: environment.to_string(),
-            available: lock.environments().map(|(name, _)| name.to_string()).collect(),
-        })?;
-    let mut names: Vec<String> = environment.platforms().map(|p| p.name().to_string()).collect();
-    names.sort();
-    Ok(names)
+    Ok(facts::platform_names(lock, environment)?)
 }
 
 /// Parse `path` and build the SBOM model for the selected environment/platform.
@@ -165,43 +179,32 @@ pub fn sbom_from_lock_with_extras(
     lockfile_name: &str,
     manifest_extras: &BTreeMap<String, BTreeSet<String>>,
 ) -> Result<Sbom, LockError> {
-    let environment = lock
-        .environment(selection.environment)
-        .ok_or_else(|| LockError::EnvironmentNotFound {
-            name: selection.environment.to_string(),
-            available: lock.environments().map(|(name, _)| name.to_string()).collect(),
-        })?;
-
-    let platform_name = match selection.platform {
-        Some(name) => name.to_string(),
-        None => current_platform_name()?,
-    };
-    let platform = environment
-        .platforms()
-        .find(|platform| platform.name().as_str() == platform_name)
-        .ok_or_else(|| LockError::PlatformNotFound {
-            platform: platform_name.clone(),
-            environment: selection.environment.to_string(),
-            available: environment.platforms().map(|p| p.name().to_string()).collect(),
-        })?;
-
-    let locked: Vec<&LockedPackage> = environment
-        .packages(platform)
-        .map(Iterator::collect)
-        .unwrap_or_default();
+    let read = facts::read(lock, selection.environment, selection.platform)?;
     tracing::info!(
         environment = selection.environment,
-        platform = %platform_name,
-        packages = locked.len(),
+        platform = %read.platform,
+        packages = read.packages.len(),
         "selected lock environment"
     );
 
-    let mut packages = locked
+    let mut packages = read
+        .packages
         .iter()
-        .map(|package| convert_package(package))
+        .map(convert_package)
         .collect::<Result<Vec<_>, _>>()?;
-    resolve_dependencies(&locked, &mut packages);
-    record_extras(&locked, &mut packages, manifest_extras);
+    // Edges by id, sorted, as `link_dependencies` gives them for every other reader.
+    let ids: Vec<String> = packages.iter().map(|p| p.id.clone()).collect();
+    for (package, fact) in packages.iter_mut().zip(&read.packages) {
+        package.dependencies = fact
+            .dependencies
+            .iter()
+            .map(|&to| ids[to].clone())
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .filter(|dep| dep != &package.id)
+            .collect();
+    }
+    record_extras(&read.packages, &mut packages, manifest_extras);
     for package in &mut packages {
         if let Some(raw) = &package.license
             && common::license::is_rewritten(raw)
@@ -214,7 +217,7 @@ pub fn sbom_from_lock_with_extras(
     Ok(Sbom {
         root,
         environment: selection.environment.to_string(),
-        platform: platform_name,
+        platform: read.platform,
         lockfile: lockfile_name.to_string(),
         prefix: None,
         document: None,
@@ -230,144 +233,82 @@ pub fn sbom_from_lock_with_extras(
     })
 }
 
-fn current_platform_name() -> Result<String, LockError> {
-    rattler_conda_types::Platform::current()
-        .map(|platform| platform.to_string())
-        .ok_or(LockError::UnknownCurrentPlatform)
-}
-
-fn convert_package(package: &LockedPackage) -> Result<Package, LockError> {
-    match package {
-        LockedPackage::Conda(conda) => convert_conda(conda),
-        LockedPackage::Pypi(pypi) => convert_pypi(pypi),
+fn convert_package(fact: &Fact) -> Result<Package, LockError> {
+    match fact.kind {
+        Kind::Pypi => convert_pypi(fact),
+        Kind::CondaBinary | Kind::CondaSource => Ok(convert_conda(fact)),
     }
 }
 
-fn convert_conda(conda: &CondaPackageData) -> Result<Package, LockError> {
-    let name = conda.name().as_source().to_string();
-    let mut location = location_string(conda.location());
-    let record = conda.record();
-    let version = record.map(|record| record.version.as_str().into_owned());
+fn convert_conda(fact: &Fact) -> Package {
     let mut properties = BTreeMap::new();
-    let mut sha256 = record.and_then(|r| r.sha256.as_ref()).map(hex);
-    let mut license = record.and_then(|r| r.license.clone());
-    let lock_purls = record.and_then(|record| record.purls.as_ref());
-    let mut purls_from_lock = lock_purls.is_some();
-    let mut extra_purls: Vec<String> = lock_purls
-        .map(|purls| purls.iter().map(ToString::to_string).collect())
-        .unwrap_or_default();
-
     let mut supplier = None;
-    let (kind, channel, subdir, archive_type, build) = match conda {
-        CondaPackageData::Binary(binary) => {
-            let channel_url = binary.channel.as_ref().map(|c| c.url().to_string());
-            let channel = channel_url
-                .as_deref()
-                .and_then(purl::channel_name_from_url)
-                .map(str::to_string);
-            if let Some(url) = &channel_url {
-                properties.insert("pixi:channel-url".into(), url.clone());
-            }
-            supplier = channel.as_ref().map(|name| Supplier {
-                name: name.clone(),
-                url: channel_url.clone(),
-            });
-            let file_name = binary.file_name.to_string();
-            let archive_type = purl::archive_type_from_file_name(&file_name).map(str::to_string);
-            properties.insert("pixi:file-name".into(), file_name);
-            (
-                PackageKind::CondaBinary,
-                channel,
-                Some(binary.package_record.subdir.clone()),
-                archive_type,
-                Some(binary.package_record.build.clone()),
-            )
+    if fact.kind == Kind::CondaBinary {
+        if let Some(url) = &fact.channel_url {
+            properties.insert("pixi:channel-url".into(), url.clone());
         }
-        CondaPackageData::Source(source) => {
-            if let Some(hash) = &source.identifier_hash {
-                properties.insert("pixi:identifier-hash".into(), hash.clone());
-            }
-            if let Some(partial) = source.metadata.as_partial() {
-                license = partial.license.clone();
-                purls_from_lock = partial.purls.is_some();
-                extra_purls = partial
-                    .purls
-                    .as_ref()
-                    .map(|purls| purls.iter().map(ToString::to_string).collect())
-                    .unwrap_or_default();
-            }
-            if let Some(build_source) = &source.package_build_source {
-                let resolved = describe_build_source(build_source, &mut properties);
-                location = resolved.location;
-                sha256 = resolved.sha256.or(sha256);
-            }
-            (
-                PackageKind::CondaSource,
-                None,
-                record.map(|r| r.subdir.clone()),
-                None,
-                record.map(|r| r.build.clone()).filter(|b| !b.is_empty()),
-            )
+        supplier = fact.channel.as_ref().map(|name| Supplier {
+            name: name.clone(),
+            url: fact.channel_url.clone(),
+        });
+        if let Some(file_name) = &fact.file_name {
+            properties.insert("pixi:file-name".into(), file_name.clone());
         }
-    };
-
-    if let Some(channel) = &channel {
+    } else {
+        if let Some(hash) = &fact.identifier_hash {
+            properties.insert("pixi:identifier-hash".into(), hash.clone());
+        }
+        if let Some(source) = &fact.build_source {
+            describe_build_source(source, &mut properties);
+        }
+    }
+    if let Some(channel) = &fact.channel {
         properties.insert("pixi:channel".into(), channel.clone());
     }
-    if let Some(subdir) = &subdir {
+    if let Some(subdir) = &fact.subdir {
         properties.insert("pixi:subdir".into(), subdir.clone());
     }
-    if let Some(build) = &build {
+    if let Some(build) = &fact.build {
         properties.insert("pixi:build".into(), build.clone());
     }
-    if let Some(record) = record {
-        add_record_properties(record, &mut properties);
-    }
-
-    // pixi writes `purls:` as bare names — `pkg:pypi/click?source=compressed-mapping` — because
-    // the mapping behind them is name to name. A purl with no version is a name, not an identity:
-    // OSV cannot query it, and because the entry exists at all the mapping pass skips the package
-    // (see `mapping::enrich`), so nothing later supplies what is missing. The version is in this
-    // same lock entry, so fill it in here and the rest of the run has something to work with.
-    if let Some(version) = version.as_deref() {
-        for stated in &mut extra_purls {
-            if let Some(versioned) = purl::with_version(stated, version) {
-                *stated = versioned;
-            }
+    if let Some(build_number) = fact.build_number {
+        properties.insert("pixi:build-number".into(), build_number.to_string());
+        if let Some(family) = &fact.license_family {
+            properties.insert("pixi:license-family".into(), family.clone());
         }
-    } else if extra_purls.iter().any(|p| !p.contains('@')) {
-        // No version to fill in with. Say so, because the alternative is a package that quietly
-        // never gets asked about.
+        if let Some(size) = fact.size {
+            properties.insert("pixi:size".into(), size.to_string());
+        }
+        if fact.noarch {
+            properties.insert("pixi:noarch".into(), "true".into());
+        }
+    }
+    // pixi writes `purls:` as bare names, and the facts fill in the entry's own version. With no version to fill
+    // in, say so, because the alternative is a package that quietly never gets asked about.
+    if fact.version.is_none() && fact.stated_purls.iter().any(|p| !p.contains('@')) {
         tracing::warn!(
-            package = %name,
+            package = %fact.name,
             "the lockfile states a PyPI purl with no version and the entry has no version either; \
              vulnerability lookups cannot query this package"
         );
     }
-
-    let purl = purl::conda(CondaPurl {
-        name: &name,
-        version: version.as_deref(),
-        build: build.as_deref(),
-        channel: channel.as_deref(),
-        subdir: subdir.as_deref(),
-        archive_type: archive_type.as_deref(),
-    })?;
-
-    Ok(Package {
-        id: purl.clone(),
-        name,
-        version,
-        kind,
-        purl,
+    Package {
+        id: fact.purl.clone(),
+        name: fact.name.clone(),
+        version: fact.version.clone(),
+        kind: match fact.kind {
+            Kind::CondaSource => PackageKind::CondaSource,
+            _ => PackageKind::CondaBinary,
+        },
+        purl: fact.purl.clone(),
         supplier,
-        extra_purls,
-        purls_from_lock,
-        location,
-        sha256,
-        md5: record.and_then(|r| r.md5.as_ref()).map(hex),
+        extra_purls: fact.stated_purls.clone(),
+        purls_from_lock: fact.purls_from_lock,
+        location: fact.location.clone(),
+        sha256: fact.sha256.clone(),
+        md5: fact.md5.clone(),
         sha512: None,
-        license,
+        license: fact.license.clone(),
         license_files: Vec::new(),
         description: None,
         homepage: None,
@@ -377,99 +318,62 @@ fn convert_conda(conda: &CondaPackageData) -> Result<Package, LockError> {
         properties,
         dependencies: Vec::new(),
         occurrences: Vec::new(),
-    })
+    }
 }
 
-struct BuildSourceInfo {
-    location: String,
-    sha256: Option<String>,
-}
-
-/// Turn a pixi-build source spec into a download location (VCS form for git) and
-/// `pixi:source-*` properties.
-fn describe_build_source(source: &PackageBuildSource, properties: &mut BTreeMap<String, String>) -> BuildSourceInfo {
+/// A pixi-build source spec as `pixi:source-*` properties.
+fn describe_build_source(source: &BuildSource, properties: &mut BTreeMap<String, String>) {
     match source {
-        PackageBuildSource::Git { url, spec, rev, subdir } => {
-            properties.insert("pixi:source-git".into(), url.to_string());
+        BuildSource::Git {
+            url,
+            rev,
+            branch,
+            tag,
+            subdir,
+        } => {
+            properties.insert("pixi:source-git".into(), url.clone());
             properties.insert("pixi:source-rev".into(), rev.clone());
-            match spec {
-                Some(GitShallowSpec::Branch(branch)) => {
-                    properties.insert("pixi:source-branch".into(), branch.clone());
-                }
-                Some(GitShallowSpec::Tag(tag)) => {
-                    properties.insert("pixi:source-tag".into(), tag.clone());
-                }
-                Some(GitShallowSpec::Rev) | None => {}
+            if let Some(branch) = branch {
+                properties.insert("pixi:source-branch".into(), branch.clone());
+            }
+            if let Some(tag) = tag {
+                properties.insert("pixi:source-tag".into(), tag.clone());
             }
             if let Some(subdir) = subdir {
-                properties.insert("pixi:source-subdirectory".into(), subdir.to_string());
-            }
-            let scheme = if url.as_str().starts_with("git+") { "" } else { "git+" };
-            let subpath = subdir.as_ref().map(|s| format!("#{s}")).unwrap_or_default();
-            BuildSourceInfo {
-                location: format!("{scheme}{url}@{rev}{subpath}"),
-                sha256: None,
+                properties.insert("pixi:source-subdirectory".into(), subdir.clone());
             }
         }
-        PackageBuildSource::Url { url, sha256, subdir } => {
-            properties.insert("pixi:source-url".into(), url.to_string());
+        BuildSource::Url { url, subdir, .. } => {
+            properties.insert("pixi:source-url".into(), url.clone());
             if let Some(subdir) = subdir {
-                properties.insert("pixi:source-subdirectory".into(), subdir.to_string());
-            }
-            BuildSourceInfo {
-                location: url.to_string(),
-                sha256: Some(hex(sha256)),
+                properties.insert("pixi:source-subdirectory".into(), subdir.clone());
             }
         }
-        PackageBuildSource::Path { path } => {
-            properties.insert("pixi:source-path".into(), path.to_string());
-            BuildSourceInfo {
-                location: path.to_string(),
-                sha256: None,
-            }
+        BuildSource::Path { path } => {
+            properties.insert("pixi:source-path".into(), path.clone());
         }
     }
 }
 
-fn add_record_properties(record: &PackageRecord, properties: &mut BTreeMap<String, String>) {
-    properties.insert("pixi:build-number".into(), record.build_number.to_string());
-    if let Some(family) = &record.license_family {
-        properties.insert("pixi:license-family".into(), family.clone());
-    }
-    if let Some(size) = record.size {
-        properties.insert("pixi:size".into(), size.to_string());
-    }
-    if !record.noarch.is_none() {
-        properties.insert("pixi:noarch".into(), "true".into());
-    }
-}
-
-fn convert_pypi(pypi: &PypiPackageData) -> Result<Package, LockError> {
-    let name = pypi.name().to_string();
-    let version = pypi.version().map(ToString::to_string);
-    let purl = purl::pypi(&name, version.as_deref().unwrap_or("0"))?;
+fn convert_pypi(fact: &Fact) -> Result<Package, LockError> {
     let mut properties = BTreeMap::new();
-    let hashes = pypi.as_wheel().and_then(|wheel| wheel.hash.as_ref());
     let mut supplier = None;
-    if let Some(index) = pypi.as_wheel().and_then(|wheel| wheel.index_url.as_ref()) {
-        properties.insert("pixi:index-url".into(), index.to_string());
+    if let Some(index) = &fact.index_url {
+        properties.insert("pixi:index-url".into(), index.clone());
         supplier = Some(Supplier {
-            name: index
-                .host_str()
-                .map(str::to_string)
-                .unwrap_or_else(|| index.to_string()),
-            url: Some(index.to_string()),
+            name: fact.index_host.clone().unwrap_or_else(|| index.clone()),
+            url: Some(index.clone()),
         });
     }
-    if let Some(requires_python) = pypi.requires_python() {
-        properties.insert("pixi:requires-python".into(), requires_python.to_string());
+    if let Some(requires_python) = &fact.requires_python {
+        properties.insert("pixi:requires-python".into(), requires_python.clone());
     }
-    if pypi.as_source().is_some() {
+    if fact.sdist {
         properties.insert("pixi:source".into(), "true".into());
     }
     // A git checkout or a local path, recorded as the other readers record them. A URL without
     // an index could be either an archive or an index wheel from an older lockfile, so it stays.
-    let location = location_string(pypi.location().inner());
+    let location = fact.location.clone();
     if let Some(git) = location.strip_prefix("git+") {
         let (rest, commit) = git.split_once('#').unwrap_or((git, ""));
         let repository = rest.split('?').next().unwrap_or(rest);
@@ -477,22 +381,22 @@ fn convert_pypi(pypi: &PypiPackageData) -> Result<Package, LockError> {
         if !commit.is_empty() {
             properties.insert("pixi:source-rev".into(), commit.to_string());
         }
-    } else if matches!(pypi.location().inner(), UrlOrPath::Path(_)) || location.starts_with("file://") {
+    } else if fact.location_is_path || location.starts_with("file://") {
         properties.insert("pixi:direct-url".into(), location.clone());
     }
 
     let mut package = Package {
-        id: purl.clone(),
-        name,
-        version,
+        id: fact.purl.clone(),
+        name: fact.name.clone(),
+        version: fact.version.clone(),
         kind: PackageKind::Pypi,
-        purl,
+        purl: fact.purl.clone(),
         supplier,
         extra_purls: Vec::new(),
         purls_from_lock: true,
         location,
-        sha256: hashes.and_then(PackageHashes::sha256).map(hex),
-        md5: hashes.and_then(PackageHashes::md5).map(hex),
+        sha256: fact.sha256.clone(),
+        md5: fact.md5.clone(),
         sha512: None,
         license: None,
         license_files: Vec::new(),
@@ -509,72 +413,8 @@ fn convert_pypi(pypi: &PypiPackageData) -> Result<Package, LockError> {
     Ok(package)
 }
 
-fn hex(bytes: impl AsRef<[u8]>) -> String {
-    bytes.as_ref().iter().map(|b| format!("{b:02x}")).collect()
-}
-
-/// A package location as a valid URI reference: URLs as they are, absolute local paths as
-/// `file://` URLs (a Windows path such as `D:\x\y.conda` is not a URI), relative paths with
-/// forward slashes.
-fn location_string(location: &UrlOrPath) -> String {
-    match location {
-        UrlOrPath::Url(url) => url.to_string(),
-        UrlOrPath::Path(path) => local_path_reference(path.as_ref()),
-    }
-}
-
-pub(crate) fn local_path_reference(path: &str) -> String {
-    let forward = path.replace('\\', "/");
-    let drive =
-        forward.as_bytes().get(1) == Some(&b':') && forward.as_bytes().first().is_some_and(u8::is_ascii_alphabetic);
-    if forward.starts_with('/') {
-        format!("file://{forward}")
-    } else if drive {
-        format!("file:///{forward}")
-    } else {
-        forward
-    }
-}
-
-/// Name of the conda package that provides the interpreter every PyPI package runs on.
-const PYTHON: &str = "python";
-
-/// Fill in `dependencies` on every package by resolving declared requirements
-/// against the packages that are actually present in the environment. The solver
-/// already picked one package per name, so resolution is by normalized name. Every
-/// PyPI package additionally depends on the environment's conda `python` package,
-/// which wheels never declare but cannot run without.
-/// The dependency names one package declares, before they are matched to packages present in
-/// the same environment.
-pub(crate) enum DeclaredDeps {
-    /// Conda matchspecs (`libzlib >=1.3`, `__glibc >=2.17`).
-    Conda(Vec<String>),
-    /// PEP 508 requirement names.
-    Pypi(Vec<String>),
-}
-
-fn resolve_dependencies(locked: &[&LockedPackage], packages: &mut [Package]) {
-    let declared: Vec<DeclaredDeps> = locked
-        .iter()
-        .map(|package| match package {
-            LockedPackage::Conda(conda) => DeclaredDeps::Conda(conda.depends().to_vec()),
-            LockedPackage::Pypi(pypi) => DeclaredDeps::Pypi(
-                pypi.requires_dist()
-                    .iter()
-                    .map(|req| req.name.as_ref().to_string())
-                    .collect(),
-            ),
-        })
-        .collect();
-    link_dependencies(packages, &declared);
-}
-
 /// Which extras each PyPI package was asked for, and which packages are present only for one.
-fn record_extras(
-    locked: &[&LockedPackage],
-    packages: &mut [Package],
-    manifest_extras: &BTreeMap<String, BTreeSet<String>>,
-) {
+fn record_extras(facts: &[Fact], packages: &mut [Package], manifest_extras: &BTreeMap<String, BTreeSet<String>>) {
     let by_name: HashMap<String, String> = packages
         .iter()
         .filter(|p| p.kind == PackageKind::Pypi)
@@ -587,18 +427,19 @@ fn record_extras(
         }
     }
     let mut gates: Vec<(String, String, String, String)> = Vec::new();
-    for (locked, package) in locked.iter().zip(packages.iter()) {
-        let LockedPackage::Pypi(pypi) = locked else { continue };
-        for requirement in pypi.requires_dist() {
-            let Some(to) = by_name.get(&purl::normalize_pypi_name(requirement.name.as_ref())) else {
+    for (fact, package) in facts.iter().zip(packages.iter()) {
+        if fact.kind != Kind::Pypi {
+            continue;
+        }
+        for requirement in &fact.requirements {
+            let Some(to) = by_name.get(&purl::normalize_pypi_name(&requirement.name)) else {
                 continue;
             };
             if !package.dependencies.contains(to) {
                 continue;
             }
-            extras.request(to, requirement.extras.iter().map(ToString::to_string));
-            let marker = requirement.marker.try_to_string().unwrap_or_default();
-            for extra in crate::extras::gating_extras(&marker) {
+            extras.request(to, requirement.extras.iter().cloned());
+            for extra in crate::extras::gating_extras(&requirement.marker) {
                 gates.push((package.id.clone(), package.name.clone(), extra, to.clone()));
             }
         }
@@ -614,54 +455,22 @@ fn record_extras(
     extras.apply(packages);
 }
 
-/// Match each package's declared dependencies (same order as `packages`) to the packages
-/// present: conda names against conda packages, PyPI names against PyPI then conda packages
-/// (pixi satisfies PyPI requirements from conda when it can), virtual packages dropped, and
-/// every PyPI package attached to the environment's `python`. Self-edges are removed.
+/// Match each package's declared dependencies (same order as `packages`) to the packages present, as
+/// `common::lockfile::link` does, giving each package its edges as sorted ids, never its own.
 pub(crate) fn link_dependencies(packages: &mut [Package], declared: &[DeclaredDeps]) {
-    let conda_ids: HashMap<String, &str> = packages
+    let entries: Vec<(String, bool)> = packages
         .iter()
-        .filter(|p| p.kind != PackageKind::Pypi)
-        .map(|p| {
-            (
-                PackageName::new_unchecked(p.name.to_lowercase())
-                    .as_normalized()
-                    .to_string(),
-                p.id.as_str(),
-            )
-        })
+        .map(|p| (p.name.clone(), p.kind == PackageKind::Pypi))
         .collect();
-    let pypi_ids: HashMap<String, &str> = packages
-        .iter()
-        .filter(|p| p.kind == PackageKind::Pypi)
-        .map(|p| (purl::normalize_pypi_name(&p.name), p.id.as_str()))
-        .collect();
-
-    let resolved: Vec<Vec<String>> = declared
-        .iter()
-        .map(|deps| match deps {
-            DeclaredDeps::Conda(specs) => specs
-                .iter()
-                .map(|spec| PackageName::normalized_name_from_matchspec_str(spec).into_owned())
-                .filter(|dep| !dep.starts_with("__"))
-                .filter_map(|dep| conda_ids.get(&dep).map(|id| (*id).to_string()))
-                .collect::<BTreeSet<_>>()
-                .into_iter()
-                .collect(),
-            DeclaredDeps::Pypi(names) => names
-                .iter()
-                .map(|name| purl::normalize_pypi_name(name))
-                .filter_map(|dep| pypi_ids.get(&dep).or_else(|| conda_ids.get(&dep)))
-                .chain(conda_ids.get(PYTHON))
-                .map(|id| (*id).to_string())
-                .collect::<BTreeSet<_>>()
-                .into_iter()
-                .collect(),
-        })
-        .collect();
-
-    for (package, deps) in packages.iter_mut().zip(resolved) {
-        package.dependencies = deps.into_iter().filter(|dep| dep != &package.id).collect();
+    let ids: Vec<String> = packages.iter().map(|p| p.id.clone()).collect();
+    for (package, edges) in packages.iter_mut().zip(facts::link(&entries, declared)) {
+        package.dependencies = edges
+            .into_iter()
+            .map(|to| ids[to].clone())
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .filter(|dep| dep != &package.id)
+            .collect();
     }
 }
 
@@ -1056,7 +865,7 @@ mod tests {
 
     #[test]
     fn pypi_packages_without_python_in_environment_get_no_extra_edge() {
-        // Hand-built: a PyPI package in an environment with no conda python.
+        // A PyPI package linked in an environment with no conda python.
         let sbom = build_sbom(&fixture("with-pypi"), select("web", "linux-64"), root()).unwrap();
         let mut packages: Vec<Package> = sbom
             .packages
@@ -1064,15 +873,19 @@ mod tests {
             .filter(|p| p.kind == PackageKind::Pypi)
             .cloned()
             .collect();
-        let locked = load(&fixture("with-pypi")).unwrap().lock;
-        let env = locked.environment("web").unwrap();
-        let platform = env.platforms().find(|p| p.name().as_str() == "linux-64").unwrap();
-        let pypi_only: Vec<&LockedPackage> = env
-            .packages(platform)
-            .unwrap()
-            .filter(|p| matches!(p, LockedPackage::Pypi(_)))
+        let lock = load(&fixture("with-pypi")).unwrap().lock;
+        let read = facts::read(&lock, "web", Some("linux-64")).unwrap();
+        let declared: Vec<DeclaredDeps> = packages
+            .iter()
+            .map(|p| {
+                read.packages
+                    .iter()
+                    .find(|f| f.kind == Kind::Pypi && f.name == p.name)
+                    .map(|f| f.declared.clone())
+                    .unwrap()
+            })
             .collect();
-        resolve_dependencies(&pypi_only, &mut packages);
+        link_dependencies(&mut packages, &declared);
         assert!(
             packages
                 .iter()
@@ -1081,32 +894,32 @@ mod tests {
     }
 
     #[test]
-    fn describe_build_source_covers_git_branch_and_subdir() {
+    fn describe_build_source_records_git_branch_and_subdir() {
         let mut properties = BTreeMap::new();
-        let source = PackageBuildSource::Git {
-            url: "https://example.com/repo.git".parse().unwrap(),
-            spec: Some(GitShallowSpec::Branch("main".into())),
+        let source = BuildSource::Git {
+            url: "https://example.com/repo.git".into(),
             rev: "abc".into(),
+            branch: Some("main".into()),
+            tag: None,
             subdir: Some("sub/dir".into()),
         };
-        let info = describe_build_source(&source, &mut properties);
-        assert_eq!(info.location, "git+https://example.com/repo.git@abc#sub/dir");
+        describe_build_source(&source, &mut properties);
+        assert_eq!(properties["pixi:source-git"], "https://example.com/repo.git");
+        assert_eq!(properties["pixi:source-rev"], "abc");
         assert_eq!(properties["pixi:source-branch"], "main");
         assert_eq!(properties["pixi:source-subdirectory"], "sub/dir");
 
         let mut properties = BTreeMap::new();
-        let source = PackageBuildSource::Git {
-            url: "git+ssh://git@example.com/repo.git".parse().unwrap(),
-            spec: Some(GitShallowSpec::Rev),
+        let source = BuildSource::Git {
+            url: "git+ssh://git@example.com/repo.git".into(),
             rev: "abc".into(),
+            branch: None,
+            tag: Some("v1".into()),
             subdir: None,
         };
-        let info = describe_build_source(&source, &mut properties);
-        assert_eq!(
-            info.location, "git+ssh://git@example.com/repo.git@abc",
-            "existing git+ prefix kept"
-        );
+        describe_build_source(&source, &mut properties);
         assert!(!properties.contains_key("pixi:source-branch"));
+        assert_eq!(properties["pixi:source-tag"], "v1");
     }
 
     #[test]
