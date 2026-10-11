@@ -23,7 +23,7 @@ Since 1.0, pixi-sbom has:
   credentials are used, and `--doctor` says which host is the problem.
 - **Learned tab completion** in bash, zsh, fish and PowerShell, for `pixi-sbom` and `pixi sbom`.
 
-## Unreleased
+## 1.13.0
 
 **Every environment in a container image, in one command.** `--scan` now finds installed environments as well as
 lockfiles: a conda environment, a venv or a Python installation anywhere under the directory, each named by its path
