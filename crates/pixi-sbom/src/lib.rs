@@ -92,6 +92,8 @@ pub mod outdated;
 pub mod pdm;
 pub mod phantom;
 #[doc(hidden)]
+pub mod pipe;
+#[doc(hidden)]
 pub mod pkgcache;
 pub mod poetry;
 #[doc(hidden)]

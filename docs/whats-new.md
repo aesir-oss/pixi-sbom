@@ -57,6 +57,12 @@ And JavaScript projects:
   `--skip-input` leaves out any lockfile, so `--skip-input javascript` gives the workspace alone and
   `--skip-input pixi` the JavaScript project alone. ([Reading JavaScript lockfiles](cli.md#reading-javascript-lockfiles))
 
+Fixed:
+
+- **A closed pipe is not an error.** `pixi sbom --doctor | head -12`, or any document or report piped into a reader
+  that stops early, no longer ends with `Broken pipe` and exit 1: the rest of the output is dropped quietly and the
+  exit code is the run's own. ([Exit codes and errors](cli.md#exit-codes-and-errors))
+
 ## 1.11.0
 
 1.11.0 looks past Python inside a conda environment. R packages, the Go modules compiled into Go programs and the

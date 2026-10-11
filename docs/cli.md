@@ -2271,6 +2271,7 @@ pixi sbom --all-environments --all-platforms --output sboms/
 |---|---|
 | 0 | Document(s) written. |
 | 1 | A runtime error; a diagnostic is printed to stderr. |
+| 2 | Command-line usage error (unknown option, conflicting options such as `--output -` with `--all-environments` or `--all-platforms`, or a `--spec-version` of the other format, or a `--allow-license` / `--deny-license` value that is not an SPDX identifier). |
 | 3 | The license policy was violated; the documents were written and the violations listed on stderr. |
 | 4 | The vulnerability gate (`--fail-on-severity` / `--fail-on-kev` / `--fail-on-epss`) failed; the documents were written and the findings listed on stderr. |
 | 6 | `--fail-on-diff` found a change it was asked to gate on; the report was printed and the sections listed on stderr. |
@@ -2290,7 +2291,10 @@ Exiting 3 (license policy); the others would have been 4.
 
 The precedence is the order of the table above: the license policy first, then vulnerabilities, yanked releases,
 phantom imports, the comparison, scorecards, and quality last.
-| 2 | Command-line usage error (unknown option, conflicting options such as `--output -` with `--all-environments` or `--all-platforms`, or a `--spec-version` of the other format, or a `--allow-license` / `--deny-license` value that is not an SPDX identifier). |
+
+A reader that closes standard output early, as `pixi sbom --doctor | head -12` does, ends the output, not the run:
+the rest is dropped, nothing is printed about the pipe, and the exit code is the one the run decides (0, `--doctor`'s
+1, or a gate's).
 
 Runtime diagnostics carry a stable code you can grep for in CI logs:
 
@@ -2298,6 +2302,8 @@ Runtime diagnostics carry a stable code you can grep for in CI logs:
 |---|---|---|
 | `pixi_sbom::discover::not_found` | No `pixi.lock` in the current directory or any parent | Run `pixi lock` in the workspace, or pass `--lockfile` |
 | `pixi_sbom::discover::missing` | `--lockfile` points at a file that does not exist | Check the path |
+| `pixi_sbom::discover::all_skipped` | `--skip-input` left out every lockfile in the nearest directory (or every directory of a `--scan`) | Drop one of the `--skip-input` values, or pass `--lockfile` |
+| `pixi_sbom::discover::skipped` | `--lockfile` names a lockfile a `--skip-input` value covers | Drop that value, or name another lockfile |
 | `pixi_sbom::lock::parse` | The lockfile is not valid, or is newer than this build understands | Regenerate with `pixi lock`; upgrade `pixi-sbom` if the lockfile `version:` is newer than 7 |
 | `pixi_sbom::lock::environment` | `--environment` names something not in the lockfile | The message lists the available environments |
 | `pixi_sbom::lock::platform` | The chosen platform is not locked for that environment | The message lists the locked platforms; pass `-p` |

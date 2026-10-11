@@ -7,7 +7,7 @@
 use pixi_sbom::{
     auditable, batch, bundled, cache, cli, concurrency, condaarchive, condalock, config, cran, diff, discover, doctor,
     embedded, epss, explain, explicit, filter, format, fromsbom, gobuild, http, imports, jslock, kev, license, lock,
-    manifest, mapping, merge, mirror, model, npm, osv, outdated, pdm, phantom, pkgcache, poetry, policy, prefix,
+    manifest, mapping, merge, mirror, model, npm, osv, outdated, pdm, phantom, pipe, pkgcache, poetry, policy, prefix,
     progress, pylock, pypi, report, requirements, scorecard, style, timings, uv, verify, vexin, vulnpolicy, wheel,
 };
 
@@ -67,7 +67,7 @@ fn main() -> Result<()> {
     init_error_reporting()?;
     // `--version -v`: the block a bug report needs, before anything else happens.
     if args.version_details {
-        let mut stdout = std::io::stdout().lock();
+        let mut stdout = pipe::stdout();
         write!(stdout, "{}", environment_banner()).into_diagnostic()?;
         stdout.flush().into_diagnostic()?;
         return Ok(());
@@ -195,7 +195,8 @@ fn main() -> Result<()> {
     }
     if args.doctor {
         let palette = style::Palette::new(args.color.enabled());
-        let mut stdout = std::io::stdout().lock();
+        // Unbuffered, so each probe's line shows as it answers.
+        let mut stdout = pipe::Quiet::new(std::io::stdout().lock());
         let healthy = run_doctor(
             &network,
             &config_layers,
@@ -981,7 +982,7 @@ fn main() -> Result<()> {
         let palette = style::Palette::new(args.color.enabled());
         // Buffered for the same reason the document is: the JSON and SARIF reports are
         // written straight out rather than assembled into a string first.
-        let mut stdout = std::io::BufWriter::new(std::io::stdout().lock());
+        let mut stdout = pipe::stdout();
         report::render(&reports, args.report_format, palette, &mut stdout)
             .and_then(|()| stdout.flush())
             .into_diagnostic()
@@ -2641,7 +2642,7 @@ fn write_output(
             // many small pieces, and Rust's stdout flushes on every newline: writing a
             // ten-thousand-package document to a pipe took twice as long as writing it to a
             // file, all of it in syscalls nobody needed.
-            let mut stdout = std::io::BufWriter::new(std::io::stdout().lock());
+            let mut stdout = pipe::stdout();
             format::write(format, sbom, ctx, &mut stdout)?;
             stdout.flush().into_diagnostic().wrap_err("cannot write to stdout")?;
             return Ok(true);

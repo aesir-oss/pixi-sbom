@@ -11008,3 +11008,55 @@ fn npm_packages_installed_in_an_environment_are_listed() {
     let spdx: Value = serde_json::from_slice(&run(&["--format", "spdx"]).get_output().stdout).unwrap();
     assert_valid(&spdx_validator(), &spdx);
 }
+
+/// A reader that closes stdout early (`pixi sbom --doctor | head -12`) ends the output, not the
+/// run: nothing about the pipe on stderr, and the exit code is still the one the run decides (#28).
+#[cfg(unix)]
+#[test]
+fn a_closed_stdout_ends_the_output_quietly() {
+    use std::process::{Command as Std, Stdio};
+    let dir = workspace("with-pypi");
+    let run = |args: &[&str]| -> (Option<i32>, String) {
+        let mut child = Std::new(assert_cmd::cargo::cargo_bin("pixi-sbom"))
+            .current_dir(dir.path())
+            .env("PIXI_HOME", empty_pixi_home())
+            .env("PIXI_SBOM_OFFLINE", "1")
+            .args(["-e", "web", "-p", "linux-64"])
+            .args(args)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        // Closed before the first write, so every write finds the pipe gone.
+        drop(child.stdout.take());
+        let output = child.wait_with_output().unwrap();
+        (
+            output.status.code(),
+            String::from_utf8_lossy(&output.stderr).into_owned(),
+        )
+    };
+    for args in [
+        &["--output", "-"][..],
+        &["--report", "packages"],
+        &["--report", "packages", "--report-format", "json"],
+        &["--version-details"],
+    ] {
+        let (code, stderr) = run(args);
+        assert_eq!(code, Some(0), "{args:?}: {stderr}");
+        assert!(
+            !stderr.contains("Broken pipe") && !stderr.contains("cannot write"),
+            "{args:?}: {stderr}"
+        );
+    }
+    let (code, stderr) = run(&["--doctor"]);
+    assert!(
+        matches!(code, Some(0) | Some(1)),
+        "--doctor: its own verdict, healthy or not: {stderr}"
+    );
+    assert!(!stderr.contains("Broken pipe"), "--doctor: {stderr}");
+    // A gate that fails still says so, and still sets the exit code.
+    let (code, stderr) = run(&["--output", "-", "--min-quality", "100"]);
+    assert_eq!(code, Some(10), "{stderr}");
+    assert!(stderr.contains("Gate failed: quality"), "{stderr}");
+    assert!(!stderr.contains("Broken pipe"), "{stderr}");
+}
