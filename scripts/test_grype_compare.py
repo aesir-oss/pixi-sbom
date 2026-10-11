@@ -46,6 +46,7 @@ class GrypeCompareTest(unittest.TestCase):
             g.pixi_sbom_input(g.Path("/w/web-frontend"), "lockfile"), ["--lockfile", str(g.Path("/w/web-frontend/package-lock.json"))]
         )
         self.assertEqual(g.pixi_sbom_input(g.Path("/w/env"), "pixi"), ["--prefix", str(g.Path("/w/env")), "--embedded-sboms"])
+        self.assertEqual(g.pixi_sbom_input(g.Path("/w/image"), "rootfs"), ["--scan", str(g.Path("/w/image")), "--merge"])
 
     def test_a_required_finding_is_missing_until_pixi_sbom_gives_it(self) -> None:
         self.assertIn("pillow-wheels", [name for name, _, _ in g.CORPUS])

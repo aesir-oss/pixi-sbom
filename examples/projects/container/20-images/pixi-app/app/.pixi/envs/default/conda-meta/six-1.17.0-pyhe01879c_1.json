@@ -1,0 +1,42 @@
+{
+ "build": "pyhe01879c_1",
+ "build_number": 1,
+ "depends": [
+  "python >=3.9",
+  "python"
+ ],
+ "license": "MIT",
+ "license_family": "MIT",
+ "md5": "3339e3b65d58accf4ca4fb8748ab16b3",
+ "name": "six",
+ "noarch": "python",
+ "purls": [
+  "pkg:pypi/six?source=hash-mapping"
+ ],
+ "run_exports": {},
+ "sha256": "458227f759d5e3fcec5d9b7acce54e10c9e1f4f4b7ec978f3bfd54ce4ee9853d",
+ "size": 18455,
+ "subdir": "noarch",
+ "timestamp": 1753199211006,
+ "version": "1.17.0",
+ "fn": "six-1.17.0-pyhe01879c_1.conda",
+ "url": "https://conda.anaconda.org/conda-forge/noarch/six-1.17.0-pyhe01879c_1.conda",
+ "channel": "https://conda.anaconda.org/conda-forge/",
+ "extracted_package_dir": "/root/.cache/rattler/cache/pkgs/six-1.17.0-pyhe01879c_1",
+ "requested_specs": [],
+ "files": [
+  "lib/python3.11/site-packages/six-1.17.0.dist-info/INSTALLER",
+  "lib/python3.11/site-packages/six-1.17.0.dist-info/METADATA",
+  "lib/python3.11/site-packages/six-1.17.0.dist-info/RECORD",
+  "lib/python3.11/site-packages/six-1.17.0.dist-info/REQUESTED",
+  "lib/python3.11/site-packages/six-1.17.0.dist-info/WHEEL",
+  "lib/python3.11/site-packages/six-1.17.0.dist-info/direct_url.json",
+  "lib/python3.11/site-packages/six-1.17.0.dist-info/licenses/LICENSE",
+  "lib/python3.11/site-packages/six-1.17.0.dist-info/top_level.txt",
+  "lib/python3.11/site-packages/six.py"
+ ],
+ "link": {
+  "source": "/root/.cache/rattler/cache/pkgs/six-1.17.0-pyhe01879c_1",
+  "type": 1
+ }
+}

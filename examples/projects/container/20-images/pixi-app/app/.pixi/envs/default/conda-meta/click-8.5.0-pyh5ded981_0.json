@@ -1,0 +1,58 @@
+{
+ "build": "pyh5ded981_0",
+ "build_number": 0,
+ "depends": [
+  "python >=3.11",
+  "python"
+ ],
+ "license": "BSD-3-Clause",
+ "license_family": "BSD",
+ "md5": "dea5b13a211bbf99876deb980b408a66",
+ "name": "click",
+ "noarch": "python",
+ "purls": [
+  "pkg:pypi/click?source=compressed-mapping"
+ ],
+ "run_exports": {},
+ "sha256": "9afb0c2c089330321a219c7ee5a25313bd574d4024be606cbb33e7a5735df662",
+ "size": 112341,
+ "subdir": "noarch",
+ "timestamp": 1788802215348,
+ "version": "8.5.0",
+ "fn": "click-8.5.0-pyh5ded981_0.conda",
+ "url": "https://conda.anaconda.org/conda-forge/noarch/click-8.5.0-pyh5ded981_0.conda",
+ "channel": "https://conda.anaconda.org/conda-forge/",
+ "extracted_package_dir": "/root/.cache/rattler/cache/pkgs/click-8.5.0-pyh5ded981_0",
+ "requested_specs": [],
+ "files": [
+  "lib/python3.11/site-packages/click/__init__.py",
+  "lib/python3.11/site-packages/click/_compat.py",
+  "lib/python3.11/site-packages/click/_termui_impl.py",
+  "lib/python3.11/site-packages/click/_textwrap.py",
+  "lib/python3.11/site-packages/click/_utils.py",
+  "lib/python3.11/site-packages/click/_winconsole.py",
+  "lib/python3.11/site-packages/click/core.py",
+  "lib/python3.11/site-packages/click/decorators.py",
+  "lib/python3.11/site-packages/click/exceptions.py",
+  "lib/python3.11/site-packages/click/formatting.py",
+  "lib/python3.11/site-packages/click/globals.py",
+  "lib/python3.11/site-packages/click/parser.py",
+  "lib/python3.11/site-packages/click/py.typed",
+  "lib/python3.11/site-packages/click/shell_completion.py",
+  "lib/python3.11/site-packages/click/termui.py",
+  "lib/python3.11/site-packages/click/testing.py",
+  "lib/python3.11/site-packages/click/types.py",
+  "lib/python3.11/site-packages/click/utils.py",
+  "lib/python3.11/site-packages/click-8.5.0.dist-info/INSTALLER",
+  "lib/python3.11/site-packages/click-8.5.0.dist-info/METADATA",
+  "lib/python3.11/site-packages/click-8.5.0.dist-info/RECORD",
+  "lib/python3.11/site-packages/click-8.5.0.dist-info/REQUESTED",
+  "lib/python3.11/site-packages/click-8.5.0.dist-info/WHEEL",
+  "lib/python3.11/site-packages/click-8.5.0.dist-info/direct_url.json",
+  "lib/python3.11/site-packages/click-8.5.0.dist-info/licenses/LICENSE.txt"
+ ],
+ "link": {
+  "source": "/root/.cache/rattler/cache/pkgs/click-8.5.0-pyh5ded981_0",
+  "type": 1
+ }
+}

@@ -1,0 +1,50 @@
+{
+ "build": "pyhd8ed1ab_0",
+ "build_number": 0,
+ "depends": [
+  "python >=3.6"
+ ],
+ "license": "BSD-3-Clause",
+ "license_family": "BSD",
+ "md5": "030cb050b845611262dcd3ee1c66316b",
+ "name": "itsdangerous",
+ "noarch": "python",
+ "purls": [
+  "pkg:pypi/itsdangerous?source=hash-mapping"
+ ],
+ "run_exports": {},
+ "sha256": "a822564add4f0a27d90f3a790d23cc85c84190cb8f48ca947d2f4ea5ef1ac42c",
+ "size": 17615,
+ "subdir": "noarch",
+ "timestamp": 1621360946844,
+ "version": "2.0.1",
+ "fn": "itsdangerous-2.0.1-pyhd8ed1ab_0.tar.bz2",
+ "url": "https://conda.anaconda.org/conda-forge/noarch/itsdangerous-2.0.1-pyhd8ed1ab_0.tar.bz2",
+ "channel": "https://conda.anaconda.org/conda-forge/",
+ "extracted_package_dir": "/root/.cache/rattler/cache/pkgs/itsdangerous-2.0.1-pyhd8ed1ab_0",
+ "requested_specs": [],
+ "files": [
+  "lib/python3.11/site-packages/itsdangerous/__init__.py",
+  "lib/python3.11/site-packages/itsdangerous/_json.py",
+  "lib/python3.11/site-packages/itsdangerous/encoding.py",
+  "lib/python3.11/site-packages/itsdangerous/exc.py",
+  "lib/python3.11/site-packages/itsdangerous/jws.py",
+  "lib/python3.11/site-packages/itsdangerous/py.typed",
+  "lib/python3.11/site-packages/itsdangerous/serializer.py",
+  "lib/python3.11/site-packages/itsdangerous/signer.py",
+  "lib/python3.11/site-packages/itsdangerous/timed.py",
+  "lib/python3.11/site-packages/itsdangerous/url_safe.py",
+  "lib/python3.11/site-packages/itsdangerous-2.0.1.dist-info/INSTALLER",
+  "lib/python3.11/site-packages/itsdangerous-2.0.1.dist-info/LICENSE.rst",
+  "lib/python3.11/site-packages/itsdangerous-2.0.1.dist-info/METADATA",
+  "lib/python3.11/site-packages/itsdangerous-2.0.1.dist-info/RECORD",
+  "lib/python3.11/site-packages/itsdangerous-2.0.1.dist-info/REQUESTED",
+  "lib/python3.11/site-packages/itsdangerous-2.0.1.dist-info/WHEEL",
+  "lib/python3.11/site-packages/itsdangerous-2.0.1.dist-info/direct_url.json",
+  "lib/python3.11/site-packages/itsdangerous-2.0.1.dist-info/top_level.txt"
+ ],
+ "link": {
+  "source": "/root/.cache/rattler/cache/pkgs/itsdangerous-2.0.1-pyhd8ed1ab_0",
+  "type": 1
+ }
+}

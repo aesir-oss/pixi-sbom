@@ -1,0 +1,48 @@
+{
+ "arch": "x86_64",
+ "build": "h81df57d_1",
+ "build_number": 1,
+ "depends": [
+  "__glibc >=2.17,<3.0.a0",
+  "libgcc >=15"
+ ],
+ "license": "MIT",
+ "license_family": "MIT",
+ "md5": "6525a0b06aa4fd390795f0740636a9dd",
+ "name": "libffi",
+ "platform": "linux",
+ "purls": [],
+ "run_exports": {
+  "weak": [
+   "libffi >=3.7.0,<3.8.0a0"
+  ]
+ },
+ "sha256": "c8c7583ef063bc3c430f1d48298e5ad24f796a35c22ed5b14183325825a61106",
+ "size": 68004,
+ "subdir": "linux-64",
+ "timestamp": 1787753412298,
+ "version": "3.7.0",
+ "fn": "libffi-3.7.0-h81df57d_1.conda",
+ "url": "https://conda.anaconda.org/conda-forge/linux-64/libffi-3.7.0-h81df57d_1.conda",
+ "channel": "https://conda.anaconda.org/conda-forge/",
+ "extracted_package_dir": "/root/.cache/rattler/cache/pkgs/libffi-3.7.0-h81df57d_1",
+ "requested_specs": [],
+ "files": [
+  "include/ffi.h",
+  "include/ffitarget.h",
+  "lib/libffi.a",
+  "lib/libffi.so",
+  "lib/libffi.so.8",
+  "lib/libffi.so.8.4.0",
+  "lib/pkgconfig/libffi.pc",
+  "share/info/libffi.info",
+  "share/man/man3/ffi.3",
+  "share/man/man3/ffi_call.3",
+  "share/man/man3/ffi_prep_cif.3",
+  "share/man/man3/ffi_prep_cif_var.3"
+ ],
+ "link": {
+  "source": "/root/.cache/rattler/cache/pkgs/libffi-3.7.0-h81df57d_1",
+  "type": 1
+ }
+}

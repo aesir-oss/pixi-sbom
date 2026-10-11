@@ -1,0 +1,45 @@
+{
+ "arch": "x86_64",
+ "build": "h0737f62_103",
+ "build_number": 103,
+ "constrains": [
+  "icu <0.0a0"
+ ],
+ "depends": [
+  "__glibc >=2.17,<3.0.a0",
+  "libgcc >=15",
+  "libzlib >=1.3.2,<2.0a0"
+ ],
+ "license": "blessing",
+ "md5": "cc1ad2520049c35344239454a17560ac",
+ "name": "libsqlite",
+ "platform": "linux",
+ "purls": [],
+ "run_exports": {
+  "weak": [
+   "libsqlite >=3.53.4,<4.0a0"
+  ]
+ },
+ "sha256": "66f4831f4ee3055f0ffe94e01901198cf3601e2c1b4f6b51d05c3f2d8557ce1d",
+ "size": 967489,
+ "subdir": "linux-64",
+ "timestamp": 1791288185694,
+ "version": "3.53.4",
+ "fn": "libsqlite-3.53.4-h0737f62_103.conda",
+ "url": "https://conda.anaconda.org/conda-forge/linux-64/libsqlite-3.53.4-h0737f62_103.conda",
+ "channel": "https://conda.anaconda.org/conda-forge/",
+ "extracted_package_dir": "/root/.cache/rattler/cache/pkgs/libsqlite-3.53.4-h0737f62_103",
+ "requested_specs": [],
+ "files": [
+  "include/sqlite3.h",
+  "include/sqlite3ext.h",
+  "lib/libsqlite3.so",
+  "lib/libsqlite3.so.0",
+  "lib/libsqlite3.so.3.53.4",
+  "lib/pkgconfig/sqlite3.pc"
+ ],
+ "link": {
+  "source": "/root/.cache/rattler/cache/pkgs/libsqlite-3.53.4-h0737f62_103",
+  "type": 1
+ }
+}

@@ -9093,6 +9093,17 @@ fn a_venv_is_checked_against_its_uv_lock_or_pylock() {
 }
 
 /// Every file under `dir`.
+/// Copy one file of an examples tree. The unpacked container images' venv links point into the image
+/// (`/usr/local/bin/python`), so a link is copied as a link, never followed (#31).
+fn copy_file(file: &Path, target: &Path) {
+    if file.is_symlink() {
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(std::fs::read_link(file).unwrap(), target).unwrap();
+        return;
+    }
+    std::fs::copy(file, target).unwrap();
+}
+
 fn walkdir(dir: &Path) -> Vec<PathBuf> {
     let mut files = Vec::new();
     for entry in std::fs::read_dir(dir).unwrap().flatten() {
@@ -9696,8 +9707,9 @@ fn the_whole_examples_tree_scans_clean() {
     let text = String::from_utf8(output).unwrap();
     assert_eq!(
         text.matches("\"report\": \"packages\"").count(),
-        97,
-        "one report per directory with a lockfile, the JavaScript project beside a pixi workspace merged into it"
+        100,
+        "one report per directory with a lockfile, the JavaScript project beside a pixi workspace merged into it, \
+         and one per installed environment in the unpacked container images (#31)"
     );
 }
 
@@ -9815,7 +9827,7 @@ fn the_examples_tour_runs_as_written() {
             .join("examples/projects")
             .join(file.strip_prefix(&examples).unwrap());
         std::fs::create_dir_all(target.parent().unwrap()).unwrap();
-        std::fs::copy(&file, &target).unwrap();
+        copy_file(&file, &target);
     }
 
     let (mut ran, mut online) = (0, 0);
@@ -10080,7 +10092,7 @@ fn the_training_lab_runs_as_written_and_shows_what_it_says() {
     for file in walkdir(&examples) {
         let target = work.path().join("examples").join(file.strip_prefix(&examples).unwrap());
         std::fs::create_dir_all(target.parent().unwrap()).unwrap();
-        std::fs::copy(&file, &target).unwrap();
+        copy_file(&file, &target);
     }
     let cache = work.path().join("examples/lab-cache");
 
@@ -10159,7 +10171,7 @@ fn the_talk_demo_runs_as_written_and_its_slides_show_what_it_prints() {
     for file in walkdir(&examples) {
         let target = work.path().join("examples").join(file.strip_prefix(&examples).unwrap());
         std::fs::create_dir_all(target.parent().unwrap()).unwrap();
-        std::fs::copy(&file, &target).unwrap();
+        copy_file(&file, &target);
     }
     let cache = work.path().join("examples/lab-cache");
 

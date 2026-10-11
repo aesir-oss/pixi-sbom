@@ -1,0 +1,62 @@
+{
+ "build": "pyhd3deb0d_0",
+ "build_number": 0,
+ "depends": [
+  "certifi >=2017.4.17",
+  "chardet >=3.0.2,<5",
+  "idna >=2.5,<3",
+  "python",
+  "urllib3 >=1.21.1,<1.27"
+ ],
+ "license": "Apache-2.0",
+ "license_family": "APACHE",
+ "md5": "ae687aba31a1c400192a86a2e993ffdc",
+ "name": "requests",
+ "noarch": "python",
+ "purls": [
+  "pkg:pypi/requests?source=hash-mapping"
+ ],
+ "run_exports": {},
+ "sha256": "a40519d3fe620713cd245e281baab1f6987b9b35f2044d19bf31404b8f7c1e19",
+ "size": 52069,
+ "subdir": "noarch",
+ "timestamp": 1608156354431,
+ "version": "2.25.1",
+ "fn": "requests-2.25.1-pyhd3deb0d_0.tar.bz2",
+ "url": "https://conda.anaconda.org/conda-forge/noarch/requests-2.25.1-pyhd3deb0d_0.tar.bz2",
+ "channel": "https://conda.anaconda.org/conda-forge/",
+ "extracted_package_dir": "/root/.cache/rattler/cache/pkgs/requests-2.25.1-pyhd3deb0d_0",
+ "requested_specs": [],
+ "files": [
+  "lib/python3.11/site-packages/requests/__init__.py",
+  "lib/python3.11/site-packages/requests/__version__.py",
+  "lib/python3.11/site-packages/requests/_internal_utils.py",
+  "lib/python3.11/site-packages/requests/adapters.py",
+  "lib/python3.11/site-packages/requests/api.py",
+  "lib/python3.11/site-packages/requests/auth.py",
+  "lib/python3.11/site-packages/requests/certs.py",
+  "lib/python3.11/site-packages/requests/compat.py",
+  "lib/python3.11/site-packages/requests/cookies.py",
+  "lib/python3.11/site-packages/requests/exceptions.py",
+  "lib/python3.11/site-packages/requests/help.py",
+  "lib/python3.11/site-packages/requests/hooks.py",
+  "lib/python3.11/site-packages/requests/models.py",
+  "lib/python3.11/site-packages/requests/packages.py",
+  "lib/python3.11/site-packages/requests/sessions.py",
+  "lib/python3.11/site-packages/requests/status_codes.py",
+  "lib/python3.11/site-packages/requests/structures.py",
+  "lib/python3.11/site-packages/requests/utils.py",
+  "lib/python3.11/site-packages/requests-2.25.1.dist-info/INSTALLER",
+  "lib/python3.11/site-packages/requests-2.25.1.dist-info/LICENSE",
+  "lib/python3.11/site-packages/requests-2.25.1.dist-info/METADATA",
+  "lib/python3.11/site-packages/requests-2.25.1.dist-info/RECORD",
+  "lib/python3.11/site-packages/requests-2.25.1.dist-info/REQUESTED",
+  "lib/python3.11/site-packages/requests-2.25.1.dist-info/WHEEL",
+  "lib/python3.11/site-packages/requests-2.25.1.dist-info/direct_url.json",
+  "lib/python3.11/site-packages/requests-2.25.1.dist-info/top_level.txt"
+ ],
+ "link": {
+  "source": "/root/.cache/rattler/cache/pkgs/requests-2.25.1-pyhd3deb0d_0",
+  "type": 1
+ }
+}

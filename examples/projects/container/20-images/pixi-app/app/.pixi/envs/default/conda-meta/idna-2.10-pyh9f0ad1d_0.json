@@ -1,0 +1,46 @@
+{
+ "build": "pyh9f0ad1d_0",
+ "build_number": 0,
+ "depends": [
+  "python"
+ ],
+ "license": "BSD Like",
+ "md5": "f95a12b4f435aae6680fe55ae2eb1b06",
+ "name": "idna",
+ "noarch": "python",
+ "purls": [
+  "pkg:pypi/idna?source=hash-mapping"
+ ],
+ "run_exports": {},
+ "sha256": "0ce5f732abdcc40a6f995d8c5021dfdff1b6be2f192895aa6101904869714102",
+ "size": 53718,
+ "subdir": "noarch",
+ "timestamp": 1593328193407,
+ "version": "2.10",
+ "fn": "idna-2.10-pyh9f0ad1d_0.tar.bz2",
+ "url": "https://conda.anaconda.org/conda-forge/noarch/idna-2.10-pyh9f0ad1d_0.tar.bz2",
+ "channel": "https://conda.anaconda.org/conda-forge/",
+ "extracted_package_dir": "/root/.cache/rattler/cache/pkgs/idna-2.10-pyh9f0ad1d_0",
+ "requested_specs": [],
+ "files": [
+  "lib/python3.11/site-packages/idna/__init__.py",
+  "lib/python3.11/site-packages/idna/codec.py",
+  "lib/python3.11/site-packages/idna/compat.py",
+  "lib/python3.11/site-packages/idna/core.py",
+  "lib/python3.11/site-packages/idna/idnadata.py",
+  "lib/python3.11/site-packages/idna/intranges.py",
+  "lib/python3.11/site-packages/idna/package_data.py",
+  "lib/python3.11/site-packages/idna/uts46data.py",
+  "lib/python3.11/site-packages/idna-2.10.dist-info/INSTALLER",
+  "lib/python3.11/site-packages/idna-2.10.dist-info/LICENSE.rst",
+  "lib/python3.11/site-packages/idna-2.10.dist-info/METADATA",
+  "lib/python3.11/site-packages/idna-2.10.dist-info/RECORD",
+  "lib/python3.11/site-packages/idna-2.10.dist-info/WHEEL",
+  "lib/python3.11/site-packages/idna-2.10.dist-info/direct_url.json",
+  "lib/python3.11/site-packages/idna-2.10.dist-info/top_level.txt"
+ ],
+ "link": {
+  "source": "/root/.cache/rattler/cache/pkgs/idna-2.10-pyh9f0ad1d_0",
+  "type": 1
+ }
+}

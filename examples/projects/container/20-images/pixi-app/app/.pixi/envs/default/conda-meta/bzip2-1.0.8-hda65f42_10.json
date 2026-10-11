@@ -1,0 +1,60 @@
+{
+ "arch": "x86_64",
+ "build": "hda65f42_10",
+ "build_number": 10,
+ "depends": [
+  "__glibc >=2.17,<3.0.a0",
+  "libgcc >=14"
+ ],
+ "license": "bzip2-1.0.6",
+ "license_family": "BSD",
+ "md5": "e675fabcf81499adc7edf58124fb1e01",
+ "name": "bzip2",
+ "platform": "linux",
+ "purls": [],
+ "run_exports": {
+  "weak": [
+   "bzip2 >=1.0.8,<2.0a0"
+  ]
+ },
+ "sha256": "1a0d382c515ebf55f8ee1f38c8b81bc95af5c2acc42ad53b66bc5df932032f96",
+ "size": 257808,
+ "subdir": "linux-64",
+ "timestamp": 1785906269155,
+ "version": "1.0.8",
+ "fn": "bzip2-1.0.8-hda65f42_10.conda",
+ "url": "https://conda.anaconda.org/conda-forge/linux-64/bzip2-1.0.8-hda65f42_10.conda",
+ "channel": "https://conda.anaconda.org/conda-forge/",
+ "extracted_package_dir": "/root/.cache/rattler/cache/pkgs/bzip2-1.0.8-hda65f42_10",
+ "requested_specs": [],
+ "files": [
+  "bin/bunzip2",
+  "bin/bzcat",
+  "bin/bzcmp",
+  "bin/bzdiff",
+  "bin/bzegrep",
+  "bin/bzfgrep",
+  "bin/bzgrep",
+  "bin/bzip2",
+  "bin/bzip2recover",
+  "bin/bzless",
+  "bin/bzmore",
+  "include/bzlib.h",
+  "lib/libbz2.a",
+  "lib/libbz2.so",
+  "lib/libbz2.so.1.0",
+  "lib/libbz2.so.1.0.8",
+  "share/man/man1/bzcmp.1",
+  "share/man/man1/bzdiff.1",
+  "share/man/man1/bzegrep.1",
+  "share/man/man1/bzfgrep.1",
+  "share/man/man1/bzgrep.1",
+  "share/man/man1/bzip2.1",
+  "share/man/man1/bzless.1",
+  "share/man/man1/bzmore.1"
+ ],
+ "link": {
+  "source": "/root/.cache/rattler/cache/pkgs/bzip2-1.0.8-hda65f42_10",
+  "type": 1
+ }
+}

@@ -1,0 +1,39 @@
+{
+ "arch": "x86_64",
+ "build": "h0c77377_1_cpython",
+ "build_number": 1,
+ "depends": [
+  "__glibc >=2.17,<3.0.a0",
+  "libgcc >=15",
+  "libstdcxx >=15"
+ ],
+ "license": "Python-2.0",
+ "md5": "96da685309a5aa6d57b96d5528461129",
+ "name": "libpython",
+ "platform": "linux",
+ "purls": [],
+ "run_exports": {
+  "weak": [
+   "libpython >=3.11,<4.0a0"
+  ]
+ },
+ "sha256": "bad3de581c5b9f193a3b43d634a47df3e90e6fb89ff712b5f6903920640e4a07",
+ "size": 7826338,
+ "subdir": "linux-64",
+ "timestamp": 1791332362504,
+ "version": "3.11.17",
+ "fn": "libpython-3.11.17-h0c77377_1_cpython.conda",
+ "url": "https://conda.anaconda.org/conda-forge/linux-64/libpython-3.11.17-h0c77377_1_cpython.conda",
+ "channel": "https://conda.anaconda.org/conda-forge/",
+ "extracted_package_dir": "/root/.cache/rattler/cache/pkgs/libpython-3.11.17-h0c77377_1_cpython",
+ "requested_specs": [],
+ "files": [
+  "lib/libpython3.11.so",
+  "lib/libpython3.11.so.1.0",
+  "lib/libpython3.so"
+ ],
+ "link": {
+  "source": "/root/.cache/rattler/cache/pkgs/libpython-3.11.17-h0c77377_1_cpython",
+  "type": 1
+ }
+}

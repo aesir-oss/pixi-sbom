@@ -1,0 +1,40 @@
+{
+ "arch": "x86_64",
+ "build": "hb03c661_1",
+ "build_number": 1,
+ "constrains": [
+  "xz 5.8.3.*"
+ ],
+ "depends": [
+  "__glibc >=2.17,<3.0.a0",
+  "libgcc >=14"
+ ],
+ "license": "0BSD",
+ "md5": "1390b7c5ac0b1d8e447bc5efa6d3c8c2",
+ "name": "liblzma",
+ "platform": "linux",
+ "purls": [],
+ "run_exports": {
+  "weak": [
+   "liblzma >=5.8.3,<6.0a0"
+  ]
+ },
+ "sha256": "9787df8c22a59c9a70d3e5a10db9ad663485e75e9ccc3f09bd092cb7b95e0dab",
+ "size": 112995,
+ "subdir": "linux-64",
+ "timestamp": 1786348617826,
+ "version": "5.8.3",
+ "fn": "liblzma-5.8.3-hb03c661_1.conda",
+ "url": "https://conda.anaconda.org/conda-forge/linux-64/liblzma-5.8.3-hb03c661_1.conda",
+ "channel": "https://conda.anaconda.org/conda-forge/",
+ "extracted_package_dir": "/root/.cache/rattler/cache/pkgs/liblzma-5.8.3-hb03c661_1",
+ "requested_specs": [],
+ "files": [
+  "lib/liblzma.so.5",
+  "lib/liblzma.so.5.8.3"
+ ],
+ "link": {
+  "source": "/root/.cache/rattler/cache/pkgs/liblzma-5.8.3-hb03c661_1",
+  "type": 1
+ }
+}

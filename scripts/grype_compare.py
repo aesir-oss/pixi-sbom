@@ -41,6 +41,9 @@ CORPUS = [
     ("pillow-wheels", "examples/projects/requirements/18-image-wheels/requirements.txt", "venv"),
     # The JavaScript example read from its package-lock.json, not installed: both tools read the lockfile (#29).
     ("web-frontend", "examples/projects/npm/19-web-frontend", "lockfile"),
+    # Unpacked container images, every environment in each found by --scan and merged (#25, #31).
+    ("image-python-app", "examples/projects/container/20-images/python-app", "rootfs"),
+    ("image-pixi-app", "examples/projects/container/20-images/pixi-app", "rootfs"),
 ]
 
 # syft reads installed package.json files only in an image unless told to; on the environment that
@@ -147,9 +150,10 @@ def run(command: list[str], **kwargs) -> subprocess.CompletedProcess:
 
 def install(name: str, project: str, how: str, work: Path) -> Path:
     """Install one corpus environment under `work` and return its prefix."""
-    if how == "lockfile":
+    if how in ("lockfile", "rootfs"):
         copy = work / name
-        shutil.copytree(ROOT / project, copy)
+        # An image's venv links point into the image (`/usr/local/bin/python`): copied as links.
+        shutil.copytree(ROOT / project, copy, symlinks=True)
         return copy
     if how == "pixi":
         copy = work / name
@@ -164,10 +168,13 @@ def install(name: str, project: str, how: str, work: Path) -> Path:
 
 
 def pixi_sbom_input(prefix: Path, how: str) -> list[str]:
-    """What pixi-sbom is pointed at: the project's lockfile for a `lockfile` entry, the installed environment
-    otherwise, with the binaries' own components read too."""
+    """What pixi-sbom is pointed at: the project's lockfile for a `lockfile` entry, every environment in an
+    unpacked image merged into one document for a `rootfs` one, the installed environment otherwise, with the
+    binaries' own components read too."""
     if how == "lockfile":
         return ["--lockfile", str(prefix / "package-lock.json")]
+    if how == "rootfs":
+        return ["--scan", str(prefix), "--merge"]
     return ["--prefix", str(prefix), "--embedded-sboms"]
 
 

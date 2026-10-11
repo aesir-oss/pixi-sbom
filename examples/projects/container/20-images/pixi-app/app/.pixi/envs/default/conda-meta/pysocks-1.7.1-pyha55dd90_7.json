@@ -1,0 +1,43 @@
+{
+ "build": "pyha55dd90_7",
+ "build_number": 7,
+ "depends": [
+  "__unix",
+  "python >=3.9"
+ ],
+ "license": "BSD-3-Clause",
+ "license_family": "BSD",
+ "md5": "461219d1a5bd61342293efa2c0c90eac",
+ "name": "pysocks",
+ "noarch": "python",
+ "purls": [
+  "pkg:pypi/pysocks?source=hash-mapping"
+ ],
+ "run_exports": {},
+ "sha256": "ba3b032fa52709ce0d9fd388f63d330a026754587a2f461117cac9ab73d8d0d8",
+ "size": 21085,
+ "subdir": "noarch",
+ "timestamp": 1733217331982,
+ "version": "1.7.1",
+ "fn": "pysocks-1.7.1-pyha55dd90_7.conda",
+ "url": "https://conda.anaconda.org/conda-forge/noarch/pysocks-1.7.1-pyha55dd90_7.conda",
+ "channel": "https://conda.anaconda.org/conda-forge/",
+ "extracted_package_dir": "/root/.cache/rattler/cache/pkgs/pysocks-1.7.1-pyha55dd90_7",
+ "requested_specs": [],
+ "files": [
+  "lib/python3.11/site-packages/PySocks-1.7.1.dist-info/INSTALLER",
+  "lib/python3.11/site-packages/PySocks-1.7.1.dist-info/LICENSE",
+  "lib/python3.11/site-packages/PySocks-1.7.1.dist-info/METADATA",
+  "lib/python3.11/site-packages/PySocks-1.7.1.dist-info/RECORD",
+  "lib/python3.11/site-packages/PySocks-1.7.1.dist-info/REQUESTED",
+  "lib/python3.11/site-packages/PySocks-1.7.1.dist-info/WHEEL",
+  "lib/python3.11/site-packages/PySocks-1.7.1.dist-info/direct_url.json",
+  "lib/python3.11/site-packages/PySocks-1.7.1.dist-info/top_level.txt",
+  "lib/python3.11/site-packages/socks.py",
+  "lib/python3.11/site-packages/sockshandler.py"
+ ],
+ "link": {
+  "source": "/root/.cache/rattler/cache/pkgs/pysocks-1.7.1-pyha55dd90_7",
+  "type": 1
+ }
+}

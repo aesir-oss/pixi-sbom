@@ -1,0 +1,29 @@
+{
+ "build": "py311hd8ed1ab_1",
+ "build_number": 1,
+ "depends": [
+  "python >=3.11,<3.12.0a0",
+  "python_abi * *_cp311"
+ ],
+ "license": "Python-2.0",
+ "md5": "f07f75fcd3fcb64c66417930e3f4010d",
+ "name": "cpython",
+ "noarch": "generic",
+ "purls": [],
+ "run_exports": {},
+ "sha256": "5de175cddbf66522226c9267b5c64e0f67638562200dfa198dd03c1d8a322c68",
+ "size": 49108,
+ "subdir": "noarch",
+ "timestamp": 1791330836584,
+ "version": "3.11.17",
+ "fn": "cpython-3.11.17-py311hd8ed1ab_1.conda",
+ "url": "https://conda.anaconda.org/conda-forge/noarch/cpython-3.11.17-py311hd8ed1ab_1.conda",
+ "channel": "https://conda.anaconda.org/conda-forge/",
+ "extracted_package_dir": "/root/.cache/rattler/cache/pkgs/cpython-3.11.17-py311hd8ed1ab_1",
+ "requested_specs": [],
+ "files": [],
+ "link": {
+  "source": "/root/.cache/rattler/cache/pkgs/cpython-3.11.17-py311hd8ed1ab_1",
+  "type": 1
+ }
+}

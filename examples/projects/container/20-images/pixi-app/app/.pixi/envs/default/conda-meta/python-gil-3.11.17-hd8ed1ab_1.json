@@ -1,0 +1,29 @@
+{
+ "build": "hd8ed1ab_1",
+ "build_number": 1,
+ "depends": [
+  "cpython 3.11.17.*",
+  "python_abi * *_cp311"
+ ],
+ "license": "Python-2.0",
+ "md5": "3508073beec62bc5cd0c5ce73c34cb90",
+ "name": "python-gil",
+ "noarch": "generic",
+ "purls": [],
+ "run_exports": {},
+ "sha256": "2342ceacbdc72d254c30b3a3674f8cd3106bdb1c4543aea3bd5e16680e17ab2b",
+ "size": 49083,
+ "subdir": "noarch",
+ "timestamp": 1791330844606,
+ "version": "3.11.17",
+ "fn": "python-gil-3.11.17-hd8ed1ab_1.conda",
+ "url": "https://conda.anaconda.org/conda-forge/noarch/python-gil-3.11.17-hd8ed1ab_1.conda",
+ "channel": "https://conda.anaconda.org/conda-forge/",
+ "extracted_package_dir": "/root/.cache/rattler/cache/pkgs/python-gil-3.11.17-hd8ed1ab_1",
+ "requested_specs": [],
+ "files": [],
+ "link": {
+  "source": "/root/.cache/rattler/cache/pkgs/python-gil-3.11.17-hd8ed1ab_1",
+  "type": 1
+ }
+}

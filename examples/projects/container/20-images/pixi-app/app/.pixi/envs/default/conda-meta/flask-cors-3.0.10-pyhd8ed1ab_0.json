@@ -1,0 +1,47 @@
+{
+ "build": "pyhd8ed1ab_0",
+ "build_number": 0,
+ "depends": [
+  "flask >=0.9",
+  "python >=3.6",
+  "six"
+ ],
+ "license": "MIT",
+ "license_family": "MIT",
+ "md5": "364ee28b2dbc393a387850d7ba9ec6d3",
+ "name": "flask-cors",
+ "noarch": "python",
+ "purls": [
+  "pkg:pypi/flask-cors?source=hash-mapping"
+ ],
+ "run_exports": {},
+ "sha256": "da877d0c01af0f4b5468bed7d6e6f893c8ff134f7b6adab58950999256aebddb",
+ "size": 15243,
+ "subdir": "noarch",
+ "timestamp": 1622383618155,
+ "version": "3.0.10",
+ "fn": "flask-cors-3.0.10-pyhd8ed1ab_0.tar.bz2",
+ "url": "https://conda.anaconda.org/conda-forge/noarch/flask-cors-3.0.10-pyhd8ed1ab_0.tar.bz2",
+ "channel": "https://conda.anaconda.org/conda-forge/",
+ "extracted_package_dir": "/root/.cache/rattler/cache/pkgs/flask-cors-3.0.10-pyhd8ed1ab_0",
+ "requested_specs": [],
+ "files": [
+  "lib/python3.11/site-packages/Flask_Cors-3.0.10.dist-info/INSTALLER",
+  "lib/python3.11/site-packages/Flask_Cors-3.0.10.dist-info/LICENSE",
+  "lib/python3.11/site-packages/Flask_Cors-3.0.10.dist-info/METADATA",
+  "lib/python3.11/site-packages/Flask_Cors-3.0.10.dist-info/RECORD",
+  "lib/python3.11/site-packages/Flask_Cors-3.0.10.dist-info/REQUESTED",
+  "lib/python3.11/site-packages/Flask_Cors-3.0.10.dist-info/WHEEL",
+  "lib/python3.11/site-packages/Flask_Cors-3.0.10.dist-info/direct_url.json",
+  "lib/python3.11/site-packages/Flask_Cors-3.0.10.dist-info/top_level.txt",
+  "lib/python3.11/site-packages/flask_cors/__init__.py",
+  "lib/python3.11/site-packages/flask_cors/core.py",
+  "lib/python3.11/site-packages/flask_cors/decorator.py",
+  "lib/python3.11/site-packages/flask_cors/extension.py",
+  "lib/python3.11/site-packages/flask_cors/version.py"
+ ],
+ "link": {
+  "source": "/root/.cache/rattler/cache/pkgs/flask-cors-3.0.10-pyhd8ed1ab_0",
+  "type": 1
+ }
+}

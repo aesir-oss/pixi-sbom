@@ -1,0 +1,64 @@
+{
+ "arch": "x86_64",
+ "build": "hd6e31c0_1",
+ "build_number": 1,
+ "depends": [
+  "__glibc >=2.17,<3.0.a0",
+  "libgcc >=15",
+  "ncurses >=6.6,<7.0a0"
+ ],
+ "license": "GPL-3.0-only",
+ "license_family": "GPL",
+ "md5": "69c01c781e7c8190bbdaf79e3848c5ca",
+ "name": "readline",
+ "platform": "linux",
+ "purls": [],
+ "run_exports": {
+  "weak": [
+   "readline >=8.3,<9.0a0"
+  ]
+ },
+ "sha256": "01b3fe073a66e321970d09e04b388708f8cbdca5cdfbfcb7c9eeb470ad10383d",
+ "size": 348899,
+ "subdir": "linux-64",
+ "timestamp": 1787033801506,
+ "version": "8.3",
+ "fn": "readline-8.3-hd6e31c0_1.conda",
+ "url": "https://conda.anaconda.org/conda-forge/linux-64/readline-8.3-hd6e31c0_1.conda",
+ "channel": "https://conda.anaconda.org/conda-forge/",
+ "extracted_package_dir": "/root/.cache/rattler/cache/pkgs/readline-8.3-hd6e31c0_1",
+ "requested_specs": [],
+ "files": [
+  "include/readline/chardefs.h",
+  "include/readline/history.h",
+  "include/readline/keymaps.h",
+  "include/readline/readline.h",
+  "include/readline/rlconf.h",
+  "include/readline/rlstdc.h",
+  "include/readline/rltypedefs.h",
+  "include/readline/tilde.h",
+  "lib/libhistory.so",
+  "lib/libhistory.so.8",
+  "lib/libhistory.so.8.3",
+  "lib/libreadline.so",
+  "lib/libreadline.so.8",
+  "lib/libreadline.so.8.3",
+  "lib/pkgconfig/history.pc",
+  "lib/pkgconfig/readline.pc",
+  "share/doc/readline/CHANGES",
+  "share/doc/readline/INSTALL",
+  "share/doc/readline/README",
+  "share/doc/readline/history.html",
+  "share/doc/readline/readline.html",
+  "share/doc/readline/rluserman.html",
+  "share/info/history.info",
+  "share/info/readline.info",
+  "share/info/rluserman.info",
+  "share/man/man3/history.3",
+  "share/man/man3/readline.3"
+ ],
+ "link": {
+  "source": "/root/.cache/rattler/cache/pkgs/readline-8.3-hd6e31c0_1",
+  "type": 1
+ }
+}

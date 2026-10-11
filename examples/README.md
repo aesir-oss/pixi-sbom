@@ -15,6 +15,7 @@ examples/
   shared/internal-utils/  a stand-in private package, depended on by local path
   projects/<reader>/<NN-scenario>/
   projects/requirements-unpinned/   hand-written requirements files that must be refused
+  projects/container/20-images/     two container images, unpacked and trimmed, and the script that builds them
 ```
 
 Each example is a self-contained project: the manifest and the lockfile sit side by side under their real names,
@@ -34,6 +35,7 @@ so lockfile discovery, `--scan` and the manifest beside a lockfile (#328) all wo
 | `yarn` | `package.json`, `yarn.lock` (v1) | `yarn install` (yarn 1.22, through corepack) |
 | `yarn-berry` | `package.json`, `yarn.lock` (Berry) | `yarn install --mode=update-lockfile` (yarn 4.9, through corepack) |
 | `pnpm` | `package.json`, `pnpm-lock.yaml` | `pnpm install --lockfile-only` (pnpm 9.15, through corepack) |
+| `container` | `<app>.Dockerfile`, `build.sh`, the unpacked image under `<app>/` | `build.sh`: `docker build`, `docker export`, trimmed to installed metadata |
 
 The `pixi` examples are the conda environment the conda readers describe, with the packages conda-forge does not
 carry (`conda_pip`) as PyPI dependencies, the local package as an editable path, and each dependency group and
@@ -90,6 +92,17 @@ was read from.
 |---|---|
 | `npm`, `yarn`, `yarn-berry`, `pnpm` `/19-web-frontend` | the same 29 `pkg:npm` releases from four lockfiles; `semver` and what it needs are development (`scope: optional`); advisories for lodash 4.17.15, minimist 1.2.5, axios 0.21.1 and @babel/traverse 7.22.5 with `--vulnerabilities osv` |
 | `pixi/19-web-frontend` | a pixi workspace (Python with FastAPI, and nodejs) with the frontend's `package.json` and `package-lock.json` beside `pixi.toml`; the frontend joins the workspace's document unless `--skip-input javascript` leaves it out |
+
+20-images is `02-flask` installed into two container images, unpacked (#31):
+
+| Example | Look for |
+|---|---|
+| `container/20-images/python-app` | the official `python:3.11-slim` image: `/usr/local` (its own Python installation, pip and setuptools) and `/app/.venv` (`requirements/02-flask` pip-installed), two environments named by their paths in the image; urllib3 1.26.4 and Werkzeug 2.0.2 advisories |
+| `container/20-images/pixi-app` | pixi's production layout: `pixi/02-flask` installed in a build stage and only `/app/.pixi/envs/default` copied to a slim image, with no lockfile beside it |
+
+`pixi sbom --scan <one of them> --merge` describes the whole image's Python and conda content in one document. Each
+tree keeps only what an installed environment is read from: `conda-meta/` records (without their per-file hashes),
+`pyvenv.cfg`, every `*.dist-info`, the interpreter's `patchlevel.h` and small executable, and `etc/os-release`.
 
 ## Trying them
 
@@ -184,6 +197,14 @@ pixi run -e examples examples                       # every reader, every scenar
 pixi run -e examples examples --reader uv           # one reader
 pixi run -e examples examples --scenario 01-django  # one scenario
 pixi run -e examples examples-test                  # the generator's own tests
+```
+
+The container images are rebuilt by their own script, which needs docker (or podman as `docker`), rsync and jq, and
+builds for linux/amd64:
+
+```sh
+examples/projects/container/20-images/build.sh             # both images
+examples/projects/container/20-images/build.sh pixi-app    # one
 ```
 
 `scripts/examples.py` writes each manifest from `scenarios.toml` and runs the tool. The tools live in the

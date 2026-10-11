@@ -1,0 +1,22 @@
+{
+  "manifest_path": "/app/pixi.toml",
+  "environment_name": "default",
+  "pixi_version": "0.81.0",
+  "environment_lock_file_hash": "7f71f467d28aabcb",
+  "resolved_platform": {
+    "subdir": "linux-64",
+    "virtual_packages": [
+      "__unix=0=0",
+      "__linux=4.18",
+      "__glibc=2.28",
+      "__archspec=0=x86_64"
+    ]
+  },
+  "minimum_supported_platform": {
+    "subdir": "linux-64",
+    "requirements": [
+      "__glibc >=2.17,<3.0.a0",
+      "__unix"
+    ]
+  }
+}

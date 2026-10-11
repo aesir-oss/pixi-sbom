@@ -1,0 +1,52 @@
+{
+ "arch": "x86_64",
+ "build": "py311h5821dac_1008",
+ "build_number": 1008,
+ "depends": [
+  "__glibc >=2.17,<3.0.a0",
+  "cffi >=1.0.0",
+  "libgcc >=15",
+  "python >=3.11,<3.12.0a0",
+  "python_abi 3.11.* *_cp311"
+ ],
+ "license": "MIT",
+ "license_family": "MIT",
+ "md5": "3b066b214322f6efeea34e30e18f4fc3",
+ "name": "brotlipy",
+ "platform": "linux",
+ "purls": [
+  "pkg:pypi/brotlipy?source=hash-mapping"
+ ],
+ "run_exports": {},
+ "sha256": "4317002db8cac65f1969956d0132257dbab55039dcbe7bfe05c3eb8c5f0aff60",
+ "size": 322806,
+ "subdir": "linux-64",
+ "timestamp": 1788287719751,
+ "version": "0.7.0",
+ "fn": "brotlipy-0.7.0-py311h5821dac_1008.conda",
+ "url": "https://conda.anaconda.org/conda-forge/linux-64/brotlipy-0.7.0-py311h5821dac_1008.conda",
+ "channel": "https://conda.anaconda.org/conda-forge/",
+ "extracted_package_dir": "/root/.cache/rattler/cache/pkgs/brotlipy-0.7.0-py311h5821dac_1008",
+ "requested_specs": [],
+ "files": [
+  "lib/python3.11/site-packages/brotli/__init__.py",
+  "lib/python3.11/site-packages/brotli/__pycache__/__init__.cpython-311.pyc",
+  "lib/python3.11/site-packages/brotli/__pycache__/brotli.cpython-311.pyc",
+  "lib/python3.11/site-packages/brotli/__pycache__/build.cpython-311.pyc",
+  "lib/python3.11/site-packages/brotli/_brotli.abi3.so",
+  "lib/python3.11/site-packages/brotli/brotli.py",
+  "lib/python3.11/site-packages/brotli/build.py",
+  "lib/python3.11/site-packages/brotlipy-0.7.0.dist-info/INSTALLER",
+  "lib/python3.11/site-packages/brotlipy-0.7.0.dist-info/METADATA",
+  "lib/python3.11/site-packages/brotlipy-0.7.0.dist-info/RECORD",
+  "lib/python3.11/site-packages/brotlipy-0.7.0.dist-info/REQUESTED",
+  "lib/python3.11/site-packages/brotlipy-0.7.0.dist-info/WHEEL",
+  "lib/python3.11/site-packages/brotlipy-0.7.0.dist-info/direct_url.json",
+  "lib/python3.11/site-packages/brotlipy-0.7.0.dist-info/licenses/LICENSE",
+  "lib/python3.11/site-packages/brotlipy-0.7.0.dist-info/top_level.txt"
+ ],
+ "link": {
+  "source": "/root/.cache/rattler/cache/pkgs/brotlipy-0.7.0-py311h5821dac_1008",
+  "type": 1
+ }
+}

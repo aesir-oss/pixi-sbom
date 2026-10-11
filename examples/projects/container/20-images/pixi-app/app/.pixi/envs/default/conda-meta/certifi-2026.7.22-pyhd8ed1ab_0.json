@@ -1,0 +1,46 @@
+{
+ "build": "pyhd8ed1ab_0",
+ "build_number": 0,
+ "depends": [
+  "python >=3.10"
+ ],
+ "license": "ISC",
+ "md5": "37e13edbe3b48f1095a9d085ef9cd83b",
+ "name": "certifi",
+ "noarch": "python",
+ "purls": [
+  "pkg:pypi/certifi?source=hash-mapping"
+ ],
+ "run_exports": {},
+ "sha256": "fb167de4388e64e52aa3907ed099afab944c1fa6e5f74b281a312dae1bcf7f3b",
+ "size": 137015,
+ "subdir": "noarch",
+ "timestamp": 1784717699092,
+ "version": "2026.7.22",
+ "fn": "certifi-2026.7.22-pyhd8ed1ab_0.conda",
+ "url": "https://conda.anaconda.org/conda-forge/noarch/certifi-2026.7.22-pyhd8ed1ab_0.conda",
+ "channel": "https://conda.anaconda.org/conda-forge/",
+ "extracted_package_dir": "/root/.cache/rattler/cache/pkgs/certifi-2026.7.22-pyhd8ed1ab_0",
+ "requested_specs": [],
+ "files": [
+  "lib/python3.11/site-packages/certifi/__init__.py",
+  "lib/python3.11/site-packages/certifi/__main__.py",
+  "lib/python3.11/site-packages/certifi/cacert.pem",
+  "lib/python3.11/site-packages/certifi/core.py",
+  "lib/python3.11/site-packages/certifi/py.typed",
+  "lib/python3.11/site-packages/certifi/tests/__init__.py",
+  "lib/python3.11/site-packages/certifi/tests/test_certify.py",
+  "lib/python3.11/site-packages/certifi-2026.7.22.dist-info/INSTALLER",
+  "lib/python3.11/site-packages/certifi-2026.7.22.dist-info/LICENSE",
+  "lib/python3.11/site-packages/certifi-2026.7.22.dist-info/METADATA",
+  "lib/python3.11/site-packages/certifi-2026.7.22.dist-info/RECORD",
+  "lib/python3.11/site-packages/certifi-2026.7.22.dist-info/REQUESTED",
+  "lib/python3.11/site-packages/certifi-2026.7.22.dist-info/WHEEL",
+  "lib/python3.11/site-packages/certifi-2026.7.22.dist-info/direct_url.json",
+  "lib/python3.11/site-packages/certifi-2026.7.22.dist-info/top_level.txt"
+ ],
+ "link": {
+  "source": "/root/.cache/rattler/cache/pkgs/certifi-2026.7.22-pyhd8ed1ab_0",
+  "type": 1
+ }
+}

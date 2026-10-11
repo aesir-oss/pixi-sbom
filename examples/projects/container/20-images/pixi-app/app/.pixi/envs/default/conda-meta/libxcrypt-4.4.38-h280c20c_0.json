@@ -1,0 +1,51 @@
+{
+ "arch": "x86_64",
+ "build": "h280c20c_0",
+ "build_number": 0,
+ "depends": [
+  "libgcc >=14",
+  "__glibc >=2.17,<3.0.a0"
+ ],
+ "license": "LGPL-2.1-or-later",
+ "md5": "f7a7ff5a6ab331e037abd34f379a631d",
+ "name": "libxcrypt",
+ "platform": "linux",
+ "purls": [],
+ "run_exports": {
+  "weak": [
+   "libxcrypt >=4.4.38"
+  ]
+ },
+ "sha256": "f7e9292dd219a6435bbb1223da9586c3e70d66d169c5a92f08db3f2127df04e9",
+ "size": 101957,
+ "subdir": "linux-64",
+ "timestamp": 1785887123445,
+ "version": "4.4.38",
+ "fn": "libxcrypt-4.4.38-h280c20c_0.conda",
+ "url": "https://conda.anaconda.org/conda-forge/linux-64/libxcrypt-4.4.38-h280c20c_0.conda",
+ "channel": "https://conda.anaconda.org/conda-forge/",
+ "extracted_package_dir": "/root/.cache/rattler/cache/pkgs/libxcrypt-4.4.38-h280c20c_0",
+ "requested_specs": [],
+ "files": [
+  "include/crypt.h",
+  "lib/libcrypt.so",
+  "lib/libcrypt.so.2",
+  "lib/libcrypt.so.2.0.0",
+  "lib/pkgconfig/libcrypt.pc",
+  "lib/pkgconfig/libxcrypt.pc",
+  "share/man/man3/crypt.3",
+  "share/man/man3/crypt_checksalt.3",
+  "share/man/man3/crypt_gensalt.3",
+  "share/man/man3/crypt_gensalt_ra.3",
+  "share/man/man3/crypt_gensalt_rn.3",
+  "share/man/man3/crypt_preferred_method.3",
+  "share/man/man3/crypt_r.3",
+  "share/man/man3/crypt_ra.3",
+  "share/man/man3/crypt_rn.3",
+  "share/man/man5/crypt.5"
+ ],
+ "link": {
+  "source": "/root/.cache/rattler/cache/pkgs/libxcrypt-4.4.38-h280c20c_0",
+  "type": 1
+ }
+}

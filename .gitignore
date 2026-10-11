@@ -58,3 +58,6 @@ docs/papers/*.html
 # Python tooling used for the maturin builds and the docs
 .venv/
 .pytest_cache/
+
+# The unpacked container images under examples/ (#31) hold a venv on purpose: it is what the example shows.
+!examples/projects/container/*/*/app/.venv/

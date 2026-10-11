@@ -1,0 +1,37 @@
+{
+ "arch": "x86_64",
+ "build": "default_hbd61a6d_102",
+ "build_number": 102,
+ "constrains": [
+  "binutils_impl_linux-64 2.46.1"
+ ],
+ "depends": [
+  "__glibc >=2.17,<3.0.a0",
+  "zstd >=1.5.7,<1.6.0a0"
+ ],
+ "license": "GPL-3.0-only",
+ "license_family": "GPL",
+ "md5": "449500f2c089da11c40f5c21312e3e07",
+ "name": "ld_impl_linux-64",
+ "platform": "linux",
+ "purls": [],
+ "run_exports": {},
+ "sha256": "27d83f1188cd19bcb7754a078b3fa7f4cfb8527f8eb2fde54dd01fc529d1adec",
+ "size": 745303,
+ "subdir": "linux-64",
+ "timestamp": 1784214507189,
+ "version": "2.46.1",
+ "fn": "ld_impl_linux-64-2.46.1-default_hbd61a6d_102.conda",
+ "url": "https://conda.anaconda.org/conda-forge/linux-64/ld_impl_linux-64-2.46.1-default_hbd61a6d_102.conda",
+ "channel": "https://conda.anaconda.org/conda-forge/",
+ "extracted_package_dir": "/root/.cache/rattler/cache/pkgs/ld_impl_linux-64-2.46.1-default_hbd61a6d_102",
+ "requested_specs": [],
+ "files": [
+  "bin/x86_64-conda-linux-gnu-ld",
+  "x86_64-conda-linux-gnu/bin/ld"
+ ],
+ "link": {
+  "source": "/root/.cache/rattler/cache/pkgs/ld_impl_linux-64-2.46.1-default_hbd61a6d_102",
+  "type": 1
+ }
+}

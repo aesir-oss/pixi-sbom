@@ -1,0 +1,55 @@
+{
+ "arch": "x86_64",
+ "build": "py311h92159aa_0",
+ "build_number": 0,
+ "constrains": [
+  "jinja2 >=3.0.0"
+ ],
+ "depends": [
+  "__glibc >=2.17,<3.0.a0",
+  "libgcc >=15",
+  "python >=3.11,<3.12.0a0",
+  "python_abi 3.11.* *_cp311"
+ ],
+ "license": "BSD-3-Clause",
+ "license_family": "BSD",
+ "md5": "65aa6d5afeef6c2a7eca98c5936dd235",
+ "name": "markupsafe",
+ "platform": "linux",
+ "purls": [
+  "pkg:pypi/markupsafe?source=compressed-mapping"
+ ],
+ "run_exports": {},
+ "sha256": "59e85a8a453cdd7081fe67436353c6bbc7dd1eb2b868619dc86dc5b855e8c7dc",
+ "size": 27173,
+ "subdir": "linux-64",
+ "timestamp": 1791014734002,
+ "version": "3.0.4",
+ "fn": "markupsafe-3.0.4-py311h92159aa_0.conda",
+ "url": "https://conda.anaconda.org/conda-forge/linux-64/markupsafe-3.0.4-py311h92159aa_0.conda",
+ "channel": "https://conda.anaconda.org/conda-forge/",
+ "extracted_package_dir": "/root/.cache/rattler/cache/pkgs/markupsafe-3.0.4-py311h92159aa_0",
+ "requested_specs": [],
+ "files": [
+  "lib/python3.11/site-packages/markupsafe/__init__.py",
+  "lib/python3.11/site-packages/markupsafe/__pycache__/__init__.cpython-311.pyc",
+  "lib/python3.11/site-packages/markupsafe/__pycache__/_native.cpython-311.pyc",
+  "lib/python3.11/site-packages/markupsafe/_native.py",
+  "lib/python3.11/site-packages/markupsafe/_speedups.c",
+  "lib/python3.11/site-packages/markupsafe/_speedups.cpython-311-x86_64-linux-gnu.so",
+  "lib/python3.11/site-packages/markupsafe/_speedups.pyi",
+  "lib/python3.11/site-packages/markupsafe/py.typed",
+  "lib/python3.11/site-packages/markupsafe-3.0.4.dist-info/INSTALLER",
+  "lib/python3.11/site-packages/markupsafe-3.0.4.dist-info/METADATA",
+  "lib/python3.11/site-packages/markupsafe-3.0.4.dist-info/RECORD",
+  "lib/python3.11/site-packages/markupsafe-3.0.4.dist-info/REQUESTED",
+  "lib/python3.11/site-packages/markupsafe-3.0.4.dist-info/WHEEL",
+  "lib/python3.11/site-packages/markupsafe-3.0.4.dist-info/direct_url.json",
+  "lib/python3.11/site-packages/markupsafe-3.0.4.dist-info/licenses/LICENSE.txt",
+  "lib/python3.11/site-packages/markupsafe-3.0.4.dist-info/top_level.txt"
+ ],
+ "link": {
+  "source": "/root/.cache/rattler/cache/pkgs/markupsafe-3.0.4-py311h92159aa_0",
+  "type": 1
+ }
+}
