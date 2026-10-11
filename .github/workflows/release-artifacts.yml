@@ -138,7 +138,7 @@ jobs:
         id: attest
         uses: actions/attest-build-provenance@v2
         with:
-          subject-path: dist/pixi-sbom-${{ needs.tag.outputs.tag }}-${{ matrix.target }}.${{ matrix.arc }}
+          subject-path: dist/${{ needs.tag.outputs.tag }}-${{ matrix.target }}.${{ matrix.arc }}
 
       # `gh attestation verify` finds the statement through the API on its own. The bundle also
       # ships beside the archive, because the machine that most needs to check a binary is often

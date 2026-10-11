@@ -9142,6 +9142,28 @@ fn the_whole_examples_tree_scans_clean() {
     );
 }
 
+/// The release archives are named after the tag (`pixi-sbom-vX.Y.Z-<platform>`), and every step that
+/// names an archive spells it the same way. 1.12.0-rc.1's build failed at the attestation because one
+/// step still prefixed `pixi-sbom-` to a tag that already carries it.
+#[test]
+fn release_archives_are_named_after_the_tag_everywhere() {
+    let workflow = std::fs::read_to_string(repo_root().join(".github/workflows/release-artifacts.yml")).unwrap();
+    assert!(
+        workflow.contains(r#"name="${TAG}-${{ matrix.target }}""#),
+        "the Package step no longer names archives after the tag"
+    );
+    assert!(
+        workflow.contains("subject-path: dist/${{ needs.tag.outputs.tag }}-${{ matrix.target }}.${{ matrix.arc }}"),
+        "the attestation does not name the archive the Package step writes"
+    );
+    for doubled in ["pixi-sbom-${TAG}", "pixi-sbom-${{ needs.tag.outputs.tag }}"] {
+        assert!(
+            !workflow.contains(doubled),
+            "{doubled} names an archive pixi-sbom-pixi-sbom-v…: the tag already starts with pixi-sbom-"
+        );
+    }
+}
+
 /// The what's-new page has a section for every release since 1.0, and none for a release that
 /// does not exist: a release that ships without one fails the next build, which is how it gets
 /// written while the release is still fresh.
