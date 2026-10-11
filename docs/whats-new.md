@@ -23,7 +23,7 @@ Since 1.0, pixi-sbom has:
   credentials are used, and `--doctor` says which host is the problem.
 - **Learned tab completion** in bash, zsh, fish and PowerShell, for `pixi-sbom` and `pixi sbom`.
 
-## Unreleased
+## 1.12.0
 
 pixi-sbom has a new home, [aesir-oss/pixi-ext-contrib](https://github.com/aesir-oss/pixi-ext-contrib), a
 workspace for pixi extensions it now shares with the tools to come. Nothing about running it changes.
