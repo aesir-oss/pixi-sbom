@@ -21,8 +21,8 @@ A Cargo workspace of pixi extensions. Each is a `pixi-<name>` binary that pixi r
 | `Cargo.toml` | The workspace manifest; the release profile lives here |
 
 Planned: `crates/pixi-policy` (dependency policy, takes over pixi-sbom's license gate). Docs per extension are tracked
-in #6. Until the shared crate is published (#57), pixi-sbom cannot be released: crates.io refuses its path
-dependency.
+in #6. Until the shared crate's first version is on crates.io, pixi-sbom cannot be released: crates.io refuses its
+path dependency (see Releases).
 
 ## Commands
 
@@ -39,8 +39,13 @@ Everything runs through pixi.
 
 ## Releases
 
-- Started by the Release workflow (`workflow_dispatch`, a `version` input). It bumps the version, regenerates
-  `crates/pixi-sbom/CHANGELOG.md`, commits and tags `pixi-sbom-vX.Y.Z` with the release App. The tag triggers `release-artifacts.yml`.
+- Started by the Release workflow (`workflow_dispatch`, `crate` and `version` inputs). It bumps the version,
+  regenerates the crate's `CHANGELOG.md`, commits and tags `<crate>-vX.Y.Z` with the release App. A `pixi-sbom-v*`
+  tag triggers `release-artifacts.yml`; an `aesir-pixi-ext-contrib-common-v*` tag triggers `publish-common.yml`
+  (crates.io only, no GitHub release).
+- Release the shared crate before an extension that needs its changes: an extension's release stops if a workspace
+  crate it builds on is untagged, changed since its tag, or not on crates.io (`shared-crates-check`). Its first
+  version is published by hand (trusted publishing cannot create a crate).
 - Tags before the move are plain `vX.Y.Z` (made in millsks/pixi-sbom); keep them. Archives are named
   `pixi-sbom-vX.Y.Z-<platform>`, which is also the tag.
 - Extension releases are never marked Latest; after each final one `repository-release.yml` publishes

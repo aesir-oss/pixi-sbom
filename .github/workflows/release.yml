@@ -6,7 +6,12 @@ name: Release
 # note at the top of it for why the split exists (#218: provenance has to be able to name the
 # commit the binaries were built from, and only a tag-triggered run can).
 #
-# Operator prerequisite: a release commits the version bump + crates/pixi-sbom/CHANGELOG.md and pushes a
+# One workflow for every crate (#57): the `crate` input picks pixi-sbom or the shared crate,
+# aesir-pixi-ext-contrib-common, and every crate-specific value comes from the `Resolve the crate` step.
+# pixi-sbom's tag starts release-artifacts.yml; the shared crate's starts publish-common.yml, which only
+# publishes it to crates.io (no GitHub release: it is not something anyone installs).
+#
+# Operator prerequisite: a release commits the version bump + the crate's CHANGELOG.md and pushes a
 # tag to `main` under the branch ruleset, so the default GITHUB_TOKEN is not enough.
 # The release GitHub App (already in the ruleset's bypass list) needs its credentials
 # exposed as two repository secrets:
@@ -17,6 +22,12 @@ name: Release
 on:
   workflow_dispatch:
     inputs:
+      crate:
+        description: "What to release"
+        required: true
+        type: choice
+        options: [pixi-sbom, aesir-pixi-ext-contrib-common]
+        default: pixi-sbom
       version:
         description: "Version to release (e.g. 1.0.0); leave blank to auto-increment the patch"
         required: false
@@ -58,6 +69,25 @@ jobs:
           fetch-depth: 0
           token: ${{ steps.app-token.outputs.token }}
 
+      # Everything that differs between crates, decided once.
+      - name: Resolve the crate
+        env:
+          CRATE: ${{ inputs.crate || 'pixi-sbom' }}
+        run: |
+          set -euo pipefail
+          {
+            echo "CRATE=${CRATE}"
+            echo "PREFIX=${CRATE}-v"
+            echo "DIR=crates/${CRATE}"
+            if [ "$CRATE" = pixi-sbom ]; then
+              echo "EXTENSION=true"
+              echo "NEXT_WORKFLOW=release-artifacts.yml"
+            else
+              echo "EXTENSION=false"
+              echo "NEXT_WORKFLOW=publish-common.yml"
+            fi
+          } >> "$GITHUB_ENV"
+
       # -----------------------------------------------------------------------
       # Version calculation
       # -----------------------------------------------------------------------
@@ -65,8 +95,10 @@ jobs:
         id: get_tag
         run: |
           git fetch --tags
-          # pixi-sbom-vX.Y.Z since the move to the workspace; plain vX.Y.Z before it.
-          latest_tag=$(git describe --tags --abbrev=0 --match 'pixi-sbom-v[0-9]*.[0-9]*.[0-9]*' --match 'v[0-9]*.[0-9]*.[0-9]*' 2>/dev/null || echo no_tag_found)
+          # <crate>-vX.Y.Z; pixi-sbom's releases before the move to the workspace are plain vX.Y.Z.
+          legacy=()
+          if [ "$CRATE" = pixi-sbom ]; then legacy=(--match 'v[0-9]*.[0-9]*.[0-9]*'); fi
+          latest_tag=$(git describe --tags --abbrev=0 --match "${PREFIX}[0-9]*.[0-9]*.[0-9]*" "${legacy[@]}" 2>/dev/null || echo no_tag_found)
           echo "tag=${latest_tag}" >> "$GITHUB_OUTPUT"
           if [ "$latest_tag" != "no_tag_found" ]; then
             echo "has_tags=true" >> "$GITHUB_OUTPUT"
@@ -79,14 +111,14 @@ jobs:
         run: |
           if [ "${{ steps.get_tag.outputs.has_tags }}" = "true" ]; then
             base_tag="${{ steps.get_tag.outputs.tag }}"
-            base_tag="${base_tag#pixi-sbom-}"
+            base_tag="${base_tag#"$PREFIX"}"
             base_tag="${base_tag#v}"
             IFS='.' read -r major minor patch <<< "${base_tag%%-*}"
             patch=$((patch + 1))
             next_tag="${major}.${minor}.${patch}"
           else
             # First release: use whatever Cargo.toml already says.
-            next_tag=$(grep -m1 '^version = ' crates/pixi-sbom/Cargo.toml | sed -E 's/version = "([^"]+)"/\1/')
+            next_tag=$(grep -m1 '^version = ' "${DIR}/Cargo.toml" | sed -E 's/version = "([^"]+)"/\1/')
           fi
           echo "next_tag=${next_tag}" >> "$GITHUB_OUTPUT"
 
@@ -96,7 +128,9 @@ jobs:
           if [ "${{ steps.get_tag.outputs.has_tags }}" = "false" ]; then
             echo "No previous tags found - proceeding with first release"
             echo "changed=true" >> "$GITHUB_OUTPUT"
-          elif git diff --quiet "${{ steps.get_tag.outputs.tag }}" HEAD; then
+          # The shared crate's release is about its own directory; an extension's about the whole tree.
+          elif if [ "$EXTENSION" = true ]; then git diff --quiet "${{ steps.get_tag.outputs.tag }}" HEAD; \
+               else git diff --quiet "${{ steps.get_tag.outputs.tag }}" HEAD -- "$DIR"; fi; then
             echo "::notice::No changes since last tag ${{ steps.get_tag.outputs.tag }} - skipping"
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
@@ -145,11 +179,11 @@ jobs:
       - name: Check the version does not already exist
         if: steps.should_skip.outputs.skip != 'true'
         run: |
-          if git tag | grep -q "^pixi-sbom-v${{ env.NEW_TAG }}$"; then
+          if git tag | grep -q "^${PREFIX}${{ env.NEW_TAG }}$"; then
             if [ "${{ inputs.force_recreate }}" = "true" ]; then
-              echo "pixi-sbom-v${{ env.NEW_TAG }} exists - force_recreate enabled"
+              echo "${PREFIX}${{ env.NEW_TAG }} exists - force_recreate enabled"
             else
-              echo "::error::pixi-sbom-v${{ env.NEW_TAG }} already exists. Use force_recreate to overwrite."
+              echo "::error::${PREFIX}${{ env.NEW_TAG }} already exists. Use force_recreate to overwrite."
               exit 1
             fi
           else
@@ -160,7 +194,7 @@ jobs:
       # section, checked here so a release without one stops before anything is pushed.
       # Release candidates are skipped by the script.
       - name: Check the What's new notes are written
-        if: steps.should_skip.outputs.skip != 'true'
+        if: steps.should_skip.outputs.skip != 'true' && env.EXTENSION == 'true'
         run: python3 scripts/whats_new.py check "${{ env.NEW_TAG }}"
 
       - name: Remove existing tag and release (force_recreate)
@@ -168,7 +202,7 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
-          VERSION="pixi-sbom-v${{ env.NEW_TAG }}"
+          VERSION="${PREFIX}${{ env.NEW_TAG }}"
           if git tag | grep -q "^${VERSION}$"; then
             git push origin --delete "${VERSION}" || true
             git tag -d "${VERSION}" || true
@@ -213,10 +247,24 @@ jobs:
           shared-key: debug
           save-if: false
 
-      - name: Bump version in crates/pixi-sbom/Cargo.toml, Cargo.lock and pixi.toml
+      # An extension released on a workspace crate that is not on crates.io, or that changed since its release,
+      # would be built from code its crates.io package does not have: release that crate first (#57).
+      - name: Require the workspace crates it builds on to be released
+        if: steps.should_skip.outputs.skip != 'true' && env.EXTENSION == 'true'
+        run: pixi run shared-crates-check "$CRATE"
+
+      # pixi.toml's version follows pixi-sbom. A new version of the shared crate also moves the version every crate
+      # that depends on it asks for, or cargo would refuse the path dependency.
+      - name: Bump the version in the crate's Cargo.toml, Cargo.lock (and pixi.toml for pixi-sbom)
         if: steps.should_skip.outputs.skip != 'true'
         run: |
-          sed -i -E "s/^version = \"[^\"]+\"/version = \"${{ env.NEW_TAG }}\"/" crates/pixi-sbom/Cargo.toml pixi.toml
+          set -euo pipefail
+          files=("${DIR}/Cargo.toml")
+          if [ "$CRATE" = pixi-sbom ]; then files+=(pixi.toml); fi
+          sed -i -E "0,/^version = /s/^version = \"[^\"]+\"/version = \"${{ env.NEW_TAG }}\"/" "${files[@]}"
+          if [ "$EXTENSION" != true ]; then
+            sed -i -E "/package = \"${CRATE}\"/s/version = \"[^\"]+\"/version = \"${{ env.NEW_TAG }}\"/" crates/*/Cargo.toml
+          fi
           pixi run cargo update --workspace
           git diff --stat
 
@@ -233,15 +281,15 @@ jobs:
       # -----------------------------------------------------------------------
       # Changelog & tag (git-cliff via cliff.toml)
       # -----------------------------------------------------------------------
-      # Only the commits that touched pixi-sbom or a workspace crate it depends on (scripts/changelog.py).
-      - name: Generate crates/pixi-sbom/CHANGELOG.md with git-cliff
+      # Only the commits that touched the crate or a workspace crate it depends on (scripts/changelog.py).
+      - name: Generate the crate's CHANGELOG.md with git-cliff
         if: steps.should_skip.outputs.skip != 'true'
-        run: pixi run changelog-of write pixi-sbom --tag "pixi-sbom-v${{ env.NEW_TAG }}"
+        run: pixi run changelog-of write "$CRATE" --tag "${PREFIX}${{ env.NEW_TAG }}"
 
       # The notes become the release's section in the same commit as the changelog, so main
       # never has a release the What's new page does not describe.
       - name: Turn the What's new notes into the release's section
-        if: steps.should_skip.outputs.skip != 'true'
+        if: steps.should_skip.outputs.skip != 'true' && env.EXTENSION == 'true'
         run: pixi run whats-new release "${{ env.NEW_TAG }}"
 
       - name: Commit the release and tag it
@@ -249,30 +297,30 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add crates/pixi-sbom/CHANGELOG.md crates/pixi-sbom/Cargo.toml Cargo.lock pixi.toml docs/whats-new.md
-          git commit -m "chore(release): pixi-sbom-v${{ env.NEW_TAG }}"
-          git tag -a "pixi-sbom-v${{ env.NEW_TAG }}" -m "Release pixi-sbom-v${{ env.NEW_TAG }}"
+          git add "${DIR}/CHANGELOG.md" crates/*/Cargo.toml Cargo.lock pixi.toml docs/whats-new.md
+          git commit -m "chore(release): ${PREFIX}${{ env.NEW_TAG }}"
+          git tag -a "${PREFIX}${{ env.NEW_TAG }}" -m "Release ${PREFIX}${{ env.NEW_TAG }}"
           git push origin HEAD:main --tags
-          echo "::notice::Pushed pixi-sbom-v${{ env.NEW_TAG }}. release-artifacts.yml builds and publishes it from here."
+          echo "::notice::Pushed ${PREFIX}${{ env.NEW_TAG }}. ${NEXT_WORKFLOW} builds and publishes it from here."
 
       # The handover. A tag pushed with the App token does start a workflow, but if that ever
       # stops being true the release would end here looking successful, with no binaries and no
       # crate — so the run does not finish green until the next one has actually started.
       # Guarded like every other step after the decision: a run that deliberately released nothing
       # has no tag to confirm, and without this it fails claiming a tag was pushed that never was.
-      - name: Confirm release-artifacts.yml picked the tag up
+      - name: Confirm the next workflow picked the tag up
         if: steps.should_skip.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           for _ in $(seq 1 20); do
-            if gh run list --workflow=release-artifacts.yml --limit 20 \
-                 --json headBranch --jq '.[].headBranch' | grep -qx "pixi-sbom-v${{ env.NEW_TAG }}"; then
-              echo "release-artifacts.yml is running for pixi-sbom-v${{ env.NEW_TAG }}"
+            if gh run list --workflow="$NEXT_WORKFLOW" --limit 20 \
+                 --json headBranch --jq '.[].headBranch' | grep -qx "${PREFIX}${{ env.NEW_TAG }}"; then
+              echo "${NEXT_WORKFLOW} is running for ${PREFIX}${{ env.NEW_TAG }}"
               exit 0
             fi
             sleep 15
           done
-          echo "::error::The tag was pushed but release-artifacts.yml never started. Dispatch it by hand with tag=pixi-sbom-v${{ env.NEW_TAG }}."
+          echo "::error::The tag was pushed but ${NEXT_WORKFLOW} never started. Dispatch it by hand with tag=${PREFIX}${{ env.NEW_TAG }}."
           exit 1

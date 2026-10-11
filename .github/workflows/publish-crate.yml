@@ -45,8 +45,12 @@ jobs:
       - name: Publish to crates.io
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.crates-io.outputs.token }}
+          TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
           # A clean checkout of the tag: cargo refuses to publish a dirty tree.
           git status --porcelain
-          pixi run cargo publish -p pixi-sbom --locked
+          # The crate is the tag's name before its version: pixi-sbom-v1.2.0, aesir-pixi-ext-contrib-common-v0.1.0.
+          crate="${TAG%-v[0-9]*}"
+          echo "publishing ${crate} from ${TAG}"
+          pixi run cargo publish -p "$crate" --locked

@@ -445,10 +445,35 @@ extension pattern (`v*`, `pixi-sbom-v*`, `cliff.toml`'s `tag_pattern`, the Actio
 
 | Input | Default | Meaning |
 |---|---|---|
+| `crate` | `pixi-sbom` | What to release: `pixi-sbom`, or the shared crate `aesir-pixi-ext-contrib-common` (see [The shared crate's releases](#the-shared-crates-releases)). |
 | `version` | blank | Version to release without the `v` (e.g. `1.2.0`). Blank auto-increments the patch of the latest `v*` tag; for the very first release it uses `Cargo.toml`'s version. |
 | `force_recreate` | false | Delete an existing tag and release of that version first, then recreate them. |
 
 A **pre-release is expressed in the version**, not by a separate flag: `1.0.0-rc.1` is one and `1.0.0` is not.
+
+### The shared crate's releases
+
+`aesir-pixi-ext-contrib-common` is released with the same workflow (`crate: aesir-pixi-ext-contrib-common`, #57), with
+three differences, decided 2026-10-11:
+
+- **Tag and crates.io only.** It is tagged `aesir-pixi-ext-contrib-common-vX.Y.Z` (for its changelog,
+  `crates/aesir-pixi-ext-contrib-common/CHANGELOG.md`) and the tag starts `publish-common.yml`, which publishes it to
+  crates.io through `publish-crate.yml`. No GitHub release, archives or wheels, no What's new notes: nobody installs
+  it, and it never shows in the release list or the repository release's table.
+- **Released only when an extension needs it, and first.** Before an extension's release, `shared-crates-check` (run
+  by the workflow, `scripts/shared_crates.py`) requires every workspace crate the extension builds on to have a tag
+  for its current version, no changes in its directory since that tag, and that version on crates.io; otherwise the
+  extension's release stops before tagging. So when the shared crate changed: release it (0.x: a minor version for
+  new or changed code, a patch for fixes), wait for its publish job, then release the extension.
+- **Its version moves the requirement too.** Releasing version X rewrites the `version = "X"` every crate's
+  `common = { package = "aesir-pixi-ext-contrib-common", ... }` asks for, in the same release commit, since cargo
+  refuses a path dependency whose version does not satisfy the requirement.
+
+**Its first version is published by hand**: crates.io trusted publishing cannot create a crate. `publish-common.yml`
+stops with instructions when the crate is not on crates.io yet: an owner publishes the tag's version with
+`pixi run cargo publish -p aesir-pixi-ext-contrib-common --locked` and their API token, then adds trusted publishers
+for `publish-common.yml` and `publish-crate.yml`, as pixi-sbom has. Until that first version exists, pixi-sbom cannot
+be released, because its own crates.io package depends on it.
 
 **Rerun the comparison with syft** before a release that changes identity or coverage: `pixi run grype-compare`,
 and the syft column of [pixi-sbom and syft](syft.md), then update that page's tables and the date and versions it

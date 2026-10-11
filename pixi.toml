@@ -20,6 +20,8 @@ test = "cargo test"
 test-integration = "cargo test --test '*'"
 build = "cargo build --release"
 changelog-of = { cmd = "python scripts/changelog.py", description = "one extension's changelog, from the commits that touched it: changelog-of write|notes|paths <extension> [--tag <tag>]" }
+shared-crates-check = { cmd = "python scripts/shared_crates.py", description = "before an extension's release: are the workspace crates it builds on released? shared-crates-check <extension>" }
+shared-crates-test = { cmd = "python -m unittest discover -s scripts -p 'test_shared_crates.py' -v", description = "the shared-crate release check's own tests" }
 changelog-test = { cmd = "python -m unittest discover -s scripts -p 'test_changelog.py' -v", description = "the per-extension changelog's own tests" }
 # The full criterion run, which takes a few minutes; `bench-test` only checks that every
 # benchmark still runs, once each in criterion's test mode and in a debug build, which is what CI
