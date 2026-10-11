@@ -5,10 +5,10 @@
 #![cfg_attr(not(test), forbid(unsafe_code))]
 
 use pixi_sbom::{
-    auditable, batch, cache, cli, concurrency, condaarchive, condalock, config, cran, diff, discover, doctor, embedded,
-    epss, explain, explicit, filter, format, fromsbom, gobuild, http, imports, kev, license, lock, manifest, mapping,
-    merge, mirror, model, npm, osv, outdated, pdm, phantom, pkgcache, poetry, policy, prefix, progress, pylock, pypi,
-    report, requirements, scorecard, style, timings, uv, verify, vexin, vulnpolicy, wheel,
+    auditable, batch, bundled, cache, cli, concurrency, condaarchive, condalock, config, cran, diff, discover, doctor,
+    embedded, epss, explain, explicit, filter, format, fromsbom, gobuild, http, imports, kev, license, lock, manifest,
+    mapping, merge, mirror, model, npm, osv, outdated, pdm, phantom, pkgcache, poetry, policy, prefix, progress,
+    pylock, pypi, report, requirements, scorecard, style, timings, uv, verify, vexin, vulnpolicy, wheel,
 };
 
 /// The system allocator on macOS and Windows is slow under the many small allocations a
@@ -2432,6 +2432,9 @@ fn enrich(sbom: &mut model::Sbom, args: &cli::Args, input: &Input, progress: pro
                 // Python distributions a package ships inside itself (setuptools/_vendor).
                 let prefix::VendoredOutcome { added, merged } = prefix::attach_vendored(sbom, dir);
                 tracing::info!(added, merged, "attached vendored Python distributions");
+                // Native libraries a wheel or a package carries a copy of (pillow.libs/libwebp).
+                let bundled::Outcome { files, added, merged } = bundled::attach(sbom, dir);
+                tracing::info!(files, added, merged, "read bundled native libraries");
             }
         }
         let pkgcache::Outcome {

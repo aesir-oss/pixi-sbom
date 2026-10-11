@@ -24,3 +24,5 @@ extend-exclude = [
 certifi = "certifi"
 # Crate name (deflate implementation)
 flate = "flate"
+# The macOS wheel repair tool (delocate-wheel), which copies a wheel's libraries into .dylibs/
+delocate = "delocate"

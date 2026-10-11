@@ -82,6 +82,9 @@ pixi-sbom describes Python and conda projects and environments. syft catalogs mu
 - **Other ecosystems**: npm, Java, Rust crates and Go modules outside a conda environment, and many more. Inside
   one, `--prefix` lists its installed npm packages, and `--prefix --embedded-sboms` reads a binary's Rust crates and
   Go modules, as syft does.
+- **Binary classification** of native code in general. pixi-sbom recognizes nine common libraries when a wheel or
+  package bundles a copy ([which ones](output-format.md#bundled-native-libraries)), and finds the libwebp inside
+  Pillow's wheels that syft's document does not give Grype; any other library compiled into a binary is syft's.
 - **Every installed file** with its digests. pixi-sbom records packages, not files; for a conda environment
   `--verify-files` instead checks every file against the hash conda recorded at installation, which syft does not do.
 

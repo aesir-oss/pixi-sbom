@@ -173,8 +173,8 @@ the machine; the test asserts the upstream saw every service's requests.
 ### Against syft, through Grype (`pixi run grype-compare`)
 
 The acceptance test for replacing syft in front of Grype. For each corpus environment (`pixi/01-django`, a web
-stack; `pixi/04-data-analysis`, a scientific stack; `pixi/10-dev-tooling`, Rust binaries; and a pip venv of
-`requirements/02-flask`), `scripts/grype_compare.py` installs it, describes it with syft and with
+stack; `pixi/04-data-analysis`, a scientific stack; `pixi/10-dev-tooling`, Rust binaries; a pip venv of `requirements/02-flask`; and a pip venv of
+Pillow 10.0.0, whose wheels bundle a vulnerable libwebp), `scripts/grype_compare.py` installs it, describes it with syft and with
 `pixi sbom --prefix --primary-purl pypi --embedded-sboms` (offline: everything pixi-sbom needs is on disk or in its
 own tables), and scans both documents with the same Grype and the same database. syft and Grype run through
 `pixi exec` at versions pinned in the script, so neither is a dependency of the project.
@@ -184,6 +184,10 @@ run unless `crates/pixi-sbom/tests/grype/exceptions.toml` lists it, for that env
 difference that is right, such as a Grype match on a CPE syft guessed from a name for code the package does not
 contain. Findings only pixi-sbom's document produces are printed, not failed. The run prints the Grype database's
 build date, because findings change as advisories are published.
+
+Some environments are in the corpus for one finding: `REQUIRED` in the script names it, and the run fails if
+pixi-sbom's document does not give it, whatever syft finds. The Pillow venv must give CVE-2023-4863 on the libwebp
+its wheels bundle.
 
 It needs the network (installing the environments, Grype's database) and takes a few minutes, so it is not part of
 `pixi run ci`. The `Grype comparison` workflow runs it on pull requests that touch identity code, weekly, and on
@@ -274,6 +278,24 @@ date. It lists only the exceptions: `r-*` packages CRAN spells differently and t
 
 `pixi run cpe-upkeep --report <file>` runs the same checks locally (about ten minutes: NVD allows five requests in
 thirty seconds without an API key); `pixi run cpe-upkeep-test` tests them.
+
+## The bundled-library signatures
+
+`crates/pixi-sbom/data/signatures.toml` says how each [bundled native library](output-format.md#bundled-native-libraries)
+is recognized: the files it is installed as, the conda packages that are the library itself, the CPE table key, and
+where its version is (`text` after a prefix, an exported `symbol` holding the string, a `symbol-pointer` to it, or a
+`packed-function` returning `major << 16 | minor << 8 | patch`). `crates/pixi-sbom/src/bundled.rs` reads it.
+
+**Adding a library** is one table in that file, plus its two releases in `bundled::tests::RELEASES`, which builds
+synthetic ELF, Mach-O and PE files for each and reads the version back. Find where the real library keeps its
+version first: `strings` on conda-forge's build shows a version text if there is one; when there is none, look
+for an exported symbol (`nm -gU`, `objdump -T`). Then run `pixi run signature-check --report <file> --only <library>`,
+which downloads conda-forge's latest build for Linux, macOS and Windows, puts the library in a wheel's `.libs`
+directory, and checks pixi-sbom reads the package's own version out of each.
+
+The same check runs weekly as the `signatures` job of `.github/workflows/cpe-upkeep.yml`, and fails, with its
+report in the job summary, when a build no longer gives its version. `pixi run signature-check-test` tests the
+script.
 
 ## The GitHub Action
 

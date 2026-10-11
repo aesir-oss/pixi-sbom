@@ -361,6 +361,37 @@ directory, found from its conda record's files or its pip `RECORD`.
 Its id (`bom-ref`) ends in `#vendored`, so it stays apart from an installed distribution of the same name and version:
 they are different copies of the code. `--report diff` leaves vendored copies out: they are not installs.
 
+### Bundled native libraries
+
+auditwheel, delocate and delvewheel copy the shared libraries a wheel links into the wheel (`pillow.libs/`,
+`PIL/.dylibs/`), where a tool that reads only package metadata never sees them: CVE-2023-4863 in the libwebp inside
+Pillow's wheels was missed that way. With `--prefix` and `--embedded-sboms`, every file an installed package owns
+(from its conda record's files or its pip `RECORD`) that is named like one of these libraries is opened, and the
+library's version is read out of the binary itself, from ELF, Mach-O (universal ones included) and PE files:
+
+| Library | Looked for in files named | Version read from | CPE |
+|---|---|---|---|
+| openssl | `libcrypto*` | the `OpenSSL <version>` text | `openssl:openssl` |
+| libwebp | `libwebp*`, `libwebpdecoder*` | what `WebPGetDecoderVersion` returns | `webmproject:libwebp` |
+| zlib | `libz*`, `zlib*`, `zlib1*` | the `deflate <version>` text | `zlib:zlib` |
+| sqlite | `libsqlite3*`, `sqlite3*` | the `sqlite3_version` string | `sqlite:sqlite` |
+| libcurl | `libcurl*` | the `libcurl/<version>` text | `haxx:libcurl` |
+| libxml2 | `libxml2*` | the `xmlParserVersion` string | `xmlsoft:libxml2` |
+| expat | `libexpat*` | the `expat_<version>` text | `libexpat_project:libexpat` |
+| libpng | `libpng*`, `libpng16*` | the `libpng version <version>` text | `libpng:libpng` |
+| libjpeg-turbo | `libjpeg*`, `libturbojpeg*`, `jpeg62*`, `turbojpeg*` | the `libjpeg-turbo version <version>` text | `libjpeg-turbo:libjpeg-turbo` |
+
+A name matches when it is the stem followed by nothing, a `.`, a `-` or a `_`: `libwebp-3a2b1c4d.so.7` is libwebp,
+`libwebpmux.so.3` is not. A file named like a library but holding no version is left out, and so is a conda package
+that is the library itself (`libwebp-base`, `libzlib`): its files are the library, not a bundled copy.
+
+Each library found is a component with `pixi:kind=embedded`, a `pkg:generic/<library>@<version>` purl, the CPE the
+[CPE table](development.md#the-cpe-table) gives that library, `pixi:embedded-sbom=bundled:<file>` (several, separated
+by `;`, when more than one file holds the same version), the files as `evidence.occurrences`, and an edge from each
+package that ships it. **This is an inventory of the libraries above, not of everything a binary contains**: a
+library linked in statically, or one not in the table, is not found, and a scanner's binary analysis still has a
+place beside it.
+
 ### Installed environments
 
 With `--prefix` the document describes an installed environment instead of a lockfile: the metadata property is

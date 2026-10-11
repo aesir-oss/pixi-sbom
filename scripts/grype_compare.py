@@ -37,6 +37,8 @@ CORPUS = [
     ("go-tools", "examples/projects/pixi/16-go-tools", "pixi"),
     # npm and its dependencies, installed by nodejs and a tool built on it (#438).
     ("node-tools", "examples/projects/pixi/17-node-tools", "pixi"),
+    # Native libraries a wheel bundles (`PIL/.dylibs`, `pillow.libs`), read out of the binaries (#23).
+    ("pillow-wheels", "crates/pixi-sbom/tests/grype/pillow-wheels/requirements.txt", "venv"),
 ]
 
 # syft reads installed package.json files only in an image unless told to; on the environment that
@@ -44,6 +46,10 @@ CORPUS = [
 # the data-analysis environment it would list JupyterLab's prebuilt extension bundles, which are
 # not installed packages.
 SYFT_EXTRA = {"node-tools": ["--select-catalogers", "+javascript-package-cataloger"]}
+
+# Findings pixi-sbom's document must give Grype in an environment, whatever syft finds: the reason the
+# environment is in the corpus. Matched on vulnerability and package; the version is the bundled copy's.
+REQUIRED = {"pillow-wheels": {("CVE-2023-4863", "libwebp")}}
 
 # syft artifact types this comparison is about: what a conda or Python environment installs.
 COMPARED_TYPES = {"python", "conda", "binary", "npm", "go-module"}
@@ -116,6 +122,11 @@ def compare(environment: str, syft: set[Finding], pixi: set[Finding], exceptions
     missing = syft - pixi
     excepted = {f for f in missing if (environment, f.vulnerability, f.package) in exceptions}
     return Comparison(agree=syft & pixi, syft_only=missing - excepted, excepted=excepted, pixi_only=pixi - syft)
+
+
+def missing_required(environment: str, pixi: set[Finding]) -> set[tuple[str, str]]:
+    """The findings REQUIRED names for an environment that pixi-sbom's document did not give."""
+    return REQUIRED.get(environment, set()) - {(f.vulnerability, f.package) for f in pixi}
 
 
 def default_gap(recommended: set[Finding], default: set[Finding]) -> set[Finding]:
@@ -205,11 +216,16 @@ def main(argv: list[str] | None = None) -> int:
         for finding in sorted(result.pixi_only):
             sys.stderr.write(f"  pixi-sbom-only: {finding.vulnerability} {finding.package} {finding.version}\n")
         unexplained += len(result.syft_only)
+        for vulnerability, package in sorted(missing_required(name, recommended)):
+            sys.stderr.write(f"  FAIL required: {vulnerability} {package} not found in pixi-sbom's document\n")
+            unexplained += 1
     env = {**os.environ, "GRYPE_DB_CACHE_DIR": str(db), "GRYPE_CHECK_FOR_APP_UPDATE": "false"}
     status = run(["pixi", "exec", "--spec", GRYPE, "grype", "db", "status", "-o", "json"], env=env)
     sys.stderr.write(f"Grype database built {json.loads(status.stdout).get('built', 'unknown')}\n")
     if unexplained:
-        sys.stderr.write(f"{unexplained} syft-only finding(s): fix pixi-sbom or add an exception with a reason\n")
+        sys.stderr.write(
+            f"{unexplained} syft-only or required finding(s) missing: fix pixi-sbom or add an exception with a reason\n"
+        )
         return 1
     return 0
 

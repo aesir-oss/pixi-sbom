@@ -69,6 +69,17 @@ pub fn for_package(package: &Package) -> Option<String> {
     if package.properties.contains_key(crate::prefix::INTERPRETER_PROPERTY) {
         return interpreter(package);
     }
+    // A native library found bundled in a file, named by its signature, gets the table's CPE for that library.
+    if crate::bundled::is_bundled(package) {
+        let entry = entry(crate::bundled::cpe_key(&package.name)?)?;
+        let version = package.version.as_deref()?;
+        return Some(format!(
+            "cpe:2.3:a:{}:{}:{}:*:*:*:*:*:*:*",
+            entry.vendor,
+            entry.product,
+            escape(version)
+        ));
+    }
     // A conda package with a PyPI identity is matched by that purl, like any PyPI package.
     if package.kind != PackageKind::CondaBinary || package.extra_purls.iter().any(|p| p.starts_with("pkg:pypi/")) {
         return None;

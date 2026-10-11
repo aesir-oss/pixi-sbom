@@ -916,7 +916,7 @@ pub fn attach_vendored(sbom: &mut Sbom, prefix: &Path) -> VendoredOutcome {
 }
 
 /// `Name` and `Version` from a dist-info's `METADATA`.
-fn name_and_version(dist_info: &Path) -> Option<(String, String)> {
+pub(crate) fn name_and_version(dist_info: &Path) -> Option<(String, String)> {
     let text = std::fs::read_to_string(dist_info.join("METADATA")).ok()?;
     let headers = wheel::parse_headers(&text);
     let first = |key: &str| {

@@ -1,0 +1,73 @@
+# Native libraries pixi-sbom recognizes when a wheel or a conda package bundles a copy of one (#23):
+# auditwheel's `<dist>.libs/`, delocate's `.dylibs/`, delvewheel's `<dist>.libs/`, or a conda package
+# that ships the library's files itself. Each library is looked for only in files named like it, and
+# its version is read out of the file, never guessed from the name.
+#
+#   cpe      the key of this library's entry in cpe.toml, which gives the component its CPE
+#   conda    conda packages that are the library itself: their files are the library, not a bundled copy
+#   files    file name stems the library is installed as; `libwebp` matches `libwebp.so.7`,
+#            `libwebp-3a2b1c4d.so.7.1.8`, `libwebp.7.dylib` and `libwebp-7.dll`, not `libwebpmux.so.3`
+#   version  how the version is read:
+#            text            the text after `prefix` (`OpenSSL 3.0.13 30 Jan 2024` -> 3.0.13)
+#            symbol          the string an exported symbol holds (`sqlite3_version`)
+#            symbol-pointer  the string an exported pointer points to; `encoding = "decimal"` reads
+#                            MMmmpp digits (`21504` -> 2.15.4)
+#            packed-function the constant an exported function returns, major << 16 | minor << 8 | patch
+#
+# This is an inventory of the libraries listed here, not of everything a binary contains. The scheduled
+# signature check (scripts/signature_check.py) reads each one out of conda-forge's own builds for Linux,
+# macOS and Windows and fails when a version no longer comes out.
+
+[library.openssl]
+cpe = "openssl"
+conda = ["openssl"]
+files = ["libcrypto"]
+version = { kind = "text", prefix = "OpenSSL " }
+
+[library.libwebp]
+cpe = "libwebp"
+conda = ["libwebp", "libwebp-base"]
+files = ["libwebp", "libwebpdecoder"]
+version = { kind = "packed-function", symbol = "WebPGetDecoderVersion" }
+
+[library.zlib]
+cpe = "zlib"
+conda = ["libzlib", "zlib"]
+files = ["libz", "zlib", "zlib1"]
+version = { kind = "text", prefix = "deflate " }
+
+[library.sqlite]
+cpe = "libsqlite"
+conda = ["libsqlite", "sqlite"]
+files = ["libsqlite3", "sqlite3"]
+version = { kind = "symbol", symbol = "sqlite3_version" }
+
+[library.libcurl]
+cpe = "libcurl"
+conda = ["libcurl", "curl"]
+files = ["libcurl"]
+version = { kind = "text", prefix = "libcurl/" }
+
+[library.libxml2]
+cpe = "libxml2"
+conda = ["libxml2", "libxml2-16"]
+files = ["libxml2"]
+version = { kind = "symbol-pointer", symbol = "xmlParserVersion", encoding = "decimal" }
+
+[library.expat]
+cpe = "libexpat"
+conda = ["libexpat", "expat"]
+files = ["libexpat"]
+version = { kind = "text", prefix = "expat_" }
+
+[library.libpng]
+cpe = "libpng"
+conda = ["libpng"]
+files = ["libpng", "libpng16"]
+version = { kind = "text", prefix = "libpng version " }
+
+[library.libjpeg-turbo]
+cpe = "libjpeg-turbo"
+conda = ["libjpeg-turbo"]
+files = ["libjpeg", "libturbojpeg", "jpeg62", "turbojpeg"]
+version = { kind = "text", prefix = "libjpeg-turbo version " }

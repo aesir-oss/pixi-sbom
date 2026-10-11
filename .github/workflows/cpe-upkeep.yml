@@ -5,6 +5,7 @@ name: CPE table upkeep
 # packages with no entry. The findings are one issue, edited in place. Deprecated entries are
 # rewritten to NVD's replacement in a pull request for review; new entries are never added here.
 # Coverage itself is checked by the Grype comparison (grype-compare.yml), on the same schedule.
+# A second job reads the bundled-library signatures (data/signatures.toml) out of conda-forge's own builds.
 
 on:
   schedule:
@@ -78,3 +79,25 @@ jobs:
           git commit -am "$title"
           git push origin "$branch"
           gh pr create --head "$branch" --title "$title" --body-file target/cpe-upkeep.md
+
+  # The bundled-library signatures (crates/pixi-sbom/data/signatures.toml) read against conda-forge's
+  # latest builds of each library for Linux, macOS and Windows (#23). A library that changes how it
+  # spells its version, or a toolchain that compiles a version function differently, fails this job,
+  # and the report in the job summary says which.
+  signatures:
+    name: Check the bundled-library signatures
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: prefix-dev/setup-pixi@v0.8.1
+        with:
+          environments: default
+          cache: true
+      - name: Run the check
+        run: pixi run signature-check --report target/signature-check.md
+      - name: Report
+        if: always()
+        run: cat target/signature-check.md >> "$GITHUB_STEP_SUMMARY"

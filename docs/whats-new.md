@@ -38,6 +38,16 @@ workspace for pixi extensions it now shares with the tools to come. Nothing abou
 - **The GitHub Action** moves to its own repository: `uses: aesir-oss/pixi-sbom-action@v1`. It installs releases
   from either repository, and `uses: millsks/pixi-sbom@v1` keeps working.
 
+It also reads more out of an installed environment (`--prefix`):
+
+- **Native libraries bundled in wheels and packages.** With `--embedded-sboms`, the copies of openssl, libwebp,
+  zlib, sqlite, libcurl, libxml2, expat, libpng and libjpeg-turbo that wheels carry in `<dist>.libs/` or
+  `.dylibs/` are listed under the package that ships them, with their versions read out of the binaries and a CPE
+  a scanner can match. The libwebp inside Pillow 10.0.0's wheels now gets Grype's CVE-2023-4863 finding.
+  ([Bundled native libraries](output-format.md#bundled-native-libraries))
+- **Where each component was found.** CycloneDX `evidence.occurrences` gives the path inside the environment:
+  the conda-meta record, the dist-info, the binary. ([Installed environments](output-format.md#installed-environments))
+
 ## 1.11.0
 
 1.11.0 looks past Python inside a conda environment. R packages, the Go modules compiled into Go programs and the

@@ -23,6 +23,8 @@ pub mod auth;
 #[doc(hidden)]
 pub mod batch;
 #[doc(hidden)]
+pub mod bundled;
+#[doc(hidden)]
 pub mod cache;
 #[doc(hidden)]
 pub mod cli;

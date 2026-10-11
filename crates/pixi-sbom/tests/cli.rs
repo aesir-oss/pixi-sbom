@@ -3875,6 +3875,92 @@ fn prefix_records_where_each_component_was_found() {
     );
 }
 
+#[test]
+fn embedded_sboms_list_the_native_libraries_a_wheel_bundles() {
+    use object::write::{Object, StandardSection, Symbol, SymbolSection};
+    use object::{Architecture, BinaryFormat, Endianness, SymbolFlags, SymbolKind, SymbolScope};
+    // A libwebp 1.3.1 as auditwheel copies it into a wheel: WebPGetDecoderVersion returns 0x010301.
+    let mut object = Object::new(BinaryFormat::Elf, Architecture::X86_64, Endianness::Little);
+    let text = object.section_id(StandardSection::Text);
+    let symbol = object.add_symbol(Symbol {
+        name: b"WebPGetDecoderVersion".to_vec(),
+        value: 0,
+        size: 0,
+        kind: SymbolKind::Text,
+        scope: SymbolScope::Dynamic,
+        weak: false,
+        section: SymbolSection::Undefined,
+        flags: SymbolFlags::None,
+    });
+    object.add_symbol_data(symbol, text, &[0xb8, 0x01, 0x03, 0x01, 0x00, 0xc3], 16);
+    let dir = installed_prefix();
+    let prefix = dir.path().join("envs").join("demo");
+    let site = prefix.join("lib/python3.12/site-packages");
+    std::fs::create_dir_all(site.join("six.libs")).unwrap();
+    std::fs::write(site.join("six.libs/libwebp-3a2b1c4d.so.7.1.8"), object.write().unwrap()).unwrap();
+    let record = site.join("six-1.17.0.dist-info/RECORD");
+    let mut lines = std::fs::read_to_string(&record).unwrap();
+    lines.push_str("six.libs/libwebp-3a2b1c4d.so.7.1.8,,\n");
+    std::fs::write(&record, lines).unwrap();
+
+    let run = |args: &[&str]| -> Value {
+        let assert = pixi_sbom()
+            .current_dir(dir.path())
+            .env("PIXI_SBOM_OFFLINE", "1")
+            .arg("--prefix")
+            .arg(&prefix)
+            .args(["--output", "-"])
+            .args(args)
+            .assert()
+            .success();
+        serde_json::from_slice(&assert.get_output().stdout).unwrap()
+    };
+    let doc = run(&["--embedded-sboms"]);
+    assert_valid(&cyclonedx_validator(), &doc);
+    let components = doc["components"].as_array().unwrap();
+    let libwebp = components.iter().find(|c| c["name"] == "libwebp").unwrap();
+    assert_eq!(libwebp["version"], "1.3.1");
+    assert_eq!(libwebp["purl"], "pkg:generic/libwebp@1.3.1");
+    assert_eq!(libwebp["cpe"], "cpe:2.3:a:webmproject:libwebp:1.3.1:*:*:*:*:*:*:*");
+    assert_eq!(
+        libwebp["evidence"]["occurrences"][0]["location"],
+        "lib/python3.12/site-packages/six.libs/libwebp-3a2b1c4d.so.7.1.8"
+    );
+    let six = components.iter().find(|c| c["name"] == "six").unwrap();
+    let edges = doc["dependencies"].as_array().unwrap();
+    let six_deps = &edges.iter().find(|d| d["ref"] == six["bom-ref"]).unwrap()["dependsOn"];
+    assert!(six_deps.as_array().unwrap().contains(&libwebp["bom-ref"]), "{six_deps}");
+
+    let spdx = run(&["--embedded-sboms", "--format", "spdx"]);
+    assert_valid(&spdx_validator(), &spdx);
+    let package = spdx["packages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|p| p["name"] == "libwebp")
+        .unwrap();
+    assert!(
+        package["externalRefs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|r| r["referenceType"] == "cpe23Type")
+    );
+    assert_valid(
+        &spdx3_validator(),
+        &run(&["--embedded-sboms", "--format", "spdx", "--spec-version", "3.0"]),
+    );
+    // Without --embedded-sboms, the files are not opened.
+    let plain = run(&[]);
+    assert!(
+        plain["components"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|c| c["name"] != "libwebp")
+    );
+}
+
 fn copy_dir(from: &Path, to: &Path) {
     std::fs::create_dir_all(to).unwrap();
     for entry in std::fs::read_dir(from).unwrap() {

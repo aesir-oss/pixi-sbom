@@ -126,7 +126,7 @@ fn is_candidate(relative: &str) -> bool {
 }
 
 /// The `files` list of every conda package installed in a prefix, by package name.
-fn installed_files(prefix: &Path) -> BTreeMap<String, Vec<String>> {
+pub(crate) fn installed_files(prefix: &Path) -> BTreeMap<String, Vec<String>> {
     #[derive(Deserialize)]
     struct Record {
         name: String,

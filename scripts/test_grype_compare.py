@@ -40,6 +40,13 @@ class GrypeCompareTest(unittest.TestCase):
         self.assertEqual(g.default_gap({django, openssl}, {openssl}), {django})
         self.assertEqual(g.default_gap({openssl}, {openssl, django}), set())
 
+    def test_a_required_finding_is_missing_until_pixi_sbom_gives_it(self) -> None:
+        self.assertIn("pillow-wheels", [name for name, _, _ in g.CORPUS])
+        webp = g.Finding("CVE-2023-4863", "libwebp", "1.3.1")
+        self.assertEqual(g.missing_required("pillow-wheels", set()), {("CVE-2023-4863", "libwebp")})
+        self.assertEqual(g.missing_required("pillow-wheels", {webp}), set())
+        self.assertEqual(g.missing_required("django", set()), set(), "nothing is required of the others")
+
     def test_only_the_npm_environment_turns_on_syfts_package_json_cataloger(self) -> None:
         names = [name for name, _, _ in g.CORPUS]
         self.assertIn("node-tools", names)
