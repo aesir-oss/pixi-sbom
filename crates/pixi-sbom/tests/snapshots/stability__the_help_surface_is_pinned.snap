@@ -47,6 +47,7 @@ expression: "surface.join(\"\\n\")"
       --fetch-licenses
       --license-texts
       --embedded-sboms
+      --javascript
       --infer-extras
       --verify-files
       --exclude <GLOB>

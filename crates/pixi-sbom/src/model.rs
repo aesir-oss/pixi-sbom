@@ -441,6 +441,8 @@ pub struct Package {
     pub sha256: Option<String>,
     /// Hex-encoded MD5 of the archive, if known.
     pub md5: Option<String>,
+    /// Hex-encoded SHA-512 of the archive, if known: what an npm lockfile's `integrity` records.
+    pub sha512: Option<String>,
     /// License string as declared by the package. Not guaranteed to be an SPDX expression.
     pub license: Option<String>,
     /// License files shipped with the package, when fetched (names always, texts on request). Sorted by name.
@@ -540,6 +542,7 @@ mod tests {
             location: String::new(),
             sha256: None,
             md5: None,
+            sha512: None,
             license: None,
             license_files: Vec::new(),
             description: None,

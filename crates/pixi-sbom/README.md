@@ -1,7 +1,7 @@
 # pixi-sbom
 
 Generates a Software Bill of Materials (SBOM) from a lockfile — `pixi.lock`, `uv.lock`, `pylock.toml`, `poetry.lock`,
-`pdm.lock`, `conda-lock.yml` or an explicit conda spec — or from an installed conda environment or venv, as
+`pdm.lock`, `conda-lock.yml`, an explicit conda spec or a JavaScript lockfile — or from an installed conda environment or venv, as
 [CycloneDX](https://cyclonedx.org) 1.6 / 1.7 or [SPDX](https://spdx.dev) 2.3 / 3.0.1 JSON. A [pixi](https://pixi.sh)
 extension (`pixi sbom`) that needs no pixi: the same binary runs as `pixi-sbom`, from PyPI with `uvx pixi-sbom`.
 
@@ -37,7 +37,7 @@ Each report has a recording of its own in the [command-line reference](https://a
 | | |
 |---|---|
 | **Writes** | CycloneDX 1.6 / 1.7 and SPDX 2.3 / 3.0.1, validated against each spec's own schema in CI |
-| **Reads** | `pixi.lock` (formats 1–7), `uv.lock`, `pylock.toml`, `poetry.lock`, `pdm.lock`, `conda-lock.yml`, explicit conda specs, a fully pinned `requirements.txt`, an installed conda environment or venv, a tree of projects, or other tools' SBOMs (`--from-sbom`, several merged into one) |
+| **Reads** | `pixi.lock` (formats 1–7), `uv.lock`, `pylock.toml`, `poetry.lock`, `pdm.lock`, `conda-lock.yml`, explicit conda specs, a fully pinned `requirements.txt`, `package-lock.json`, `pnpm-lock.yaml` and `yarn.lock`, an installed conda environment or venv, a tree of projects, or other tools' SBOMs (`--from-sbom`, several merged into one) |
 | **Covers** | conda and PyPI packages together, with purls a scanner can match, license expressions and texts, and the dependency graph |
 | **Finds** | vulnerabilities from OSV with CISA KEV flags and FIRST EPSS scores, yanked releases, outdated packages, OpenSSF scorecards, undeclared imports, how complete a document is |
 | **Gates** | a license policy, a severity threshold, a KEV hit, an EPSS score, an SBOM diff, a quality score — each its own exit code, document still written; a vendor's VEX can clear the findings it covers |

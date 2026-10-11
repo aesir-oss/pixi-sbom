@@ -140,6 +140,7 @@ mod tests {
             location: String::new(),
             sha256: None,
             md5: None,
+            sha512: None,
             license: None,
             license_files: Vec::new(),
             description: None,

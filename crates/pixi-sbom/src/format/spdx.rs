@@ -299,6 +299,12 @@ fn spdx_package(
             checksum_value: md5.clone(),
         });
     }
+    if let Some(sha512) = &package.sha512 {
+        checksums.push(Checksum {
+            algorithm: "SHA512",
+            checksum_value: sha512.clone(),
+        });
+    }
 
     let external_refs = std::iter::once(&package.purl)
         .chain(&package.extra_purls)

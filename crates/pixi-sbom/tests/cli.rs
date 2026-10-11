@@ -184,7 +184,7 @@ fn no_lockfile_in_tree_fails_with_help() {
         .assert()
         .failure()
         .stderr(predicate::str::contains(
-            "no pixi.lock, uv.lock, pylock.toml, poetry.lock, pdm.lock or conda-lock.yml found",
+            "no pixi.lock, uv.lock, pylock.toml, poetry.lock, pdm.lock, conda-lock.yml, package-lock.json, pnpm-lock.yaml or yarn.lock found",
         ))
         .stderr(predicate::str::contains("--lockfile"));
 }
@@ -3959,6 +3959,150 @@ fn embedded_sboms_list_the_native_libraries_a_wheel_bundles() {
             .iter()
             .all(|c| c["name"] != "libwebp")
     );
+}
+
+#[test]
+fn javascript_lockfiles_are_inputs_of_their_own() {
+    for (fixture, file) in [
+        ("npm-v2", "package-lock.json"),
+        ("npm-v3", "package-lock.json"),
+        ("yarn-v1", "yarn.lock"),
+        ("yarn-berry", "yarn.lock"),
+        ("pnpm-v6", "pnpm-lock.yaml"),
+        ("pnpm-v9", "pnpm-lock.yaml"),
+    ] {
+        let dir = tempfile::tempdir().unwrap();
+        copy_dir(&tests_dir().join("fixtures/js").join(fixture), dir.path());
+        let run = |args: &[&str]| -> Value {
+            let assert = pixi_sbom()
+                .current_dir(dir.path())
+                .args(["--lockfile", file, "--output", "-"])
+                .args(args)
+                .assert()
+                .success();
+            serde_json::from_slice(&assert.get_output().stdout).unwrap()
+        };
+        let doc = run(&[]);
+        assert_valid(&cyclonedx_validator(), &doc);
+        assert_eq!(doc["metadata"]["component"]["name"], "js-demo", "{fixture}");
+        let components = doc["components"].as_array().unwrap();
+        assert_eq!(components.len(), 6, "{fixture}");
+        let find = |name: &str| components.iter().find(|c| c["name"] == name).unwrap();
+        assert_eq!(find("@sindresorhus/is")["purl"], "pkg:npm/%40sindresorhus/is@4.6.0");
+        assert_eq!(
+            find("is-number")["scope"],
+            "optional",
+            "{fixture}: a development dependency"
+        );
+        assert_eq!(find("debug")["scope"], "required", "{fixture}");
+        assert_eq!(find("@demo/util")["purl"], "pkg:generic/%40demo/util@0.1.0");
+        if fixture != "yarn-berry" {
+            assert_eq!(find("debug")["hashes"][0]["alg"], "SHA-512", "{fixture}");
+        }
+        let root_deps = doc["dependencies"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|d| d["ref"] == "root")
+            .unwrap()["dependsOn"]
+            .as_array()
+            .unwrap()
+            .len();
+        assert_eq!(
+            root_deps, 5,
+            "{fixture}: the four declared packages and the workspace member"
+        );
+        assert_valid(&cyclonedx_1_7_validator(), &run(&["--spec-version", "1.7"]));
+        let spdx = run(&["--format", "spdx"]);
+        assert_valid(&spdx_validator(), &spdx);
+        assert!(
+            spdx["relationships"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|r| r["relationshipType"] == "DEV_DEPENDENCY_OF"),
+            "{fixture}"
+        );
+        assert_valid(&spdx3_validator(), &run(&["--format", "spdx", "--spec-version", "3.0"]));
+    }
+}
+
+#[test]
+fn a_javascript_project_beside_a_workspace_joins_it_only_when_asked() {
+    let dir = workspace("with-pypi");
+    for file in ["package.json", "package-lock.json"] {
+        std::fs::copy(tests_dir().join("fixtures/js/npm-v3").join(file), dir.path().join(file)).unwrap();
+    }
+    copy_dir(
+        &tests_dir().join("fixtures/js/npm-v3/packages"),
+        &dir.path().join("packages"),
+    );
+    let run = |args: &[&str]| -> Value {
+        let assert = pixi_sbom()
+            .current_dir(dir.path())
+            .args(["-e", "web", "-p", "linux-64", "--output", "-"])
+            .args(args)
+            .assert()
+            .success();
+        serde_json::from_slice(&assert.get_output().stdout).unwrap()
+    };
+    let npm = |doc: &Value| -> Vec<String> {
+        doc["components"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|c| c["purl"].as_str().unwrap().starts_with("pkg:npm/"))
+            .map(|c| c["name"].as_str().unwrap().to_string())
+            .collect()
+    };
+    let plain = run(&[]);
+    assert!(npm(&plain).is_empty(), "pixi.lock is still the input");
+    let doc = run(&["--javascript"]);
+    assert_valid(&cyclonedx_validator(), &doc);
+    assert_eq!(npm(&doc).len(), 5);
+    let root_deps = doc["dependencies"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|d| d["ref"] == "root")
+        .unwrap()["dependsOn"]
+        .clone();
+    assert!(
+        root_deps.as_array().unwrap().iter().any(|d| d == "pkg:npm/debug@4.3.4"),
+        "{root_deps}"
+    );
+    assert!(
+        plain["components"].as_array().unwrap().len() + 6 == doc["components"].as_array().unwrap().len(),
+        "the workspace's own components are all still there"
+    );
+
+    // Nothing beside it: said, and the document is the workspace's alone.
+    let bare = workspace("with-pypi");
+    pixi_sbom()
+        .current_dir(bare.path())
+        .args(["-e", "web", "-p", "linux-64", "--output", "-", "--javascript"])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains(
+            "no package-lock.json, pnpm-lock.yaml or yarn.lock",
+        ));
+
+    // A scan reads it as a project of its own, named apart from the workspace's document.
+    let scanned = tempfile::tempdir().unwrap();
+    pixi_sbom()
+        .current_dir(dir.path())
+        .arg("--scan")
+        .arg(dir.path())
+        .arg("--output")
+        .arg(scanned.path())
+        .args(["-e", "web", "-p", "linux-64"])
+        .assert()
+        .success();
+    let js: Value =
+        serde_json::from_str(&std::fs::read_to_string(scanned.path().join("sbom-javascript.cdx.json")).unwrap())
+            .unwrap();
+    assert_eq!(js["metadata"]["component"]["name"], "js-demo");
+    assert!(scanned.path().join("sbom.cdx.json").is_file());
 }
 
 fn copy_dir(from: &Path, to: &Path) {

@@ -48,6 +48,7 @@ fn root_package(input: &Input, top_level: Vec<String>) -> Package {
         location: String::new(),
         sha256: None,
         md5: None,
+        sha512: None,
         license: root.license.clone(),
         license_files: Vec::new(),
         description: None,
@@ -83,6 +84,7 @@ fn conflicts(kept: &Package, kept_from: &str, other: &Package, other_from: &str)
     if names_one_file(&kept.purl) {
         check("sha256", &kept.sha256, &other.sha256);
         check("md5", &kept.md5, &other.md5);
+        check("sha512", &kept.sha512, &other.sha512);
     }
     found
 }
@@ -137,6 +139,7 @@ pub fn merge(inputs: &[Input], root: Root) -> Sbom {
                 kept.license = kept.license.take().or_else(|| package.license.clone());
                 kept.sha256 = kept.sha256.take().or_else(|| package.sha256.clone());
                 kept.md5 = kept.md5.take().or_else(|| package.md5.clone());
+                kept.sha512 = kept.sha512.take().or_else(|| package.sha512.clone());
                 kept.supplier = kept.supplier.take().or_else(|| package.supplier.clone());
                 kept.repository = kept.repository.take().or_else(|| package.repository.clone());
                 kept.homepage = kept.homepage.take().or_else(|| package.homepage.clone());

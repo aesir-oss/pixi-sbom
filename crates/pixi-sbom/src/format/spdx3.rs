@@ -467,6 +467,13 @@ pub(crate) fn document(sbom: &Sbom, ctx: &WriteContext) -> Document {
                 hash_value: md5.clone(),
             });
         }
+        if let Some(sha512) = &package.sha512 {
+            hashes.push(Hash {
+                kind: "Hash",
+                algorithm: "sha512",
+                hash_value: sha512.clone(),
+            });
+        }
         node.verified_using = (!hashes.is_empty()).then_some(hashes);
         let mut comment: Vec<String> = package
             .properties

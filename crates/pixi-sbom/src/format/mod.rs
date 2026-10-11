@@ -396,6 +396,7 @@ pub(crate) mod testing {
                     location: "https://conda.anaconda.org/conda-forge/linux-64/libzlib-1.3.1-h1.conda".into(),
                     sha256: Some("a".repeat(64)),
                     md5: Some("b".repeat(32)),
+                    sha512: None,
                     license: Some("Zlib".into()),
                     license_files: vec![LicenseFile {
                         name: "LICENSE.txt".into(),
@@ -428,6 +429,7 @@ pub(crate) mod testing {
                     location: "https://conda.anaconda.org/conda-forge/linux-64/zlib-1.3.1-h1.conda".into(),
                     sha256: Some("c".repeat(64)),
                     md5: None,
+                    sha512: None,
                     license: Some("MIT/Apache-2.0".into()),
                     license_files: vec![
                         LicenseFile {
@@ -460,6 +462,7 @@ pub(crate) mod testing {
                     location: "./packages/mylib".into(),
                     sha256: None,
                     md5: None,
+                    sha512: None,
                     license: Some("Proprietary".into()),
                     license_files: vec![LicenseFile {
                         name: "EULA".into(),
@@ -489,6 +492,7 @@ pub(crate) mod testing {
                     location: "https://files.pythonhosted.org/packages/six-1.17.0-py2.py3-none-any.whl".into(),
                     sha256: Some("d".repeat(64)),
                     md5: None,
+                    sha512: None,
                     license: None,
                     license_files: vec![],
                     description: None,

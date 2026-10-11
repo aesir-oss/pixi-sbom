@@ -518,6 +518,7 @@ pub fn build_sbom(
                 location: String::new(),
                 sha256: pin.sha256.first().cloned(),
                 md5: None,
+                sha512: None,
                 license: None,
                 license_files: Vec::new(),
                 description: None,

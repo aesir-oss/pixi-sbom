@@ -4,7 +4,7 @@ A [pixi](https://pixi.sh) extension that writes a Software Bill of Materials fro
 package of one environment on one platform, with purls, licenses and the dependency graph, as
 [CycloneDX](https://cyclonedx.org) 1.6 / 1.7 or [SPDX](https://spdx.dev) 2.3 / 3.0.1 JSON that validates against the
 official schemas. It reads `pixi.lock`, `uv.lock`, `pylock.toml`, `poetry.lock`, `pdm.lock`, `conda-lock.yml`,
-explicit conda specs and fully pinned `requirements.txt` files, an installed conda environment or venv, or other
+explicit conda specs and fully pinned `requirements.txt` files, a JavaScript project's `package-lock.json`, `pnpm-lock.yaml` or `yarn.lock`, an installed conda environment or venv, or other
 tools' SBOMs (one, or several merged into one), and needs neither an installed environment nor pixi
 itself: a uv or Poetry project runs it as `uvx pixi-sbom` ([Using pixi-sbom without pixi](without-pixi.md)).
 

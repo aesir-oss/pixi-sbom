@@ -213,6 +213,7 @@ mod tests {
             location: format!("https://example.invalid/{name}.conda"),
             sha256: None,
             md5: None,
+            sha512: None,
             license: None,
             license_files: Vec::new(),
             description: None,

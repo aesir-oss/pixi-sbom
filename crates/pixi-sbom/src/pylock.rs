@@ -591,6 +591,7 @@ fn convert(package: &LockedPackage, platform: &str, python: &str) -> Result<Pack
         location: location.unwrap_or_default(),
         sha256,
         md5: None,
+        sha512: None,
         license: None,
         license_files: Vec::new(),
         description: None,

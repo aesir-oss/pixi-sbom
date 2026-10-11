@@ -39,6 +39,8 @@ CORPUS = [
     ("node-tools", "examples/projects/pixi/17-node-tools", "pixi"),
     # Native libraries a wheel bundles (`PIL/.dylibs`, `pillow.libs`), read out of the binaries (#23).
     ("pillow-wheels", "crates/pixi-sbom/tests/grype/pillow-wheels/requirements.txt", "venv"),
+    # A JavaScript project read from its package-lock.json, not installed: both tools read the lockfile (#29).
+    ("js-app", "crates/pixi-sbom/tests/grype/js-app", "lockfile"),
 ]
 
 # syft reads installed package.json files only in an image unless told to; on the environment that
@@ -145,6 +147,10 @@ def run(command: list[str], **kwargs) -> subprocess.CompletedProcess:
 
 def install(name: str, project: str, how: str, work: Path) -> Path:
     """Install one corpus environment under `work` and return its prefix."""
+    if how == "lockfile":
+        copy = work / name
+        shutil.copytree(ROOT / project, copy)
+        return copy
     if how == "pixi":
         copy = work / name
         shutil.copytree(ROOT / project, copy, ignore=shutil.ignore_patterns(".pixi"))
@@ -155,6 +161,14 @@ def install(name: str, project: str, how: str, work: Path) -> Path:
     pip = venv / ("Scripts" if os.name == "nt" else "bin") / "pip"
     run([str(pip), "install", "--quiet", "--no-deps", "-r", str(ROOT / project)])
     return venv
+
+
+def pixi_sbom_input(prefix: Path, how: str) -> list[str]:
+    """What pixi-sbom is pointed at: the project's lockfile for a `lockfile` entry, the installed environment
+    otherwise, with the binaries' own components read too."""
+    if how == "lockfile":
+        return ["--lockfile", str(prefix / "package-lock.json")]
+    return ["--prefix", str(prefix), "--embedded-sboms"]
 
 
 def grype(sbom: Path, db: Path) -> dict:
@@ -192,16 +206,18 @@ def main(argv: list[str] | None = None) -> int:
         )
         # Offline: everything pixi-sbom needs to be matched is on disk or in its own tables.
         run(
-            [str(args.pixi_sbom), "--prefix", str(prefix), "--primary-purl", "pypi", "--embedded-sboms",
-             "--output", str(pixi_sbom), "-q"],
+            [str(args.pixi_sbom), *pixi_sbom_input(prefix, how), "--primary-purl", "pypi", "--output", str(pixi_sbom), "-q"],
             env={**os.environ, "PIXI_SBOM_OFFLINE": "1"},
         )
         run(
-            [str(args.pixi_sbom), "--prefix", str(prefix), "--embedded-sboms", "--output", str(default_sbom), "-q"],
+            [str(args.pixi_sbom), *pixi_sbom_input(prefix, how), "--output", str(default_sbom), "-q"],
             env={**os.environ, "PIXI_SBOM_OFFLINE": "1"},
         )
         recommended = findings(grype(pixi_sbom, db))
-        lockfile_entries = not_installed(json.loads(syft_sbom.read_text(encoding="utf-8")))
+        # Where the lockfile is the subject, its entries are what is compared.
+        lockfile_entries = (
+            set() if how == "lockfile" else not_installed(json.loads(syft_sbom.read_text(encoding="utf-8")))
+        )
         result = compare(
             name, findings(grype(syft_sbom, db), COMPARED_TYPES, lockfile_entries), recommended, exceptions
         )

@@ -48,6 +48,13 @@ It also reads more out of an installed environment (`--prefix`):
 - **Where each component was found.** CycloneDX `evidence.occurrences` gives the path inside the environment:
   the conda-meta record, the dist-info, the binary. ([Installed environments](output-format.md#installed-environments))
 
+And JavaScript projects:
+
+- **`package-lock.json`, `pnpm-lock.yaml` and `yarn.lock`** are inputs of their own: `pkg:npm` components with the
+  dependency graph, SHA-512 hashes from `integrity`, workspace members, and development dependencies marked as such.
+  `--scan` finds them, including beside a pixi or Python lockfile, and `--javascript` adds the project beside a
+  workspace to the workspace's document. ([Reading JavaScript lockfiles](cli.md#reading-javascript-lockfiles))
+
 ## 1.11.0
 
 1.11.0 looks past Python inside a conda environment. R packages, the Go modules compiled into Go programs and the

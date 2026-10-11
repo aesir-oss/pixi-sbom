@@ -40,6 +40,13 @@ class GrypeCompareTest(unittest.TestCase):
         self.assertEqual(g.default_gap({django, openssl}, {openssl}), {django})
         self.assertEqual(g.default_gap({openssl}, {openssl, django}), set())
 
+    def test_a_lockfile_entry_is_described_from_its_lockfile_and_an_environment_from_its_prefix(self) -> None:
+        self.assertIn(("js-app", "crates/pixi-sbom/tests/grype/js-app", "lockfile"), g.CORPUS)
+        self.assertEqual(
+            g.pixi_sbom_input(g.Path("/w/js-app"), "lockfile"), ["--lockfile", str(g.Path("/w/js-app/package-lock.json"))]
+        )
+        self.assertEqual(g.pixi_sbom_input(g.Path("/w/env"), "pixi"), ["--prefix", str(g.Path("/w/env")), "--embedded-sboms"])
+
     def test_a_required_finding_is_missing_until_pixi_sbom_gives_it(self) -> None:
         self.assertIn("pillow-wheels", [name for name, _, _ in g.CORPUS])
         webp = g.Finding("CVE-2023-4863", "libwebp", "1.3.1")

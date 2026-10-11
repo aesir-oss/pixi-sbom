@@ -650,6 +650,12 @@ fn component(package: &Package) -> Component {
             content: md5.clone(),
         });
     }
+    if let Some(sha512) = &package.sha512 {
+        hashes.push(Hash {
+            alg: "SHA-512",
+            content: sha512.clone(),
+        });
+    }
 
     Component {
         kind: "library",

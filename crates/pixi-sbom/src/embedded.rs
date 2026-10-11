@@ -49,6 +49,7 @@ pub struct Component {
     pub description: Option<String>,
     pub sha256: Option<String>,
     pub md5: Option<String>,
+    pub sha512: Option<String>,
     pub location: Option<String>,
     /// The source repository the document names: a CycloneDX `vcs` reference, or an SPDX
     /// `downloadLocation` that is a VCS URL.
@@ -249,6 +250,11 @@ fn parse_cyclonedx(text: &str) -> Option<Fragment> {
                 .hashes
                 .iter()
                 .find(|h| h.alg.eq_ignore_ascii_case("MD5"))
+                .map(|h| h.content.to_lowercase()),
+            sha512: c
+                .hashes
+                .iter()
+                .find(|h| h.alg.eq_ignore_ascii_case("SHA-512"))
                 .map(|h| h.content.to_lowercase()),
             location: c
                 .external_references
@@ -454,6 +460,11 @@ fn parse_spdx(text: &str) -> Option<Fragment> {
                 .iter()
                 .find(|c| c.algorithm.eq_ignore_ascii_case("MD5"))
                 .map(|c| c.checksum_value.to_lowercase()),
+            sha512: p
+                .checksums
+                .iter()
+                .find(|c| c.algorithm.eq_ignore_ascii_case("SHA512"))
+                .map(|c| c.checksum_value.to_lowercase()),
             location: noassertion(&p.download_location),
             repository: noassertion(&p.download_location).as_deref().and_then(vcs_repository),
             homepage: noassertion(&p.homepage),
@@ -618,6 +629,7 @@ fn to_package(component: &Component, id: String, source: &str) -> Package {
         location: component.location.clone().unwrap_or_default(),
         sha256: component.sha256.clone(),
         md5: None,
+        sha512: None,
         license: component.license.clone(),
         license_files: Vec::new(),
         description: component.description.clone(),

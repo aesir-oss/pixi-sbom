@@ -14,7 +14,7 @@ this page fails the build, and so does a line on this page for something that do
 
 ## Command-line flags
 
-All 74. Their meanings are in [cli.md](cli.md); what this page promises is that none of them
+All 75. Their meanings are in [cli.md](cli.md); what this page promises is that none of them
 disappears or changes shape before 2.0.
 
 | `--against` | `--all-environments` | `--all-platforms` | `--allow-license` |
@@ -25,17 +25,17 @@ disappears or changes shape before 2.0.
 | `--fail-on-epss` | `--fail-on-kev` | `--fail-on-phantom` | `--fail-on-scorecard` |
 | `--fail-on-severity` | `--fail-on-yanked` | `--fetch-licenses` | `--format` |
 | `--from-sbom` | `--group-by` | `--help` | `--ignore-license` |
-| `--ignore-vuln` | `--include` | `--infer-extras` | `--keep-orphans` |
-| `--kev` | `--license-texts` | `--lockfile` | `--log-format` |
-| `--merge` | `--min-quality` | `--no-cache` | `--no-config` |
-| `--outdated-min` | `--output` | `--platform` | `--prefix` |
-| `--primary-purl` | `--pypi-mapping` | `--pypi-mapping-file` | `--quiet` |
-| `--refresh` | `--report` | `--report-format` | `--require-license` |
-| `--root-name` | `--root-version` | `--scan` | `--scan-depth` |
-| `--scorecard` | `--scorecard-min` | `--source` | `--spec-version` |
-| `--timings` | `--tree` | `--verbose` | `--verify-files` |
-| `--version` | `--version-details` | `--vex` | `--vex-in` |
-| `--vex-open` | `--vulnerabilities` |  |  |
+| `--ignore-vuln` | `--include` | `--infer-extras` | `--javascript` |
+| `--keep-orphans` | `--kev` | `--license-texts` | `--lockfile` |
+| `--log-format` | `--merge` | `--min-quality` | `--no-cache` |
+| `--no-config` | `--outdated-min` | `--output` | `--platform` |
+| `--prefix` | `--primary-purl` | `--pypi-mapping` | `--pypi-mapping-file` |
+| `--quiet` | `--refresh` | `--report` | `--report-format` |
+| `--require-license` | `--root-name` | `--root-version` | `--scan` |
+| `--scan-depth` | `--scorecard` | `--scorecard-min` | `--source` |
+| `--spec-version` | `--timings` | `--tree` | `--verbose` |
+| `--verify-files` | `--version` | `--version-details` | `--vex` |
+| `--vex-in` | `--vex-open` | `--vulnerabilities` |  |
 
 ### Spellings that answer to an older name
 

@@ -58,7 +58,7 @@ project and a venv, on a runner with no pixi installed.
 | Input | Default | Meaning |
 |---|---|---|
 | `version` | the action's own tag (`@v1`: the newest 1.x.y), else the latest release | pixi-sbom version to run |
-| `lockfile` | upward search | The lockfile to describe: any kind pixi-sbom reads (`pixi.lock`, `uv.lock`, `pylock.toml`, `poetry.lock`, `pdm.lock`, `conda-lock.yml`, an explicit spec file). The action downloads its own binary, so pixi is not needed on the runner |
+| `lockfile` | upward search | The lockfile to describe: any kind pixi-sbom reads (`pixi.lock`, `uv.lock`, `pylock.toml`, `poetry.lock`, `pdm.lock`, `conda-lock.yml`, `package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, an explicit spec file). The action downloads its own binary, so pixi is not needed on the runner |
 | `format`, `spec-version`, `environment`, `platform`, `all-environments`, `all-platforms` | as the CLI | Selection and format, see the options above |
 | `scan` | | Describe every project under this directory, one document per directory with a lockfile of any supported kind, under `output` at the same relative path |
 | `prefix` | | Describe an installed environment instead: a conda or pixi environment, a venv, or a Python installation |

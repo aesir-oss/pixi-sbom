@@ -12,20 +12,23 @@ pub const LOCKFILE_NAME: &str = "pixi.lock";
 
 /// The lockfiles the upward search and `--scan` look for, in the order they prefer them within one
 /// directory: `pixi.lock` first, as the most complete (a pixi workspace that also has a `uv.lock`
-/// is a pixi workspace), then the Python lockfiles, then conda-lock. `pylock.toml` also stands
+/// is a pixi workspace), then the Python lockfiles, then conda-lock, then the JavaScript lockfiles. `pylock.toml` also stands
 /// for its named form, `pylock.<name>.toml`. An explicit conda spec file has no fixed name, so it
 /// is only ever read through `--lockfile`.
-pub const LOCKFILE_KINDS: [&str; 6] = [
+pub const LOCKFILE_KINDS: [&str; 9] = [
     LOCKFILE_NAME,
     "uv.lock",
     "pylock.toml",
     "poetry.lock",
     "pdm.lock",
     "conda-lock.yml",
+    "package-lock.json",
+    "pnpm-lock.yaml",
+    "yarn.lock",
 ];
 
 /// [`LOCKFILE_KINDS`] for a message: `pixi.lock, uv.lock, ... or conda-lock.yml`.
-const KINDS_TEXT: &str = "pixi.lock, uv.lock, pylock.toml, poetry.lock, pdm.lock or conda-lock.yml";
+const KINDS_TEXT: &str = "pixi.lock, uv.lock, pylock.toml, poetry.lock, pdm.lock, conda-lock.yml, package-lock.json, pnpm-lock.yaml or yarn.lock";
 
 /// The lockfiles of [`LOCKFILE_KINDS`] in `dir`, in that order; named `pylock.<name>.toml` files
 /// follow `pylock.toml`, sorted.
@@ -154,6 +157,12 @@ pub fn scan(dir: &Path, depth: Option<usize>) -> Result<Vec<PathBuf>, DiscoverEr
 
 fn walk(dir: &Path, level: usize, max: usize, found: &mut Vec<PathBuf>) {
     if let Some(lockfile) = lockfile_in(dir) {
+        // A JavaScript project beside a Python or pixi one is a project of its own.
+        if !crate::jslock::is_js_lock_name(&lockfile)
+            && let Some(javascript) = crate::jslock::lockfile_in(dir)
+        {
+            found.push(javascript);
+        }
         found.push(lockfile);
     }
     if level >= max {
@@ -284,6 +293,9 @@ mod tests {
             "an explicit spec file is never discovered"
         );
         for name in [
+            "yarn.lock",
+            "pnpm-lock.yaml",
+            "package-lock.json",
             "conda-lock.yml",
             "pdm.lock",
             "poetry.lock",
@@ -309,7 +321,10 @@ mod tests {
                 "pylock.dev.toml",
                 "poetry.lock",
                 "pdm.lock",
-                "conda-lock.yml"
+                "conda-lock.yml",
+                "package-lock.json",
+                "pnpm-lock.yaml",
+                "yarn.lock"
             ]
         );
         let named = tempfile::tempdir().unwrap();
@@ -331,6 +346,11 @@ mod tests {
             ("b", "uv.lock"),
             ("c/d", "poetry.lock"),
             ("e", "conda-lock.yml"),
+            // A JavaScript project beside a pixi one is its own; one per directory among themselves.
+            ("a", "package-lock.json"),
+            ("f", "yarn.lock"),
+            ("g", "pnpm-lock.yaml"),
+            ("g", "yarn.lock"),
         ] {
             std::fs::create_dir_all(dir.path().join(sub)).unwrap();
             std::fs::write(dir.path().join(sub).join(name), "").unwrap();
@@ -341,12 +361,20 @@ mod tests {
             .map(|p| p.strip_prefix(dir.path()).unwrap().to_path_buf())
             .collect();
         let found: Vec<&str> = found.iter().map(|p| p.to_str().unwrap()).collect();
-        let expected = ["a/pixi.lock", "b/uv.lock", "c/d/poetry.lock", "e/conda-lock.yml"]
-            .map(|p| p.replace('/', std::path::MAIN_SEPARATOR_STR));
+        let expected = [
+            "a/package-lock.json",
+            "a/pixi.lock",
+            "b/uv.lock",
+            "c/d/poetry.lock",
+            "e/conda-lock.yml",
+            "f/yarn.lock",
+            "g/pnpm-lock.yaml",
+        ]
+        .map(|p| p.replace('/', std::path::MAIN_SEPARATOR_STR));
         assert_eq!(found, expected);
         let empty = tempfile::tempdir().unwrap();
         let err = scan(empty.path(), None).unwrap_err().to_string();
-        assert!(err.contains("conda-lock.yml anywhere under"), "{err}");
+        assert!(err.contains("yarn.lock anywhere under"), "{err}");
     }
 
     #[test]

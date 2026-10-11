@@ -6,9 +6,9 @@
 
 use pixi_sbom::{
     auditable, batch, bundled, cache, cli, concurrency, condaarchive, condalock, config, cran, diff, discover, doctor,
-    embedded, epss, explain, explicit, filter, format, fromsbom, gobuild, http, imports, kev, license, lock, manifest,
-    mapping, merge, mirror, model, npm, osv, outdated, pdm, phantom, pkgcache, poetry, policy, prefix, progress,
-    pylock, pypi, report, requirements, scorecard, style, timings, uv, verify, vexin, vulnpolicy, wheel,
+    embedded, epss, explain, explicit, filter, format, fromsbom, gobuild, http, imports, jslock, kev, license, lock,
+    manifest, mapping, merge, mirror, model, npm, osv, outdated, pdm, phantom, pkgcache, poetry, policy, prefix,
+    progress, pylock, pypi, report, requirements, scorecard, style, timings, uv, verify, vexin, vulnpolicy, wheel,
 };
 
 /// The system allocator on macOS and Windows is slow under the many small allocations a
@@ -330,6 +330,14 @@ fn main() -> Result<()> {
                         output: discover::resolve_output(args.output.as_deref(), &lockfile, args.format),
                     }]
                 }
+                Input::JavaScript { .. } => {
+                    refuse_workspace_flags(&args, &discover::lockfile_name(&lockfile));
+                    vec![Target {
+                        environment: "default".to_string(),
+                        platform: args.platform.clone(),
+                        output: discover::resolve_output(args.output.as_deref(), &lockfile, args.format),
+                    }]
+                }
                 Input::Pylock { .. } => {
                     refuse_workspace_flags(&args, "pylock.toml");
                     vec![Target {
@@ -351,6 +359,7 @@ fn main() -> Result<()> {
             };
             vec![Workspace {
                 lockfile: lockfile.clone(),
+                javascript: javascript_beside(&args, &lockfile, &input)?,
                 input,
                 targets,
             }]
@@ -843,6 +852,7 @@ fn main() -> Result<()> {
                                 lockfile: path.clone(),
                                 input: read_input(path)?,
                                 targets: Vec::new(),
+                                javascript: None,
                             };
                             let environment = if pylock::is_pylock_name(path) {
                                 pylock::environment_name(path)
@@ -1880,12 +1890,36 @@ struct Workspace {
     lockfile: std::path::PathBuf,
     input: Input,
     targets: Vec<Target>,
+    /// The JavaScript lockfile beside it, read for `--javascript`.
+    javascript: Option<jslock::JsLock>,
+}
+
+/// The JavaScript lockfile beside `lockfile`, for `--javascript`: none without the flag, for an input
+/// that is one already or has no lockfile directory, or when the directory has none (said once).
+fn javascript_beside(args: &cli::Args, lockfile: &Path, input: &Input) -> Result<Option<jslock::JsLock>> {
+    if !args.javascript || matches!(input, Input::JavaScript { .. } | Input::Document(_)) {
+        return Ok(None);
+    }
+    let dir = lockfile.parent().unwrap_or(Path::new("."));
+    let Some(found) = jslock::lockfile_in(dir) else {
+        tracing::warn!(dir = %dir.display(), "--javascript: no package-lock.json, pnpm-lock.yaml or yarn.lock beside the lockfile");
+        return Ok(None);
+    };
+    Ok(Some(jslock::load(&found)?.lock))
 }
 
 /// Read the lockfile at `lockfile`, whichever kind it is: by name for the kinds that have one,
 /// by its `@EXPLICIT` line for an explicit spec file, and as `pixi.lock` otherwise.
 fn read_input(lockfile: &Path) -> Result<Input> {
     let manifest = || timings::time(timings::Phase::Manifest, || manifest::read(lockfile));
+    if jslock::is_js_lock_name(lockfile) {
+        let jslock::Loaded { lock, contents } = timings::time(timings::Phase::Input, || jslock::load(lockfile))?;
+        return Ok(Input::JavaScript {
+            lock,
+            contents,
+            manifest: manifest(),
+        });
+    }
     if condalock::is_conda_lock_name(lockfile) {
         let condalock::Loaded { lock, contents } = timings::time(timings::Phase::Input, || condalock::load(lockfile))?;
         return Ok(Input::CondaLock {
@@ -1986,14 +2020,23 @@ fn scanned_workspace(args: &cli::Args, scanned: &Path, lockfile: std::path::Path
                 Input::Pylock { .. } => pylock::environment_name(&lockfile),
                 _ => "default".to_string(),
             };
+            // A JavaScript project that shares its directory with another lockfile's gets its own name.
+            let shared = jslock::is_js_lock_name(&lockfile)
+                && discover::lockfile_in(&dir).is_some_and(|other| other != lockfile);
+            let file_name = if shared {
+                args.format.batch_file_name(["javascript"])
+            } else {
+                args.format.default_file_name().to_string()
+            };
             vec![Target {
                 environment,
                 platform: args.platform.clone(),
-                output: discover::Output::File(output_dir.join(args.format.default_file_name())),
+                output: discover::Output::File(output_dir.join(file_name)),
             }]
         }
     };
     Ok(Workspace {
+        javascript: javascript_beside(args, &lockfile, &input)?,
         lockfile,
         input,
         targets,
@@ -2060,6 +2103,13 @@ enum Input {
         /// `--infer-extras`.
         infer_extras: bool,
     },
+    /// A `package-lock.json`, `pnpm-lock.yaml` or `yarn.lock`, with its text and the manifest beside it
+    /// (for a name when the `package.json` has none).
+    JavaScript {
+        lock: jslock::JsLock,
+        contents: String,
+        manifest: manifest::Manifest,
+    },
     /// An existing document (`--from-sbom`), already read into the model.
     Document(Box<fromsbom::Loaded>),
 }
@@ -2075,7 +2125,8 @@ impl Input {
             | Input::Pdm { manifest, .. }
             | Input::Poetry { manifest, .. }
             | Input::Uv { manifest, .. }
-            | Input::Pylock { manifest, .. } => Some(manifest),
+            | Input::Pylock { manifest, .. }
+            | Input::JavaScript { manifest, .. } => Some(manifest),
             _ => None,
         }
     }
@@ -2154,6 +2205,7 @@ fn merge_workspaces(args: &cli::Args, dir: &Path, workspaces: &[Workspace]) -> R
         }],
         input: Input::Document(Box::new(document)),
         lockfile,
+        javascript: None,
     })
 }
 
@@ -2374,10 +2426,28 @@ fn model_for(workspace: &Workspace, environment: &str, platform: Option<&str>) -
             tracing::info!(prefix = %dir.display(), packages = sbom.packages.len(), "read the installed environment");
             (sbom, contents)
         }
+        Input::JavaScript {
+            lock,
+            contents,
+            manifest,
+        } => {
+            let dir = lockfile.parent().unwrap_or(Path::new("."));
+            let mut root = jslock::root_of(lock, dir, model::Root::default());
+            if root.name.is_empty() {
+                root.name = manifest.root.name.clone();
+            }
+            let sbom = jslock::build_sbom(lock, platform, root, &discover::lockfile_name(lockfile))?;
+            (sbom, contents.clone())
+        }
         // Already read: the source document's own text is what identifies everything
         // derived from it.
         Input::Document(loaded) => (loaded.sbom.clone(), loaded.contents.clone()),
     };
+    let mut sbom = sbom;
+    if let Some(javascript) = &workspace.javascript {
+        let added = jslock::merge_into(&mut sbom, javascript)?;
+        tracing::info!(kind = %javascript.kind, added, "added the JavaScript project beside the workspace");
+    }
     Ok((sbom, contents))
 }
 

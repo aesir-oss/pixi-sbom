@@ -337,6 +337,7 @@ fn to_package(installed: &Installed, purl: &str, source: &str) -> Package {
         location: String::new(),
         sha256: None,
         md5: None,
+        sha512: None,
         license: installed.license.clone(),
         license_files: Vec::new(),
         description: installed.description.clone(),

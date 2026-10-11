@@ -1,0 +1,19 @@
+{
+  "name": "js-demo",
+  "version": "1.0.0",
+  "private": true,
+  "license": "MIT",
+  "workspaces": [
+    "packages/*"
+  ],
+  "dependencies": {
+    "@sindresorhus/is": "4.6.0",
+    "debug": "4.3.4"
+  },
+  "devDependencies": {
+    "is-number": "7.0.0"
+  },
+  "optionalDependencies": {
+    "ms": "2.1.3"
+  }
+}

@@ -118,6 +118,25 @@ pub fn generic(name: &str, version: &str) -> Result<String, PurlError> {
     Ok(purl.to_string())
 }
 
+/// Build a `pkg:generic/...` purl for a first-party JavaScript package: a workspace member no registry
+/// has released. A scoped name puts its scope in the namespace, as [`npm`] does.
+pub fn generic_js(name: &str, version: &str) -> Result<String, PurlError> {
+    let wrap = |source| PurlError {
+        name: name.to_string(),
+        source,
+    };
+    let (namespace, bare) = match name.split_once('/') {
+        Some((scope, bare)) if scope.starts_with('@') => (Some(scope), bare),
+        _ => (None, name),
+    };
+    let mut purl = PackageUrl::new("generic", bare.to_string()).map_err(wrap)?;
+    if let Some(namespace) = namespace {
+        purl.with_namespace(namespace.to_string()).map_err(wrap)?;
+    }
+    purl.with_version(version).map_err(wrap)?;
+    Ok(purl.to_string())
+}
+
 /// Give a PyPI package installed from somewhere other than an index an identity that says so,
 /// rather than a `pkg:pypi` purl claiming a release that may not exist or may hold other code.
 /// Reads what every reader records for such a source: `pixi:direct-url` (the repository, path or

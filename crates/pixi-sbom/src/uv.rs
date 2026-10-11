@@ -564,6 +564,7 @@ fn convert(locked: &UvPackage, member: bool, platform: &str, python: &str) -> Re
         location: location.unwrap_or_default(),
         sha256,
         md5: None,
+        sha512: None,
         license: None,
         license_files: Vec::new(),
         description: None,

@@ -67,6 +67,8 @@ pub mod http;
 #[doc(hidden)]
 pub mod imports;
 #[doc(hidden)]
+pub mod jslock;
+#[doc(hidden)]
 pub mod kev;
 #[doc(hidden)]
 pub mod license;

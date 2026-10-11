@@ -51,10 +51,16 @@ database, and fails on any conda, Python or npm finding syft's SBOM produces tha
 | A pip venv (`requirements/02-flask`) | 45 | 0 | 0 |
 | Go programs (`pixi/16-go-tools`) | 26 | 0 | 1 |
 | nodejs and an npm tool (`pixi/17-node-tools`) | 30 | 0 | 1 |
+| Pillow 10.0.0 wheels, which bundle native libraries (a pip venv) | 23 | 0 | 13 |
+| A JavaScript project, from its `package-lock.json` | 32 | 0 | 1 |
 
 For the environment that installs JavaScript, syft is run with `--select-catalogers +javascript-package-cataloger`:
 on a directory it otherwise reads only JavaScript lockfiles, not installed packages, and lists none of the 178 npm
 releases there. With it, it lists the same 178 as pixi-sbom, and Grype finds the same 12 npm advisories in both.
+
+The 13 only pixi-sbom's document gives on the Pillow venv are CVE-2023-4863 in the bundled libwebp, and libpng and
+zlib advisories in their bundled copies: syft does not list the libraries inside the wheel. The one on the JavaScript
+project is in a development dependency (`semver`), which syft leaves out of a `package-lock.json` by default.
 
 The findings only pixi-sbom's SBOM produces are native conda libraries (krb5, libpq, openjpeg, libxml2, zlib) that
 syft lists without an identity Grype can match, and pixi-sbom identifies with a CPE from its
@@ -79,9 +85,10 @@ pixi-sbom describes Python and conda projects and environments. syft catalogs mu
 
 - **Container images**, read from a registry or a tarball, layer by layer.
 - **Operating system packages**: dpkg, rpm, apk.
-- **Other ecosystems**: npm, Java, Rust crates and Go modules outside a conda environment, and many more. Inside
-  one, `--prefix` lists its installed npm packages, and `--prefix --embedded-sboms` reads a binary's Rust crates and
-  Go modules, as syft does.
+- **Other ecosystems**: Java, Rust crates and Go modules outside a conda environment, a JavaScript project's
+  installed `node_modules`, and many more. pixi-sbom reads a JavaScript project's `package-lock.json`, `pnpm-lock.yaml`
+  or `yarn.lock`, and inside a conda environment `--prefix` lists its installed npm packages and
+  `--prefix --embedded-sboms` reads a binary's Rust crates and Go modules, as syft does.
 - **Binary classification** of native code in general. pixi-sbom recognizes nine common libraries when a wheel or
   package bundles a copy ([which ones](output-format.md#bundled-native-libraries)), and finds the libwebp inside
   Pillow's wheels that syft's document does not give Grype; any other library compiled into a binary is syft's.

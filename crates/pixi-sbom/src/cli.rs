@@ -590,6 +590,11 @@ pub struct Args {
     #[arg(help_heading = "Enrichment", long)]
     pub embedded_sboms: bool,
 
+    /// Also describe the JavaScript project beside the lockfile: the packages its package-lock.json,
+    /// pnpm-lock.yaml or yarn.lock locks join the document, and its direct dependencies are the root's.
+    #[arg(help_heading = "Enrichment", long)]
+    pub javascript: bool,
+
     /// With --prefix, infer which extras each Python package was installed with: an extra counts
     /// when every requirement it gates is installed. Labelled pixi:python-extras-inferred, since
     /// the packages may be there for another reason.

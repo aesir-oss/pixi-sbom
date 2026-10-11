@@ -15,6 +15,7 @@ on:
       - "crates/pixi-sbom/src/gobuild.rs"
       - "crates/pixi-sbom/src/auditable.rs"
       - "crates/pixi-sbom/src/bundled.rs"
+      - "crates/pixi-sbom/src/jslock.rs"
       - "crates/pixi-sbom/src/prefix.rs"
       - "crates/pixi-sbom/src/mapping.rs"
       - "crates/pixi-sbom/src/purl.rs"

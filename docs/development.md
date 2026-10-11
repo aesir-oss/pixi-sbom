@@ -174,7 +174,8 @@ the machine; the test asserts the upstream saw every service's requests.
 
 The acceptance test for replacing syft in front of Grype. For each corpus environment (`pixi/01-django`, a web
 stack; `pixi/04-data-analysis`, a scientific stack; `pixi/10-dev-tooling`, Rust binaries; a pip venv of `requirements/02-flask`; and a pip venv of
-Pillow 10.0.0, whose wheels bundle a vulnerable libwebp), `scripts/grype_compare.py` installs it, describes it with syft and with
+Pillow 10.0.0, whose wheels bundle a vulnerable libwebp; and a JavaScript project, `js-app`, described from its
+`package-lock.json` by both tools rather than installed), `scripts/grype_compare.py` installs it, describes it with syft and with
 `pixi sbom --prefix --primary-purl pypi --embedded-sboms` (offline: everything pixi-sbom needs is on disk or in its
 own tables), and scans both documents with the same Grype and the same database. syft and Grype run through
 `pixi exec` at versions pinned in the script, so neither is a dependency of the project.

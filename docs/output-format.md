@@ -79,7 +79,7 @@ conda source, PyPI), then name, then version.
 | Supplier | `supplier` (`name`, `url[]`): the conda channel (e.g. `conda-forge`) or the PyPI index host (e.g. `pypi.org`); absent for source packages | `supplier`: `Organization: <name> (<url>)` |
 | Extra purls (see below) | property `pixi:purl` per purl | additional `externalRefs[]` entries |
 | Download location | `externalReferences[]` of type `distribution`, or `vcs` for `git+` locations; none when nothing records one (`poetry.lock` names files, not URLs) | `downloadLocation` (URL or `git+<url>@<rev>`); `NOASSERTION` plus `sourceInfo` for local paths; `NOASSERTION` alone when nothing records one |
-| SHA-256, MD5 | `hashes[]` (`SHA-256`, `MD5`) | `checksums[]` (`SHA256`, `MD5`) |
+| SHA-256, MD5, SHA-512 | `hashes[]` (`SHA-256`, `MD5`, `SHA-512`; SHA-512 is a JavaScript lockfile's `integrity`) | `checksums[]` (`SHA256`, `MD5`, `SHA512`) |
 | License | `licenses[]` (see below) | `licenseDeclared` (see below); `licenseConcluded` and `copyrightText` are `NOASSERTION` |
 | License file names, summary, URLs (`--fetch-licenses`) | `pixi:license-file` properties, `description`, `externalReferences[]` | `licenseComments`, `summary`, `homepage` |
 | License texts (`--license-texts`) | `licenses[].license.text` | `hasExtractedLicensingInfos` for `LicenseRef-` licenses |
@@ -533,6 +533,9 @@ root: `pytest DEV_DEPENDENCY_OF my-app`. Inside a group the edges stay `DEPENDS_
 The scopes come from the manifest beside a lockfile other than `pixi.lock`, when it declares dependency groups or
 extras (see [What a project without pixi declared](cli.md#what-a-project-without-pixi-declared)), and from the
 categories of a `conda-lock.yml` when there are others than `main` (`dev` is development, any other optional). A
+JavaScript lockfile gets them from what each workspace member declares: `devDependencies` are development and
+`optionalDependencies` optional (for a `yarn.lock`, only when the `package.json` files are beside it; see
+[Reading JavaScript lockfiles](cli.md#reading-javascript-lockfiles)). A
 `pixi.lock` environment is already one selection of features, so its documents carry no scope, and neither does an
 input with nothing to tell apart.
 

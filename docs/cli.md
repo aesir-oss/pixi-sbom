@@ -28,7 +28,7 @@ Grouped as `--help` groups them.
 
 | Option | Default | Effect |
 |---|---|---|
-| `--lockfile <PATH>` | upward search from cwd | Lockfile to read: a `pixi.lock`, a `uv.lock` (see [Reading uv.lock](#reading-uvlock)), a `poetry.lock` (see [Reading poetry.lock](#reading-poetrylock)), a `pdm.lock` (see [Reading pdm.lock](#reading-pdmlock)), a `conda-lock.yml` (see [Reading conda-lock.yml](#reading-conda-lockyml)), an explicit conda spec file (see [Reading an explicit spec file](#reading-an-explicit-spec-file)), a fully pinned `requirements.txt` (see [Reading a pinned requirements.txt](#reading-a-pinned-requirementstxt)), or a PEP 751 `pylock.toml` / `pylock.<name>.toml` (see [Reading pylock.toml](#reading-pylocktoml)). The file must exist; there is no fallback search when this is given. Without it, the nearest directory at or above the current one that has a lockfile is used, and within a directory the first in the order of [Which lockfile is found](#which-lockfile-is-found). |
+| `--lockfile <PATH>` | upward search from cwd | Lockfile to read: a `pixi.lock`, a `uv.lock` (see [Reading uv.lock](#reading-uvlock)), a `poetry.lock` (see [Reading poetry.lock](#reading-poetrylock)), a `pdm.lock` (see [Reading pdm.lock](#reading-pdmlock)), a `conda-lock.yml` (see [Reading conda-lock.yml](#reading-conda-lockyml)), an explicit conda spec file (see [Reading an explicit spec file](#reading-an-explicit-spec-file)), a fully pinned `requirements.txt` (see [Reading a pinned requirements.txt](#reading-a-pinned-requirementstxt)), or a PEP 751 `pylock.toml` / `pylock.<name>.toml` (see [Reading pylock.toml](#reading-pylocktoml)), or a JavaScript project's `package-lock.json`, `pnpm-lock.yaml` or `yarn.lock` (see [Reading JavaScript lockfiles](#reading-javascript-lockfiles)). The file must exist; there is no fallback search when this is given. Without it, the nearest directory at or above the current one that has a lockfile is used, and within a directory the first in the order of [Which lockfile is found](#which-lockfile-is-found). |
 | `--from-sbom <FILE>` | | Read an existing document (CycloneDX 1.4–1.7, SPDX 2.x or SPDX 3.0 JSON) instead of a lockfile and run the reports, the license policy and the vulnerability gate on it. Repeatable: several documents are merged into one, see [Merging documents](#merging-documents). |
 | `--merge` | off | With `--scan`: write one document for the whole tree instead of one per workspace (and then `--output -` and `--against` apply). See [Merging documents](#merging-documents). |
 | `--scan <DIR>` | | Describe every project under the directory: one document per directory with a lockfile of any kind it finds (see [Which lockfile is found](#which-lockfile-is-found)). Cannot be combined with `--lockfile` or `--prefix`, nor, without `--merge`, with `--against` or `--output -`. |
@@ -72,6 +72,7 @@ Grouped as `--help` groups them.
 | `--fetch-licenses` | off | Fetch the license of every package, conda and PyPI alike, where the lockfile has none, plus the names of the license files it ships and its summary and project URLs. Conda details come from the local package cache pixi filled at install time, or from the archive on the channel via HTTP range requests (a few KB per package, cached); PyPI details from the wheel's `dist-info` the same way, then the index JSON API for what is still missing. Failures are logged and the run continues. |
 | `--license-texts` | off | With `--fetch-licenses`, also embed the full text of every license file. Each file is capped at 1 MiB and the document holds at most 64 MiB of text in total; past that the files are listed by name and the document says so (see [incomplete enrichment](output-format.md#incomplete-enrichment)). |
 | `--embedded-sboms` | off | Add the components declared by SBOMs embedded in wheels (PEP 770, e.g. the Rust crates maturin compiled in) as dependencies of the wheel. Reads each wheel's `dist-info` like `--fetch-licenses`. With `--prefix`, also reads the `cargo auditable` crate list and the Go modules out of the environment's binaries, and the Python distributions packages vendor inside themselves (`setuptools/_vendor`). |
+| `--javascript` | off | Also describe the JavaScript project beside the lockfile: the packages its `package-lock.json`, `pnpm-lock.yaml` or `yarn.lock` locks join the document, and its direct dependencies and workspace members become the root's. Without one, a warning says so and the document is the lockfile's alone. See [Reading JavaScript lockfiles](#reading-javascript-lockfiles). |
 | `--infer-extras` | off | With `--prefix`: infer which extras each Python package was installed with, from what is installed, and label it as inferred (see [Python extras](#python-extras)). |
 | `--verify-files` | off | With `--prefix`: hash every file each conda package installed and compare it with its conda-meta record. Exit **11** (document written first) when one is modified or missing; see [Has anything changed since installation](#has-anything-changed-since-installation). |
 | `--pypi-licenses` | | Deprecated alias for `--fetch-licenses` (hidden from `--help`; removed in a future release). |
@@ -131,7 +132,7 @@ Grouped as `--help` groups them.
 | `--depth <N>` | unlimited | With `--tree`: how deep to go (`0` shows what the root depends on and nothing below). |
 | `--group-by license` | | With `--report licenses`: one section per license instead of one row per package. |
 | `--outdated-min <patch\|minor\|major>` | | With `--report outdated`: list only packages at least that far behind. |
-| `--against <PATH>` | | With `--report diff`: what to compare with — a document (CycloneDX 1.4–1.7, SPDX 2.x or SPDX 3.0 JSON), any lockfile `--lockfile` reads (`pixi.lock`, `uv.lock`, `pylock.toml`, `poetry.lock`, `pdm.lock`, `conda-lock.yml`, an explicit spec file), or the directory of an installed environment (conda, venv or plain Python). |
+| `--against <PATH>` | | With `--report diff`: what to compare with — a document (CycloneDX 1.4–1.7, SPDX 2.x or SPDX 3.0 JSON), any lockfile `--lockfile` reads (`pixi.lock`, `uv.lock`, `pylock.toml`, `poetry.lock`, `pdm.lock`, `conda-lock.yml`, a JavaScript lockfile, an explicit spec file), or the directory of an installed environment (conda, venv or plain Python). |
 | `--fail-on-diff [<SECTION>...]` | off | With `--report diff`: exit **6** when the named sections (`added`, `removed`, `version`, `license`, `build`, `pip`) are not empty. The bare flag means any change. |
 | `--source <DIR>` | the lockfile's directory | With `--report phantom`: where the workspace's Python sources are (repeatable). |
 | `--assume-used <GLOB>` | | With `--report phantom`: packages matching this are never reported as unused or undeclared (repeatable). |
@@ -202,16 +203,16 @@ there:
 3. `pylock.toml`, then the named `pylock.<name>.toml` files, sorted
 4. `poetry.lock`
 5. `pdm.lock`
-6. `conda-lock.yml`
+. `package-lock.json`, then `pnpm-lock.yaml`, then `yarn.lock`
 
 One directory is one project, so a project with both a `pixi.lock` and a `uv.lock` gets one document, not two; pass
-`--lockfile` to read the other. An explicit conda spec file has no fixed name, and a `requirements.txt` is as often a
+`--lockfile` to read the other. A JavaScript lockfile is the exception: it describes another project, so `--scan` also reads one that sits beside another kind's lockfile, as a project of its own written to `sbom-javascript.<ext>` beside the other's document. An explicit conda spec file has no fixed name, and a `requirements.txt` is as often a
 list of loose ranges as a lock, so neither is ever discovered; both are only read through `--lockfile`. When nothing is found, `pixi_sbom::discover::not_found` (or `none_found` for `--scan`)
 lists the names it looked for, and `not_found` first names the nearest manifest it passed with no lockfile beside it
 and the command that locks it ("pyproject.toml is a Poetry project's manifest: run `poetry lock` beside it"):
 
 ```text
-  × no pixi.lock, uv.lock, pylock.toml, poetry.lock, pdm.lock or conda-lock.yml found in /work/app or any parent directory
+  × no pixi.lock, uv.lock, pylock.toml, poetry.lock, pdm.lock, conda-lock.yml, package-lock.json, pnpm-lock.yaml or yarn.lock found in /work/app or any parent directory
   help: write one with your project's tool (`pixi lock`, `uv lock`, `poetry lock`, `pdm lock`, `pip lock`, `conda-lock`),
         or pass --lockfile with the path to one; an explicit conda spec file or a pinned requirements.txt is only read
         that way
@@ -620,6 +621,38 @@ platforms, which a `pylock.toml` does not have, so they are refused (exit 2). Ev
 from a PyPI purl (licenses, vulnerabilities, outdated, scorecard, diff) runs unchanged.
 
 `examples/projects/pylock/` has fourteen lockfiles written by uv and pip to try this on.
+
+## Reading JavaScript lockfiles
+
+A JavaScript project is described from the lockfile its package manager writes, with nothing installed:
+
+```bash
+pixi sbom --lockfile package-lock.json            # npm 7 and later (lockfileVersion 2 and 3)
+pixi sbom --lockfile pnpm-lock.yaml               # pnpm 8 and later (lockfileVersion 6 and later)
+pixi sbom --lockfile yarn.lock                    # yarn 1, and yarn 2 and later (Berry)
+pixi sbom -e default -p linux-64 --javascript     # a pixi workspace and the JavaScript project beside it
+```
+
+Every locked package is a `pkg:npm/<name>@<version>` component (`pkg:npm/%40types/node@20.0.0` for a scoped one) with
+`pixi:kind=external`, the dependency graph as the lockfile records it, and, where the lockfile has them, the tarball
+URL as its distribution reference and the `integrity` value as a SHA-512 hash; npm's lockfile also gives each
+package's license. Two copies of one release at different places in `node_modules` are one component. Workspace
+members are first-party, `pkg:generic/<name>@<version>` with `pixi:source-path`, and the root depends on them and on
+what the project declares. What is declared only in `devDependencies` is development scope and only in
+`optionalDependencies` optional, followed through the graph as for the Python lockfiles
+([Runtime, development and optional](output-format.md#runtime-development-and-optional)). The root's name, version,
+license, homepage and repository come from the project's `package.json`.
+
+A `yarn.lock` records neither the workspace members nor which dependencies are for development, so those come from
+the `package.json` files beside it (the project's and those its `workspaces` name; `dir/*` patterns and plain paths
+are followed). Without them the document has the packages and the graph but no scopes. pnpm and Berry record no
+tarball URL, and Berry's `checksum` is yarn's own, not npm's integrity, so a Berry document has no hashes.
+JavaScript packages are the same on every platform, so the document's platform is `noarch` unless `--platform` says
+otherwise.
+
+With `--javascript`, the JavaScript project beside any other lockfile joins that lockfile's document: its packages are
+added (one already there is not added twice), and its direct dependencies and workspace members become direct
+dependencies of the root. A project's `node_modules` is not read, with or without a lockfile.
 
 ## Describing an installed environment
 
