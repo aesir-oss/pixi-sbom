@@ -6,7 +6,7 @@ name: Release
 # note at the top of it for why the split exists (#218: provenance has to be able to name the
 # commit the binaries were built from, and only a tag-triggered run can).
 #
-# Operator prerequisite: a release commits the version bump + CHANGELOG.md and pushes a
+# Operator prerequisite: a release commits the version bump + crates/pixi-sbom/CHANGELOG.md and pushes a
 # tag to `main` under the branch ruleset, so the default GITHUB_TOKEN is not enough.
 # The release GitHub App (already in the ruleset's bypass list) needs its credentials
 # exposed as two repository secrets:
@@ -205,11 +205,10 @@ jobs:
       # -----------------------------------------------------------------------
       # Changelog & tag (git-cliff via cliff.toml)
       # -----------------------------------------------------------------------
-      - name: Generate CHANGELOG.md with git-cliff
+      # Only the commits that touched pixi-sbom or a workspace crate it depends on (scripts/changelog.py).
+      - name: Generate crates/pixi-sbom/CHANGELOG.md with git-cliff
         if: steps.should_skip.outputs.skip != 'true'
-        run: |
-          pixi run git-cliff --config cliff.toml --tag "pixi-sbom-v${{ env.NEW_TAG }}" -o CHANGELOG.md
-          echo "CHANGELOG.md updated for pixi-sbom-v${{ env.NEW_TAG }}"
+        run: pixi run changelog-of write pixi-sbom --tag "pixi-sbom-v${{ env.NEW_TAG }}"
 
       # The notes become the release's section in the same commit as the changelog, so main
       # never has a release the What's new page does not describe.
@@ -222,7 +221,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add CHANGELOG.md crates/pixi-sbom/Cargo.toml Cargo.lock pixi.toml docs/whats-new.md
+          git add crates/pixi-sbom/CHANGELOG.md crates/pixi-sbom/Cargo.toml Cargo.lock pixi.toml docs/whats-new.md
           git commit -m "chore(release): pixi-sbom-v${{ env.NEW_TAG }}"
           git tag -a "pixi-sbom-v${{ env.NEW_TAG }}" -m "Release pixi-sbom-v${{ env.NEW_TAG }}"
           git push origin HEAD:main --tags

@@ -7,7 +7,7 @@ Issue and PR numbers from before 2026-10-11 refer to millsks/pixi-sbom.
 - [Minimal enrichment defaults](feedback-minimal-defaults.md) — the fact by default, bulky payloads behind their own flag
 - [Issue delivery loop](issue-delivery-loop.md) — "guardrail"/"harness" = global CLAUDE.md §6 loop; merge with --squash --admin --delete-branch; never cut a release unasked
 - [Force-push permission](force-push-permission.md) — own feature branches, and the stale-check trap behind it
-- [Changelog generation](release-notes-span-last-tag.md) — anchored tag_pattern for both tag formats; fix cliff.toml, never CHANGELOG.md
+- [Changelog generation](release-notes-span-last-tag.md) — anchored tag_pattern; per-extension changelog filtered by path, pre-move history appended whole; fix the generator, never the file
 - [Marketplace listing](marketplace-listing.md) — the action ships from aesir-oss/pixi-sbom-action; its listing needs a new name
 - [Concurrent CI runs SIGKILL](concurrent-ci-sigkill.md) — SIGKILL in cov = two ci runs overlapping (mine + stop hook), not a failing test
 - [Concurrent sessions and the Stop hook](concurrent-sessions-stop-hook.md) — two sessions in one tree: CI runs kill each other; mass failures may not be real

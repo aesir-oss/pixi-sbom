@@ -18,6 +18,14 @@ categories = ["command-line-utilities", "development-tools"]
 # templates stay out of the crates.io package.
 exclude = ["pre-commit-mirror/", "tests/"]
 
+# What counts toward this crate's CHANGELOG.md beyond its own directory and the workspace crates it
+# depends on (scripts/changelog.py). docs/ and examples/ are pixi-sbom's until the site gets a
+# section per extension (#6). Releases up to v1.11.0 were made before the move into crates/, so that
+# history is kept whole rather than filtered by path.
+[package.metadata.changelog]
+include = ["actions/pixi-sbom/**", "docs/**", "examples/**"]
+history-before = "v1.11.0"
+
 # `cargo binstall pixi-sbom` fetches the release archive for the host instead of compiling.
 # The archives are named after pixi platforms, so each supported target is spelled out.
 [package.metadata.binstall]

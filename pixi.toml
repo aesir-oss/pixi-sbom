@@ -19,7 +19,8 @@ check = "cargo check --all-targets"
 test = "cargo test"
 test-integration = "cargo test --test '*'"
 build = "cargo build --release"
-changelog = "git-cliff --config cliff.toml -o CHANGELOG.md"
+changelog-of = { cmd = "python scripts/changelog.py", description = "one extension's changelog, from the commits that touched it: changelog-of write|notes|paths <extension> [--tag <tag>]" }
+changelog-test = { cmd = "python -m unittest discover -s scripts -p 'test_changelog.py' -v", description = "the per-extension changelog's own tests" }
 # The full criterion run, which takes a few minutes; `bench-test` only checks that every
 # benchmark still runs, which is what CI needs and what the change harness can afford.
 # What the binary costs to run, measured the same way on every platform a release is built

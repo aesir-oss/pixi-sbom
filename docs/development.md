@@ -29,14 +29,14 @@ prefer adding a task.
 | `build` | `cargo build --release` | Optimized binary (`lto`, `codegen-units = 1`, stripped) at `target/release/pixi-sbom` |
 | `pre-commit-run` | `pre-commit run --all-files` | All hooks over the tree |
 | `ci` | `pre-commit-run` → `build` → `check` → `lint` → `cov` | The gate; must exit 0 before work is considered done |
-| `changelog` | `git cliff --config cliff.toml -o CHANGELOG.md` | Regenerate the changelog from conventional commits |
+| `changelog-of` | `python scripts/changelog.py write <extension>` | Regenerate one extension's changelog from the commits that touched it |
 | `bootstrap` | `pre-commit install ...` | One-time hook installation |
 | `docs-serve` | `mkdocs serve` (`docs` environment) | Live preview of the documentation site at http://127.0.0.1:8000 |
 | `docs-build` | `mkdocs build --strict` (`docs` environment) | Build the site into `site/`; a broken link or a page missing from the nav fails |
 
 The documentation site is [MkDocs](https://www.mkdocs.org) with the Material theme, configured in `mkdocs.yml`; the
-pages are the Markdown files in `docs/` with `index.md` as the landing page, plus the repository `CHANGELOG.md`, which
-`mkdocs_hooks.py` publishes as the changelog page at build time. The `docs` pixi environment is separate
+pages are the Markdown files in `docs/` with `index.md` as the landing page, plus pixi-sbom's `crates/pixi-sbom/CHANGELOG.md`,
+which `mkdocs_hooks.py` publishes as the changelog page at build time. The `docs` pixi environment is separate
 from the Rust one, so `pixi run -e docs docs-serve` (or plain `pixi run docs-serve`, which resolves to it) does not
 pull the Rust toolchain into a docs-only checkout.
 
@@ -444,7 +444,8 @@ What the two do, in order:
    `## Unreleased` section.
 2. **Bump.** Writes the version into `crates/pixi-sbom/Cargo.toml`, `Cargo.lock` (via `cargo update --workspace`) and `pixi.toml`.
 3. **Gate.** Runs `pixi run ci` on the bumped tree; a red gate stops the release before anything is pushed.
-4. **Changelog.** Regenerates `CHANGELOG.md` with `git-cliff --tag pixi-sbom-vX.Y.Z` (`cliff.toml`), renames What's
+4. **Changelog.** Regenerates `crates/pixi-sbom/CHANGELOG.md` with `pixi run changelog-of write pixi-sbom --tag
+   pixi-sbom-vX.Y.Z` (see [Changelogs](#changelogs)), renames What's
    new's `## Unreleased` to `## X.Y.Z` (final releases only), commits the bump, changelog and page as
    `chore(release): pixi-sbom-vX.Y.Z`, tags that commit, and pushes both to `main`. It then waits until
    `release-artifacts.yml` is visibly running for that tag before going green: a tag that pushed but started
@@ -453,13 +454,13 @@ What the two do, in order:
    *`release-artifacts.yml` takes over here, triggered by the tag.*
 
 5. **Build.** Checks out the tag on five runners and builds `pixi-sbom` for linux-64, linux-aarch64, osx-64,
-   osx-arm64 and win-64, packaged with `LICENSE`, pixi-sbom's `README.md`, `CHANGELOG.md` and a `.sha256` each. Archives
+   osx-arm64 and win-64, packaged with `LICENSE`, pixi-sbom's `README.md` and `CHANGELOG.md` and a `.sha256` each. Archives
    keep their names, `pixi-sbom-vX.Y.Z-<platform>`, which is now also the tag.
 6. **Attest.** `actions/attest-build-provenance` signs a provenance statement for each archive: what built it, from
    which commit, in which workflow run. It runs on the build runner, before the artifact upload, so the claim covers
    the round trip through artifact storage as well. The statement goes to the repository's attestation store, and
    the Sigstore bundle also ships beside the archive as `.sigstore.json` for anyone verifying offline.
-7. **Publish.** Creates the GitHub release with this version's changelog section (from `git-cliff --latest`) plus an
+7. **Publish.** Creates the GitHub release with this version's changelog section (from `changelog-of notes pixi-sbom`) plus an
    artifact table as the notes and the packages as assets, marked pre-release when the tag carries a suffix.
    `release-artifacts.yml` only triggers on `pixi-sbom-vX.Y.Z` tags. The action reads releases from both this
    repository and `millsks/pixi-sbom` (1.11.x and older, tagged `vX.Y.Z`), and downloads each version from the
@@ -559,6 +560,36 @@ authenticates with the release GitHub App (already in the ruleset's bypass list)
 App's credentials must be present as the repository secrets `APP_ID` and `APP_PRIVATE_KEY`; the workflow mints a
 short-lived token from them per run.
 
-`pixi run changelog` regenerates `CHANGELOG.md` locally with an *Unreleased* section if you want to preview it; do
-not commit that. Commit types map to sections via `cliff.toml`: `feat` → Features, `fix` → Bug Fixes, `perf`,
-`refactor`, `docs`, `test`, `ci`/`build` → CI and Build; `chore` commits are omitted.
+### Changelogs
+
+Each extension has its own changelog beside its crate, `crates/<extension>/CHANGELOG.md`; the root `CHANGELOG.md`
+only links to them. `scripts/changelog.py` writes one with git-cliff from the commits that touched:
+
+- the extension's own crate;
+- every workspace crate it depends on, read from `cargo metadata`, so adding a dependency on a shared crate needs no
+  other change;
+- the extra paths its `Cargo.toml` claims under `[package.metadata.changelog] include`. pixi-sbom claims `docs/**`,
+  `examples/**` and `actions/pixi-sbom/**` until the site gets a section per extension (#6).
+
+A commit that touches only another extension, or only repository-wide files (`.github/`, `.claude/`, the root
+configuration), appears in no extension's changelog. A commit to a shared crate appears in the changelog of every
+extension built on it, because every one of those binaries changed. Releases are the extension's own
+`<extension>-vX.Y.Z` tags; release candidates are not sections of their own. `Cargo.lock` is never an include path:
+dependency bumps touch it for every crate, and they are `chore(deps)` commits, which the changelog skips anyway.
+
+`pixi run changelog-of paths pixi-sbom` prints the paths, and `pixi run changelog-of write pixi-sbom` regenerates the
+file with an *Unreleased* section if you want to preview it; do not commit that. `notes` prints the newest release's
+section, which is what the GitHub release carries. Commit types map to sections via `cliff.toml`: `feat` → Features,
+`fix` → Bug Fixes, `perf`, `refactor`, `docs`, `test`, `ci`/`build` → CI and Build; `chore` commits are omitted.
+
+**Work that spans a shared crate and the extensions** is split into pull requests by concern: the shared change first,
+then one pull request per extension that adopts it. Pull requests are squash-merged, so one that touches the shared
+crate and two extensions becomes a single commit in both extensions' changelogs, described in words that fit neither.
+Commit scopes stay the area of change (`feat(lock)`, `fix(diff)`); which extension a commit belongs to comes from the
+paths it touches, and its issue's label.
+
+**A new extension** gets its changelog with no setup: its first `write` creates `crates/<extension>/CHANGELOG.md`.
+Give its release workflow `changelog-of write <extension> --tag <extension>-vX.Y.Z` and `changelog-of notes
+<extension>`, add a row to the root `CHANGELOG.md`, and claim any paths outside its crate in its `Cargo.toml`. A
+shared crate that is compiled into the extensions and never released itself is created with `publish = false` and
+needs no changelog or tags of its own.

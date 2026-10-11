@@ -9637,7 +9637,7 @@ fn the_whats_new_page_covers_every_release_since_1_0() {
         let mut parts = version.split('.').map(|p| p.parse::<u32>());
         Some((parts.next()?.ok()?, parts.next()?.ok()?, parts.next()?.ok()?))
     };
-    let changelog = std::fs::read_to_string(root.join("CHANGELOG.md")).unwrap();
+    let changelog = std::fs::read_to_string(root.join("crates/pixi-sbom/CHANGELOG.md")).unwrap();
     let released: std::collections::BTreeSet<(u32, u32, u32)> = changelog
         .lines()
         .filter_map(|l| version_of(l, "## "))

@@ -115,7 +115,7 @@ jobs:
           set -euo pipefail
           name="${TAG}-${{ matrix.target }}"
           mkdir -p dist/"$name"
-          cp "target/release/pixi-sbom${{ matrix.ext }}" LICENSE crates/pixi-sbom/README.md CHANGELOG.md dist/"$name"/
+          cp "target/release/pixi-sbom${{ matrix.ext }}" LICENSE crates/pixi-sbom/README.md crates/pixi-sbom/CHANGELOG.md dist/"$name"/
           cd dist
           if [[ "${{ matrix.target }}" == win-64 ]]; then
             7z a "$name.zip" "$name" > /dev/null
@@ -196,7 +196,7 @@ jobs:
         run: |
           set -euo pipefail
           # An optional hand-written preamble, for a release where the list of commits is not the
-          # story: `docs/release-notes/v1.2.3.md` for `pixi-sbom-v1.2.3`. git-cliff rewrites CHANGELOG.md wholesale from
+          # story: `docs/release-notes/v1.2.3.md` for `pixi-sbom-v1.2.3`. git-cliff rewrites the changelog wholesale from
           # the commit log every release, so this is the one place a narrative survives.
           preamble="docs/release-notes/${TAG#pixi-sbom-}.md"
           if [ -f "$preamble" ]; then
@@ -206,7 +206,7 @@ jobs:
           else
             : > RELEASE_NOTES.md
           fi
-          pixi run git-cliff --config cliff.toml --latest --strip header >> RELEASE_NOTES.md
+          pixi run changelog-of notes pixi-sbom >> RELEASE_NOTES.md
           {
             echo
             echo "---"
@@ -239,7 +239,7 @@ jobs:
             echo
             echo "Add \`--bundle ${TAG}-linux-64.tar.gz.sigstore.json\` to verify without reaching GitHub."
             echo
-            echo "Full changelog: [CHANGELOG.md](https://github.com/${GITHUB_REPOSITORY}/blob/main/CHANGELOG.md)"
+            echo "Full changelog: [CHANGELOG.md](https://github.com/${GITHUB_REPOSITORY}/blob/main/crates/pixi-sbom/CHANGELOG.md)"
           } >> RELEASE_NOTES.md
           cat RELEASE_NOTES.md
 

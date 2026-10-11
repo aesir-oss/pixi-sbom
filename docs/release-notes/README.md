@@ -4,7 +4,7 @@ One optional file per release, named for its tag: `v1.0.0.md`. When `release-art
 `docs/release-notes/<tag>.md` it puts that text at the top of the GitHub release, above the section
 git-cliff generates from the commit log.
 
-It exists because git-cliff rewrites `CHANGELOG.md` wholesale from the commits on every release, so
+It exists because git-cliff rewrites `crates/pixi-sbom/CHANGELOG.md` wholesale from the commits on every release, so
 there is nowhere in that file a hand-written paragraph survives. Most releases need nothing here —
 the commit list *is* the story. A release where it is not, like 1.0.0, gets a file.
 
