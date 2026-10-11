@@ -43,7 +43,8 @@ It also reads more out of an installed environment (`--prefix`):
 - **Native libraries bundled in wheels and packages.** With `--embedded-sboms`, the copies of openssl, libwebp,
   zlib, sqlite, libcurl, libxml2, expat, libpng and libjpeg-turbo that wheels carry in `<dist>.libs/` or
   `.dylibs/` are listed under the package that ships them, with their versions read out of the binaries and a CPE
-  a scanner can match. The libwebp inside Pillow 10.0.0's wheels now gets Grype's CVE-2023-4863 finding.
+  a scanner can match. The libwebp inside Pillow 10.0.0's wheels now gets Grype's CVE-2023-4863 finding. Like vendored
+  copies, they are not installs, so `--report diff` leaves them out.
   ([Bundled native libraries](output-format.md#bundled-native-libraries))
 - **Where each component was found.** CycloneDX `evidence.occurrences` gives the path inside the environment:
   the conda-meta record, the dist-info, the binary. ([Installed environments](output-format.md#installed-environments))

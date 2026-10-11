@@ -1585,6 +1585,11 @@ With `--prefix` the document is named after the environment's directory, which s
 a lockfile run with `--against <prefix directory>` — and between two lockfiles, where `--against pixi.lock` on the
 workspace's own lockfile is the "nothing has changed" baseline.
 
+Copies inside other packages are not installs. Of what `--embedded-sboms` adds, the Python distributions a package
+vendors (`setuptools/_vendor/packaging`) and the native libraries bundled in a wheel or binary (Pillow's own
+libwebp) stay in the document but are left out of both sides of the comparison, including when the other side is a
+document that lists them.
+
 ### Does this venv still match its lock?
 
 `--against` reads every lockfile `--lockfile` reads, through the same reader, so the same check works for a venv:

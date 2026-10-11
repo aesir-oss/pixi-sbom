@@ -94,7 +94,14 @@ pub fn is_bundled(package: &Package) -> bool {
         && package
             .properties
             .get(SOURCE_PROPERTY)
-            .is_some_and(|source| source.starts_with(&format!("{SOURCE_KIND}:")))
+            .is_some_and(|source| is_bundled_source(source))
+}
+
+/// Whether a `pixi:embedded-sbom` value names a bundled library, as a document read back records it.
+pub fn is_bundled_source(source: &str) -> bool {
+    source
+        .strip_prefix(SOURCE_KIND)
+        .is_some_and(|rest| rest.starts_with(':'))
 }
 
 /// Whether a file name is one the signature's library is installed as: a stem followed by

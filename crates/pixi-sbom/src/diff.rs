@@ -145,12 +145,7 @@ fn entry_of(package: &crate::model::Package) -> Entry {
 /// side the comparison reads.
 pub fn previous_from_sbom(sbom: &Sbom) -> Previous {
     Previous {
-        entries: sbom
-            .packages
-            .iter()
-            .filter(|p| !p.id.ends_with(crate::prefix::VENDORED_ID_SUFFIX))
-            .map(entry_of)
-            .collect(),
+        entries: sbom.packages.iter().filter(|p| !is_copy(p)).map(entry_of).collect(),
         format: sbom.input_description(),
         pypi_only: describes_pypi_only(sbom),
     }
@@ -216,6 +211,11 @@ pub fn parse_previous(text: &str) -> Option<Previous> {
             .into_iter()
             .filter(|c| root.as_deref() != Some(c.reference.as_str()))
             .filter(|c| !is_vendored(&c.reference, c.purl.as_deref()))
+            .filter(|c| {
+                !c.properties
+                    .get(crate::embedded::SOURCE_PROPERTY)
+                    .is_some_and(|s| crate::bundled::is_bundled_source(s))
+            })
             .map(|c| Entry {
                 kind: kind_of(c.purl.as_deref()),
                 name: c.name,
@@ -233,6 +233,23 @@ pub fn parse_previous(text: &str) -> Option<Previous> {
         });
     }
     parse_spdx3(text)
+}
+
+/// Whether a package is a copy inside another one rather than an install of its own: a vendored
+/// Python distribution, or a native library bundled in a wheel or binary (#41).
+fn is_copy(package: &crate::model::Package) -> bool {
+    package.id.ends_with(crate::prefix::VENDORED_ID_SUFFIX) || crate::bundled::is_bundled(package)
+}
+
+/// Whether an SPDX 3 package's comment records it as a bundled library (`pixi:embedded-sbom=bundled:…`).
+fn spdx3_is_bundled(node: &serde_json::Value) -> bool {
+    node.get("comment").and_then(|v| v.as_str()).is_some_and(|comment| {
+        comment.lines().any(|line| {
+            line.strip_prefix(crate::embedded::SOURCE_PROPERTY)
+                .and_then(|rest| rest.strip_prefix('='))
+                .is_some_and(crate::bundled::is_bundled_source)
+        })
+    })
 }
 
 /// Whether a component read back from a document is a vendored copy: its CycloneDX `bom-ref` ends
@@ -290,6 +307,9 @@ fn parse_spdx3(text: &str) -> Option<Previous> {
         let id = node.get("spdxId").and_then(|v| v.as_str()).unwrap_or("");
         if id.ends_with("#package-root") {
             seen_root = true;
+            continue;
+        }
+        if spdx3_is_bundled(node) {
             continue;
         }
         let purl = node
@@ -449,12 +469,13 @@ pub const DIFF_EXIT_CODE: i32 = 6;
 /// Compare `sbom` (the new side) with `previous`.
 pub fn compare(sbom: &Sbom, previous: &Previous, against: &Path) -> Diff {
     let mut old: BTreeMap<String, &Entry> = previous.entries.iter().map(|e| (key(&e.kind, &e.name), e)).collect();
-    // A vendored copy (setuptools/_vendor/packaging) is not an install of its own: comparing it by
-    // name would make it stand in for, or be mistaken for, the installed distribution.
+    // A vendored copy (setuptools/_vendor/packaging) or a bundled library (Pillow's libwebp) is not
+    // an install of its own: comparing it by name would make it stand in for, or be mistaken for,
+    // the installed distribution, and every wheel that bundles one would read as drift (#41).
     let mut new: BTreeMap<String, Entry> = sbom
         .packages
         .iter()
-        .filter(|p| !p.id.ends_with(crate::prefix::VENDORED_ID_SUFFIX))
+        .filter(|p| !is_copy(p))
         .map(|p| {
             let entry = entry_of(p);
             (key(&entry.kind, &entry.name), entry)
@@ -574,6 +595,81 @@ mod tests {
         }
         assert!(parse_previous("{}").is_none());
         assert!(parse_previous("not json").is_none());
+    }
+
+    /// The sample with Pillow-style bundled libwebp and a Go module read out of a binary, both under six.
+    fn with_copies() -> Sbom {
+        let mut sbom = sample_sbom();
+        let embedded = |name: &str, purl: &str, source: &str| {
+            let mut p = sbom.packages[0].clone();
+            p.id = purl.into();
+            p.purl = purl.into();
+            p.name = name.into();
+            p.version = Some("1.3.1".into());
+            p.kind = crate::model::PackageKind::Embedded;
+            p.license = None;
+            p.dependencies = Vec::new();
+            p.properties = BTreeMap::from([(crate::embedded::SOURCE_PROPERTY.to_string(), source.to_string())]);
+            p
+        };
+        let libwebp = embedded(
+            "libwebp",
+            "pkg:generic/libwebp@1.3.1",
+            "bundled:lib/python3.12/site-packages/PIL/.dylibs/libwebp.7.dylib",
+        );
+        let yaml = embedded(
+            "gopkg.in/yaml.v3",
+            "pkg:golang/gopkg.in/yaml.v3@1.3.1",
+            "go-buildinfo:bin/yq",
+        );
+        let six = sbom.packages.iter().position(|p| p.name == "six").unwrap();
+        sbom.packages[six]
+            .dependencies
+            .extend([libwebp.id.clone(), yaml.id.clone()]);
+        sbom.packages.extend([libwebp, yaml]);
+        sbom
+    }
+
+    #[test]
+    fn bundled_libraries_are_not_compared_as_installs() {
+        let sbom = with_copies();
+        // Built this run, on either side.
+        let names = |p: &Previous| p.entries.iter().map(|e| e.name.clone()).collect::<Vec<_>>();
+        let previous = previous_from_sbom(&sbom);
+        assert!(!names(&previous).contains(&"libwebp".to_string()));
+        assert!(
+            names(&previous).contains(&"gopkg.in/yaml.v3".to_string()),
+            "Go modules are still compared"
+        );
+        let diff = compare(&sbom, &previous_from_sbom(&sample_sbom()), Path::new("pixi.lock"));
+        assert_eq!(
+            diff.added.iter().map(|e| e.name.as_str()).collect::<Vec<_>>(),
+            ["gopkg.in/yaml.v3"]
+        );
+
+        // Read back from every format we write.
+        for (format, version) in [
+            (Format::Cyclonedx, SpecVersion::V1_6),
+            (Format::Cyclonedx, SpecVersion::V1_7),
+            (Format::Spdx, SpecVersion::V2_3),
+            (Format::Spdx, SpecVersion::V3_0),
+        ] {
+            let ctx = crate::format::WriteContext {
+                spec_version: version,
+                ..fixed_context()
+            };
+            let text = serde_json::to_string(&crate::format::to_value(format, &sbom, &ctx).unwrap()).unwrap();
+            let read = parse_previous(&text).unwrap();
+            assert!(!names(&read).contains(&"libwebp".to_string()), "{}", read.format);
+            assert!(
+                names(&read).contains(&"gopkg.in/yaml.v3".to_string()),
+                "{}",
+                read.format
+            );
+            // SPDX 2.3 rewrites a non-SPDX license as a LicenseRef, so only what was added or removed is checked.
+            let d = compare(&sbom, &read, Path::new("old.json"));
+            assert!(d.added.is_empty() && d.removed.is_empty(), "{}", read.format);
+        }
     }
 
     #[test]
