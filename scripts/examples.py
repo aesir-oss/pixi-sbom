@@ -431,7 +431,7 @@ def generate(scenario: dict, reader: str) -> Path:
         run(["pixi", "lock", "--manifest-path", str(target / "pixi.toml")], target, isolated=True)
         # pixi installs into the workspace to build a local or git package's metadata; not part of it.
         shutil.rmtree(target / ".pixi", ignore_errors=True)
-        # A workspace with a JavaScript frontend keeps the frontend's lockfile beside pixi.toml (`--javascript`).
+        # A workspace with a JavaScript frontend keeps its lockfile beside pixi.toml, which joins its document (#42).
         if scenario.get("npm"):
             (target / "package.json").write_text(package_json(scenario))
             lock_javascript("npm", target)

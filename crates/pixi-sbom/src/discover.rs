@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use miette::Diagnostic;
 use thiserror::Error;
 
-use crate::cli::Format;
+use crate::cli::{Format, SkipInput};
 
 /// Name of the lockfile pixi writes next to its manifest.
 pub const LOCKFILE_NAME: &str = "pixi.lock";
@@ -54,20 +54,64 @@ fn lockfiles_in(dir: &Path) -> Vec<PathBuf> {
     found
 }
 
-/// The one lockfile to read in `dir`, and a log line when there were several to choose from.
-pub fn lockfile_in(dir: &Path) -> Option<PathBuf> {
+/// Whether `--skip-input` leaves `lockfile` out.
+pub fn is_skipped(lockfile: &Path, skip: &[SkipInput]) -> bool {
+    let name = lockfile_name(lockfile);
+    skip.iter().any(|input| input.covers(&name))
+}
+
+/// The lockfile a run reads in `dir`: the first conda or Python one in [`LOCKFILE_KINDS`] order
+/// that `skip` leaves in, or a JavaScript one when there is none. Logs what was read, what joins
+/// it and what was left out when there was more than one.
+pub fn lockfile_in(dir: &Path, skip: &[SkipInput]) -> Option<PathBuf> {
     let found = lockfiles_in(dir);
-    let chosen = found.first()?.clone();
+    let (kept, skipped): (Vec<&PathBuf>, Vec<&PathBuf>) = found.iter().partition(|p| !is_skipped(p, skip));
+    let chosen = kept
+        .iter()
+        .find(|p| !crate::jslock::is_js_lock_name(p))
+        .or_else(|| kept.first())
+        .map(|p| (*p).clone())?;
+    let javascript = javascript_in(dir, &chosen, skip);
     if found.len() > 1 {
-        let others: Vec<String> = found[1..].iter().map(|p| lockfile_name(p)).collect();
+        let not_read: Vec<String> = kept
+            .iter()
+            .filter(|p| ***p != chosen && Some(**p) != javascript.as_ref())
+            .map(|p| lockfile_name(p))
+            .collect();
+        let skipped: Vec<String> = skipped.iter().map(|p| lockfile_name(p)).collect();
         tracing::info!(
             dir = %dir.display(),
-            chosen = %lockfile_name(&chosen),
-            also = %others.join(", "),
-            "several lockfiles in one directory; reading the first in the order {KINDS_TEXT} (pass --lockfile for another)"
+            reading = %lockfile_name(&chosen),
+            joined_by = %javascript.as_deref().map(lockfile_name).unwrap_or_default(),
+            not_read = %not_read.join(", "),
+            skipped = %skipped.join(", "),
+            "several lockfiles in one directory; reading one per ecosystem, the first in the order {KINDS_TEXT} \
+             (--skip-input leaves one out, --lockfile reads one alone)"
         );
     }
     Some(chosen)
+}
+
+/// The JavaScript lockfile that joins `lockfile`'s document: the first in `dir` that `skip`
+/// leaves in, unless `lockfile` is itself a JavaScript one.
+pub fn javascript_in(dir: &Path, lockfile: &Path, skip: &[SkipInput]) -> Option<PathBuf> {
+    if crate::jslock::is_js_lock_name(lockfile) {
+        return None;
+    }
+    crate::jslock::LOCKFILE_NAMES
+        .iter()
+        .map(|name| dir.join(name))
+        .find(|p| p.is_file() && !is_skipped(p, skip))
+}
+
+/// The names of the lockfiles in `dir` that `skip` leaves out, for a message.
+fn skipped_in(dir: &Path, skip: &[SkipInput]) -> String {
+    lockfiles_in(dir)
+        .iter()
+        .filter(|p| is_skipped(p, skip))
+        .map(|p| lockfile_name(p))
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 /// Errors raised while locating input and output files.
@@ -110,6 +154,32 @@ pub enum DiscoverError {
         path: PathBuf,
     },
 
+    /// `--skip-input` left out every lockfile the nearest project (or every project of a scan) has.
+    #[error("--skip-input left out every lockfile in {dir}: {skipped}")]
+    #[diagnostic(
+        code(pixi_sbom::discover::all_skipped),
+        help(
+            "drop one of the --skip-input values (or the skip-input configuration key), or pass --lockfile for another project"
+        )
+    )]
+    AllSkipped {
+        /// The directory whose lockfiles were all skipped.
+        dir: PathBuf,
+        /// The lockfiles left out, for the message.
+        skipped: String,
+    },
+
+    /// `--lockfile` named a lockfile `--skip-input` leaves out.
+    #[error("--lockfile {path} is a lockfile --skip-input leaves out")]
+    #[diagnostic(
+        code(pixi_sbom::discover::skipped),
+        help("pass --lockfile without the --skip-input value that covers it, or leave --lockfile out to find another")
+    )]
+    Skipped {
+        /// The lockfile given.
+        path: PathBuf,
+    },
+
     /// `--scan` walked the tree and came back with nothing.
     #[error("no {KINDS_TEXT} anywhere under {dir}")]
     #[diagnostic(
@@ -134,19 +204,27 @@ pub const SCAN_SKIPPED_DIRS: &[&str] = &["node_modules", "target", "build", "dis
 /// One lockfile per project under `dir`, sorted by path so a scan is reproducible.
 ///
 /// A project keeps its lockfile next to its manifest, so one directory is one project, and the
-/// lockfile read for it is the one [`lockfile_in`] picks. Hidden directories and [`SCAN_SKIPPED_DIRS`] are never entered, symlinked
-/// directories are not followed (a cycle would never end), and `depth` caps how far below
-/// `dir` the walk goes (`0` is `dir` itself).
-pub fn scan(dir: &Path, depth: Option<usize>) -> Result<Vec<PathBuf>, DiscoverError> {
+/// lockfile read for it is the one [`lockfile_in`] picks; a JavaScript lockfile beside it joins
+/// its document ([`javascript_in`]). Hidden directories and [`SCAN_SKIPPED_DIRS`] are never
+/// entered, symlinked directories are not followed (a cycle would never end), and `depth` caps
+/// how far below `dir` the walk goes (`0` is `dir` itself).
+pub fn scan(dir: &Path, depth: Option<usize>, skip: &[SkipInput]) -> Result<Vec<PathBuf>, DiscoverError> {
     if !dir.is_dir() {
         return Err(DiscoverError::NotADirectory {
             path: dir.to_path_buf(),
         });
     }
-    let mut found = Vec::new();
-    walk(dir, 0, depth.unwrap_or(usize::MAX), &mut found);
+    let mut walked = Walked::default();
+    walk(dir, 0, depth.unwrap_or(usize::MAX), skip, &mut walked);
+    let Walked { mut found, skipped } = walked;
     found.sort();
     if found.is_empty() {
+        if !skipped.is_empty() {
+            return Err(DiscoverError::AllSkipped {
+                dir: dir.to_path_buf(),
+                skipped: skipped.join("; "),
+            });
+        }
         return Err(DiscoverError::NoneFound {
             dir: dir.to_path_buf(),
             skipped: SCAN_SKIPPED_DIRS.join(", "),
@@ -155,15 +233,23 @@ pub fn scan(dir: &Path, depth: Option<usize>) -> Result<Vec<PathBuf>, DiscoverEr
     Ok(found)
 }
 
-fn walk(dir: &Path, level: usize, max: usize, found: &mut Vec<PathBuf>) {
-    if let Some(lockfile) = lockfile_in(dir) {
-        // A JavaScript project beside a Python or pixi one is a project of its own.
-        if !crate::jslock::is_js_lock_name(&lockfile)
-            && let Some(javascript) = crate::jslock::lockfile_in(dir)
-        {
-            found.push(javascript);
+/// What a scan's walk collects: the lockfiles to read, and the directories whose lockfiles
+/// `--skip-input` all left out (as `dir: names`, for a message).
+#[derive(Default)]
+struct Walked {
+    found: Vec<PathBuf>,
+    skipped: Vec<String>,
+}
+
+fn walk(dir: &Path, level: usize, max: usize, skip: &[SkipInput], walked: &mut Walked) {
+    match lockfile_in(dir, skip) {
+        Some(lockfile) => walked.found.push(lockfile),
+        None => {
+            let skipped = skipped_in(dir, skip);
+            if !skipped.is_empty() {
+                walked.skipped.push(format!("{}: {skipped}", dir.display()));
+            }
         }
-        found.push(lockfile);
     }
     if level >= max {
         return;
@@ -185,31 +271,46 @@ fn walk(dir: &Path, level: usize, max: usize, found: &mut Vec<PathBuf>) {
         if name.starts_with('.') || SCAN_SKIPPED_DIRS.contains(&name.as_str()) {
             continue;
         }
-        walk(&path, level + 1, max, found);
+        walk(&path, level + 1, max, skip, walked);
     }
 }
 
 /// Resolve the lockfile to read: an explicit path if given, otherwise the nearest lockfile
-/// found by walking upward from `start`.
-pub fn resolve_lockfile(explicit: Option<&Path>, start: &Path) -> Result<PathBuf, DiscoverError> {
+/// found by walking upward from `start`, with `skip` applied in the nearest directory that has
+/// any. That directory is the project: when `skip` leaves out all of its lockfiles, the search
+/// stops there rather than reaching a project above it.
+pub fn resolve_lockfile(explicit: Option<&Path>, start: &Path, skip: &[SkipInput]) -> Result<PathBuf, DiscoverError> {
     match explicit {
+        Some(path) if path.is_file() && is_skipped(path, skip) => Err(DiscoverError::Skipped {
+            path: path.to_path_buf(),
+        }),
         Some(path) if path.is_file() => Ok(path.to_path_buf()),
         Some(path) => Err(DiscoverError::Missing {
             path: path.to_path_buf(),
         }),
-        None => find_upward(start).ok_or_else(|| DiscoverError::NotFound {
+        None => {
+            let dir = project_dir(start)?;
+            lockfile_in(&dir, skip).ok_or_else(|| DiscoverError::AllSkipped {
+                skipped: skipped_in(&dir, skip),
+                dir,
+            })
+        }
+    }
+}
+
+/// The nearest directory at or above `start` that has a lockfile of any kind: the project a run
+/// without `--lockfile` describes, and where its configuration is looked up.
+pub fn project_dir(start: &Path) -> Result<PathBuf, DiscoverError> {
+    start
+        .ancestors()
+        .find(|dir| !lockfiles_in(dir).is_empty())
+        .map(Path::to_path_buf)
+        .ok_or_else(|| DiscoverError::NotFound {
             start: start.to_path_buf(),
             hint: crate::unlocked::nearest_manifest(start)
                 .map(|(path, found)| format!("{} is {}: {}. Otherwise, ", path.display(), found.what, found.next))
                 .unwrap_or_default(),
-        }),
-    }
-}
-
-/// The nearest lockfile at or above `start`: the closest directory wins, and within a directory
-/// the one [`lockfile_in`] picks.
-fn find_upward(start: &Path) -> Option<PathBuf> {
-    start.ancestors().find_map(lockfile_in)
+        })
 }
 
 /// The `--output` spelling that selects standard output.
@@ -285,10 +386,10 @@ mod tests {
     fn one_lockfile_per_directory_in_the_documented_order() {
         let dir = tempfile::tempdir().unwrap();
         let touch = |name: &str| std::fs::write(dir.path().join(name), "").unwrap();
-        assert_eq!(lockfile_in(dir.path()), None);
+        assert_eq!(lockfile_in(dir.path(), &[]), None);
         touch("spec.txt");
         assert_eq!(
-            lockfile_in(dir.path()),
+            lockfile_in(dir.path(), &[]),
             None,
             "an explicit spec file is never discovered"
         );
@@ -306,7 +407,7 @@ mod tests {
         ] {
             touch(name);
             assert_eq!(
-                lockfile_in(dir.path()),
+                lockfile_in(dir.path(), &[]),
                 Some(dir.path().join(name)),
                 "{name} goes before the ones so far"
             );
@@ -331,7 +432,7 @@ mod tests {
         std::fs::write(named.path().join("pylock.web.toml"), "").unwrap();
         std::fs::write(named.path().join("pylock.api.toml"), "").unwrap();
         assert_eq!(
-            lockfile_in(named.path()),
+            lockfile_in(named.path(), &[]),
             Some(named.path().join("pylock.api.toml")),
             "named ones, sorted"
         );
@@ -346,7 +447,7 @@ mod tests {
             ("b", "uv.lock"),
             ("c/d", "poetry.lock"),
             ("e", "conda-lock.yml"),
-            // A JavaScript project beside a pixi one is its own; one per directory among themselves.
+            // A JavaScript lockfile beside a pixi one joins its document; one per directory among themselves.
             ("a", "package-lock.json"),
             ("f", "yarn.lock"),
             ("g", "pnpm-lock.yaml"),
@@ -355,14 +456,13 @@ mod tests {
             std::fs::create_dir_all(dir.path().join(sub)).unwrap();
             std::fs::write(dir.path().join(sub).join(name), "").unwrap();
         }
-        let found: Vec<PathBuf> = scan(dir.path(), None)
+        let found: Vec<PathBuf> = scan(dir.path(), None, &[])
             .unwrap()
             .into_iter()
             .map(|p| p.strip_prefix(dir.path()).unwrap().to_path_buf())
             .collect();
         let found: Vec<&str> = found.iter().map(|p| p.to_str().unwrap()).collect();
         let expected = [
-            "a/package-lock.json",
             "a/pixi.lock",
             "b/uv.lock",
             "c/d/poetry.lock",
@@ -373,8 +473,65 @@ mod tests {
         .map(|p| p.replace('/', std::path::MAIN_SEPARATOR_STR));
         assert_eq!(found, expected);
         let empty = tempfile::tempdir().unwrap();
-        let err = scan(empty.path(), None).unwrap_err().to_string();
+        let err = scan(empty.path(), None, &[]).unwrap_err().to_string();
         assert!(err.contains("yarn.lock anywhere under"), "{err}");
+    }
+
+    #[test]
+    fn skip_input_picks_the_next_lockfile_of_the_ecosystem_and_leaves_the_rest() {
+        let dir = tempfile::tempdir().unwrap();
+        for name in ["pixi.lock", "uv.lock", "package-lock.json", "yarn.lock"] {
+            std::fs::write(dir.path().join(name), "").unwrap();
+        }
+        let pick = |skip: &[SkipInput]| {
+            let lockfile = lockfile_in(dir.path(), skip);
+            let javascript = lockfile.as_ref().and_then(|l| javascript_in(dir.path(), l, skip));
+            (
+                lockfile.map(|p| lockfile_name(&p)),
+                javascript.map(|p| lockfile_name(&p)),
+            )
+        };
+        let both = |l: &str, j: Option<&str>| (Some(l.to_string()), j.map(str::to_string));
+        assert_eq!(pick(&[]), both("pixi.lock", Some("package-lock.json")));
+        assert_eq!(pick(&[SkipInput::Pixi]), both("uv.lock", Some("package-lock.json")));
+        assert_eq!(pick(&[SkipInput::Npm]), both("pixi.lock", Some("yarn.lock")));
+        assert_eq!(pick(&[SkipInput::Javascript]), both("pixi.lock", None));
+        assert_eq!(
+            pick(&[SkipInput::Pixi, SkipInput::Uv]),
+            both("package-lock.json", None),
+            "JavaScript alone"
+        );
+        let all = [SkipInput::Pixi, SkipInput::Uv, SkipInput::Javascript];
+        assert_eq!(pick(&all), (None, None));
+
+        let err = resolve_lockfile(None, dir.path(), &all).unwrap_err();
+        assert!(matches!(err, DiscoverError::AllSkipped { .. }), "{err}");
+        assert!(
+            err.to_string()
+                .contains("pixi.lock, uv.lock, package-lock.json, yarn.lock"),
+            "{err}"
+        );
+        crate::assert_actionable(&err);
+        let err = resolve_lockfile(Some(&dir.path().join("uv.lock")), dir.path(), &[SkipInput::Uv]).unwrap_err();
+        assert!(matches!(err, DiscoverError::Skipped { .. }), "{err}");
+        crate::assert_actionable(&err);
+        // A scan leaves a fully skipped directory out, and says so when that leaves nothing.
+        let err = scan(dir.path(), None, &all).unwrap_err();
+        assert!(matches!(err, DiscoverError::AllSkipped { .. }), "{err}");
+        assert_eq!(
+            scan(dir.path(), None, &[SkipInput::Pixi]).unwrap(),
+            [dir.path().join("uv.lock")]
+        );
+    }
+
+    #[test]
+    fn every_skip_input_value_names_its_own_lockfiles() {
+        use clap::ValueEnum;
+        for input in SkipInput::value_variants() {
+            assert!(LOCKFILE_KINDS.into_iter().any(|n| input.covers(n)), "{input:?}");
+        }
+        assert!(SkipInput::Pylock.covers("pylock.dev.toml"));
+        assert!(!SkipInput::Pixi.covers("uv.lock"));
     }
 
     #[test]
@@ -385,18 +542,21 @@ mod tests {
         std::fs::write(dir.path().join("pixi.lock"), "").unwrap();
         std::fs::write(dir.path().join("a/uv.lock"), "").unwrap();
         assert_eq!(
-            resolve_lockfile(None, &nested).unwrap(),
+            resolve_lockfile(None, &nested, &[]).unwrap(),
             dir.path().join("a/uv.lock"),
             "closer"
         );
         std::fs::write(dir.path().join("a/pixi.lock"), "").unwrap();
         assert_eq!(
-            resolve_lockfile(None, &nested).unwrap(),
+            resolve_lockfile(None, &nested, &[]).unwrap(),
             dir.path().join("a/pixi.lock"),
             "pixi first"
         );
         std::fs::write(nested.join("pylock.toml"), "").unwrap();
-        assert_eq!(resolve_lockfile(None, &nested).unwrap(), nested.join("pylock.toml"));
+        assert_eq!(
+            resolve_lockfile(None, &nested, &[]).unwrap(),
+            nested.join("pylock.toml")
+        );
     }
 
     #[test]
@@ -427,7 +587,7 @@ mod tests {
         let lock = dir.path().join("custom.lock");
         std::fs::write(&lock, "version: 6\n").unwrap();
 
-        let found = resolve_lockfile(Some(&lock), dir.path()).unwrap();
+        let found = resolve_lockfile(Some(&lock), dir.path(), &[]).unwrap();
         assert_eq!(found, lock);
     }
 
@@ -436,7 +596,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let missing = dir.path().join("nope.lock");
 
-        let err = resolve_lockfile(Some(&missing), dir.path()).unwrap_err();
+        let err = resolve_lockfile(Some(&missing), dir.path(), &[]).unwrap_err();
         assert!(matches!(err, DiscoverError::Missing { path } if path == missing));
     }
 
@@ -448,7 +608,7 @@ mod tests {
         let nested = dir.path().join("a").join("b");
         std::fs::create_dir_all(&nested).unwrap();
 
-        let found = resolve_lockfile(None, &nested).unwrap();
+        let found = resolve_lockfile(None, &nested, &[]).unwrap();
         assert_eq!(found, lock);
     }
 
@@ -456,7 +616,7 @@ mod tests {
     fn no_lockfile_anywhere_errors() {
         let dir = tempfile::tempdir().unwrap();
 
-        let err = resolve_lockfile(None, dir.path()).unwrap_err();
+        let err = resolve_lockfile(None, dir.path(), &[]).unwrap_err();
         assert!(matches!(err, DiscoverError::NotFound { .. }));
         assert!(err.to_string().contains(LOCKFILE_NAME));
     }
@@ -491,7 +651,7 @@ mod tests {
             ],
             &["docs"],
         );
-        let found = scan(dir.path(), None).unwrap();
+        let found = scan(dir.path(), None, &[]).unwrap();
         let relative: Vec<String> = found
             .iter()
             .map(|p| p.strip_prefix(dir.path()).unwrap().to_string_lossy().replace('\\', "/"))
@@ -510,7 +670,7 @@ mod tests {
     fn scanning_finds_the_directory_s_own_lockfile_and_stops_at_the_depth() {
         let dir = tempfile::tempdir().unwrap();
         tree(dir.path(), &["pixi.lock", "a/pixi.lock", "a/b/pixi.lock"], &[]);
-        let names = |depth: Option<usize>| scan(dir.path(), depth).unwrap().len();
+        let names = |depth: Option<usize>| scan(dir.path(), depth, &[]).unwrap().len();
         assert_eq!(names(Some(0)), 1, "the directory itself");
         assert_eq!(names(Some(1)), 2);
         assert_eq!(names(None), 3);
@@ -523,18 +683,21 @@ mod tests {
         tree(dir.path(), &["real/pixi.lock"], &[]);
         // A link back to the root would walk for ever.
         std::os::unix::fs::symlink(dir.path(), dir.path().join("real").join("loop")).unwrap();
-        assert_eq!(scan(dir.path(), None).unwrap().len(), 1);
+        assert_eq!(scan(dir.path(), None, &[]).unwrap().len(), 1);
     }
 
     #[test]
     fn scanning_nothing_is_an_error_that_says_what_was_skipped() {
         let dir = tempfile::tempdir().unwrap();
         tree(dir.path(), &["node_modules/pkg/pixi.lock"], &["empty"]);
-        let err = scan(dir.path(), None).unwrap_err();
+        let err = scan(dir.path(), None, &[]).unwrap_err();
         assert!(matches!(err, DiscoverError::NoneFound { .. }));
         let file = dir.path().join("not-a-directory");
         std::fs::write(&file, "x").unwrap();
-        assert!(matches!(scan(&file, None), Err(DiscoverError::NotADirectory { .. })));
+        assert!(matches!(
+            scan(&file, None, &[]),
+            Err(DiscoverError::NotADirectory { .. })
+        ));
     }
 
     #[test]

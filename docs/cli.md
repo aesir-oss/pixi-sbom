@@ -33,6 +33,7 @@ Grouped as `--help` groups them.
 | `--merge` | off | With `--scan`: write one document for the whole tree instead of one per workspace (and then `--output -` and `--against` apply). See [Merging documents](#merging-documents). |
 | `--scan <DIR>` | | Describe every project under the directory: one document per directory with a lockfile of any kind it finds (see [Which lockfile is found](#which-lockfile-is-found)). Cannot be combined with `--lockfile` or `--prefix`, nor, without `--merge`, with `--against` or `--output -`. |
 | `--scan-depth <N>` | unlimited | With `--scan`: how far below the directory to walk (`0` is the directory itself). |
+| `--skip-input <INPUT>` | | Repeatable. Leave a lockfile out when finding them: `pixi`, `uv`, `pylock`, `poetry`, `pdm`, `conda-lock`, `npm`, `pnpm`, `yarn`, or `javascript` for all three JavaScript ones. A skipped lockfile is never read, and the next of the same ecosystem takes its place. See [Which lockfile is found](#which-lockfile-is-found). |
 | `--prefix <DIR>` | | Describe an installed environment instead of a lockfile: a conda environment, a venv or a Python installation (see below). Cannot be combined with `--lockfile` or the `--all-*` flags; `--environment` only names the lockfile side of `--against`. |
 | `--root-name <NAME>`, `--root-version <VERSION>` | directory name, none | With `--prefix`: what the described application is called. |
 
@@ -72,7 +73,6 @@ Grouped as `--help` groups them.
 | `--fetch-licenses` | off | Fetch the license of every package, conda and PyPI alike, where the lockfile has none, plus the names of the license files it ships and its summary and project URLs. Conda details come from the local package cache pixi filled at install time, or from the archive on the channel via HTTP range requests (a few KB per package, cached); PyPI details from the wheel's `dist-info` the same way, then the index JSON API for what is still missing. Failures are logged and the run continues. |
 | `--license-texts` | off | With `--fetch-licenses`, also embed the full text of every license file. Each file is capped at 1 MiB and the document holds at most 64 MiB of text in total; past that the files are listed by name and the document says so (see [incomplete enrichment](output-format.md#incomplete-enrichment)). |
 | `--embedded-sboms` | off | Add the components declared by SBOMs embedded in wheels (PEP 770, e.g. the Rust crates maturin compiled in) as dependencies of the wheel. Reads each wheel's `dist-info` like `--fetch-licenses`. With `--prefix`, also reads the `cargo auditable` crate list and the Go modules out of the environment's binaries, and the Python distributions packages vendor inside themselves (`setuptools/_vendor`). |
-| `--javascript` | off | Also describe the JavaScript project beside the lockfile: the packages its `package-lock.json`, `pnpm-lock.yaml` or `yarn.lock` locks join the document, and its direct dependencies and workspace members become the root's. Without one, a warning says so and the document is the lockfile's alone. See [Reading JavaScript lockfiles](#reading-javascript-lockfiles). |
 | `--infer-extras` | off | With `--prefix`: infer which extras each Python package was installed with, from what is installed, and label it as inferred (see [Python extras](#python-extras)). |
 | `--verify-files` | off | With `--prefix`: hash every file each conda package installed and compare it with its conda-meta record. Exit **11** (document written first) when one is modified or missing; see [Has anything changed since installation](#has-anything-changed-since-installation). |
 | `--pypi-licenses` | | Deprecated alias for `--fetch-licenses` (hidden from `--help`; removed in a future release). |
@@ -192,21 +192,41 @@ Dropping support for a lockfile version would be a breaking change, and after 1.
 
 ### Which lockfile is found
 
-Without `--lockfile`, the search walks up from the working directory and reads the lockfile of the nearest
-directory that has one; `--scan` reads one per directory under the one it is given. Both know the same names, and
-when a directory has several, both take the first in this order and log which one they chose and what else was
-there:
+Without `--lockfile`, the search walks up from the working directory to the nearest directory that has a lockfile;
+`--scan` reads every directory under the one it is given that has one. One directory is one project, described in
+one document, and both read **one lockfile per ecosystem** in it:
 
-1. `pixi.lock`: the most complete, and a pixi workspace that also has a `uv.lock` (pixi uses uv underneath) is a
-   pixi workspace
-2. `uv.lock`
-3. `pylock.toml`, then the named `pylock.<name>.toml` files, sorted
-4. `poetry.lock`
-5. `pdm.lock`
-. `package-lock.json`, then `pnpm-lock.yaml`, then `yarn.lock`
+- **the conda or Python lockfile**, the first in this order:
+  1. `pixi.lock`: the most complete, and a pixi workspace that also has a `uv.lock` (pixi uses uv underneath) is a
+     pixi workspace
+  2. `uv.lock`
+  3. `pylock.toml`, then the named `pylock.<name>.toml` files, sorted
+  4. `poetry.lock`
+  5. `pdm.lock`
+  6. `conda-lock.yml`
+- **and the JavaScript lockfile**, the first of `package-lock.json`, `pnpm-lock.yaml` and `yarn.lock`. Its packages
+  join the other lockfile's document (see [Reading JavaScript lockfiles](#reading-javascript-lockfiles)); with no
+  other lockfile in the directory, it is the document.
 
-One directory is one project, so a project with both a `pixi.lock` and a `uv.lock` gets one document, not two; pass
-`--lockfile` to read the other. A JavaScript lockfile is the exception: it describes another project, so `--scan` also reads one that sits beside another kind's lockfile, as a project of its own written to `sbom-javascript.<ext>` beside the other's document. An explicit conda spec file has no fixed name, and a `requirements.txt` is as often a
+Two lockfiles of one ecosystem describe the same packages, so a project with both a `pixi.lock` and a `uv.lock` gets
+its document from `pixi.lock` alone. When a directory has more than one lockfile, the log says which were read and
+which were not.
+
+`--skip-input` (repeatable, or the `skip-input` configuration key) leaves lockfiles out before anything is read:
+
+```sh
+pixi sbom --skip-input javascript   # the pixi workspace alone, without the frontend beside it
+pixi sbom --skip-input pixi         # the uv.lock beside pixi.lock instead, still with the frontend
+pixi sbom --skip-input pixi --skip-input uv   # the JavaScript project alone
+```
+
+A skipped lockfile's place goes to the next of its ecosystem. When `--skip-input` leaves out every lockfile in the
+nearest directory, the search stops there with `pixi_sbom::discover::all_skipped`, naming what was skipped, rather
+than going on to a project above it. `--lockfile` names the conda or Python lockfile instead of searching for one;
+the JavaScript lockfile beside it still joins its document unless skipped, and a lockfile `--skip-input` covers is
+refused.
+
+An explicit conda spec file has no fixed name, and a `requirements.txt` is as often a
 list of loose ranges as a lock, so neither is ever discovered; both are only read through `--lockfile`. When nothing is found, `pixi_sbom::discover::not_found` (or `none_found` for `--scan`)
 lists the names it looked for, and `not_found` first names the nearest manifest it passed with no lockfile beside it
 and the command that locks it ("pyproject.toml is a Poetry project's manifest: run `poetry lock` beside it"):
@@ -630,7 +650,7 @@ A JavaScript project is described from the lockfile its package manager writes, 
 pixi sbom --lockfile package-lock.json            # npm 7 and later (lockfileVersion 2 and 3)
 pixi sbom --lockfile pnpm-lock.yaml               # pnpm 8 and later (lockfileVersion 6 and later)
 pixi sbom --lockfile yarn.lock                    # yarn 1, and yarn 2 and later (Berry)
-pixi sbom -e default -p linux-64 --javascript     # a pixi workspace and the JavaScript project beside it
+pixi sbom -e default -p linux-64                  # a pixi workspace and the JavaScript project beside it
 ```
 
 Every locked package is a `pkg:npm/<name>@<version>` component (`pkg:npm/%40types/node@20.0.0` for a scoped one) with
@@ -650,9 +670,10 @@ tarball URL, and Berry's `checksum` is yarn's own, not npm's integrity, so a Ber
 JavaScript packages are the same on every platform, so the document's platform is `noarch` unless `--platform` says
 otherwise.
 
-With `--javascript`, the JavaScript project beside any other lockfile joins that lockfile's document: its packages are
-added (one already there is not added twice), and its direct dependencies and workspace members become direct
-dependencies of the root. A project's `node_modules` is not read, with or without a lockfile.
+A JavaScript project found beside any other lockfile joins that lockfile's document (see
+[Which lockfile is found](#which-lockfile-is-found)): its packages are added (one already there is not added twice),
+and its direct dependencies and workspace members become direct dependencies of the root. `--skip-input javascript`
+leaves it out, and `--skip-input pixi` (or whichever the other lockfile is) describes the JavaScript project alone. A project's `node_modules` is not read, with or without a lockfile.
 
 ## Describing an installed environment
 
@@ -757,6 +778,7 @@ license-texts = false
 embedded-sboms = true
 exclude = ["pre-commit*", "compilers"]
 exclude-kind = ["conda-source"]
+skip-input = []                   # e.g. ["javascript"] to leave the frontend beside the workspace out
 keep-orphans = false
 allow-license = []                # or deny-license = ["GPL-3.0-only", "AGPL-3.0-only"]
 require-license = true

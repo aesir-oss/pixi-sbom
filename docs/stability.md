@@ -25,14 +25,14 @@ disappears or changes shape before 2.0.
 | `--fail-on-epss` | `--fail-on-kev` | `--fail-on-phantom` | `--fail-on-scorecard` |
 | `--fail-on-severity` | `--fail-on-yanked` | `--fetch-licenses` | `--format` |
 | `--from-sbom` | `--group-by` | `--help` | `--ignore-license` |
-| `--ignore-vuln` | `--include` | `--infer-extras` | `--javascript` |
-| `--keep-orphans` | `--kev` | `--license-texts` | `--lockfile` |
-| `--log-format` | `--merge` | `--min-quality` | `--no-cache` |
-| `--no-config` | `--outdated-min` | `--output` | `--platform` |
-| `--prefix` | `--primary-purl` | `--pypi-mapping` | `--pypi-mapping-file` |
-| `--quiet` | `--refresh` | `--report` | `--report-format` |
-| `--require-license` | `--root-name` | `--root-version` | `--scan` |
-| `--scan-depth` | `--scorecard` | `--scorecard-min` | `--source` |
+| `--ignore-vuln` | `--include` | `--infer-extras` | `--keep-orphans` |
+| `--kev` | `--license-texts` | `--lockfile` | `--log-format` |
+| `--merge` | `--min-quality` | `--no-cache` | `--no-config` |
+| `--outdated-min` | `--output` | `--platform` | `--prefix` |
+| `--primary-purl` | `--pypi-mapping` | `--pypi-mapping-file` | `--quiet` |
+| `--refresh` | `--report` | `--report-format` | `--require-license` |
+| `--root-name` | `--root-version` | `--scan` | `--scan-depth` |
+| `--scorecard` | `--scorecard-min` | `--skip-input` | `--source` |
 | `--spec-version` | `--timings` | `--tree` | `--verbose` |
 | `--verify-files` | `--version` | `--version-details` | `--vex` |
 | `--vex-in` | `--vex-open` | `--vulnerabilities` |  |
@@ -114,6 +114,7 @@ stays supported.
 | `fail-on-scorecard` | `fail-on-diff` | `source` | `assume-used` |
 | `fail-on-phantom` | `conda-index-kind` | `concurrency` | `infer-extras` |
 | `min-quality` | `epss` | `fail-on-epss` | `vex-in` |
+| `skip-input` | | | |
 
 An unknown key is an error, not a warning, and the diagnostic lists every key that is accepted — so
 a typo cannot pass silently and you are never left guessing at the spelling.
@@ -243,6 +244,9 @@ These change without a major version, and nothing should be parsed out of them:
   colour, the tree glyphs. Use `--report-format json` or `csv` if something reads it.
 - **Recommendation and diagnostic wording.** `recommendation` text in a document, the phrasing of a
   miette diagnostic, the help text of a flag.
+- **Which lockfiles are read without `--lockfile`.** A directory's lockfiles are read one per ecosystem, and
+  the ecosystems found and read this way may grow in a minor release. `--skip-input` (or the `skip-input` key)
+  pins it to the ones you want.
 - **Progress output.** Bars, spinners, what they count.
 - **`--timings` output.** The phases, their names, the table.
 - **`--doctor` output.** What it checks and how it says so; only the exit code is frozen.

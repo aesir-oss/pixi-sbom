@@ -9,6 +9,17 @@ expression: "surface.join(\"\\n\")"
       --merge
       --scan <DIR>
       --scan-depth <N>
+      --skip-input <INPUT>
+          - pixi:       pixi.lock
+          - uv:         uv.lock
+          - pylock:     pylock.toml and its named pylock.<name>.toml files
+          - poetry:     poetry.lock
+          - pdm:        pdm.lock
+          - conda-lock: conda-lock.yml
+          - npm:        package-lock.json
+          - pnpm:       pnpm-lock.yaml
+          - yarn:       yarn.lock, from yarn 1 or yarn 2 and later
+          - javascript: Every JavaScript lockfile: npm, pnpm and yarn
       --prefix <DIR>
       --root-name <NAME>
       --root-version <VERSION>
@@ -47,7 +58,6 @@ expression: "surface.join(\"\\n\")"
       --fetch-licenses
       --license-texts
       --embedded-sboms
-      --javascript
       --infer-extras
       --verify-files
       --exclude <GLOB>

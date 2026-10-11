@@ -338,7 +338,7 @@ title = "A web frontend locked by npm, yarn and pnpm, and a pixi workspace with 
 readers = ["npm", "yarn", "yarn-berry", "pnpm", "pixi"]
 shows = [
   "JavaScript lockfiles (package-lock.json, yarn.lock v1 and Berry, pnpm-lock.yaml)",
-  "a pixi workspace with its frontend beside it (--javascript)",
+  "a pixi workspace with its frontend beside it, merged into one document",
   "vulnerabilities in npm packages, a development dependency",
 ]
 dependencies = []

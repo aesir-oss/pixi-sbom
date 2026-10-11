@@ -24,8 +24,8 @@ use clap::{ArgMatches, ValueEnum, parser::ValueSource};
 use serde::Deserialize;
 
 use crate::cli::{
-    Args, CondaIndexKind, DiffSection, FailOnSeverity, Format, Kind, PrimaryPurl, PypiMappingSource, SpecVersion,
-    VulnerabilitySource,
+    Args, CondaIndexKind, DiffSection, FailOnSeverity, Format, Kind, PrimaryPurl, PypiMappingSource, SkipInput,
+    SpecVersion, VulnerabilitySource,
 };
 
 /// The configuration file, in pixi's configuration directories and in `<workspace>/.pixi`.
@@ -77,6 +77,7 @@ pub struct Config {
     pub exclude: Option<Vec<String>>,
     pub include: Option<Vec<String>>,
     pub exclude_kind: Option<Vec<String>>,
+    pub skip_input: Option<Vec<String>>,
     pub keep_orphans: Option<bool>,
     pub allow_license: Option<Vec<String>>,
     pub deny_license: Option<Vec<String>>,
@@ -411,6 +412,15 @@ pub fn apply(loaded: &Loaded, args: &mut Args, matches: &ArgMatches) -> Result<(
                 .collect::<Result<_, _>>()?;
         }
     }
+    if let Some(inputs) = &config.skip_input {
+        note!("skip_input");
+        if !on_cli(matches, "skip_input") {
+            args.skip_input = inputs
+                .iter()
+                .map(|i| parse_enum::<SkipInput>(path, "skip-input", i))
+                .collect::<Result<_, _>>()?;
+        }
+    }
     set!(keep_orphans, "keep_orphans", config.keep_orphans);
     set!(allow_license, "allow_license", config.allow_license.clone());
     set!(deny_license, "deny_license", config.deny_license.clone());
@@ -558,6 +568,7 @@ mod tests {
             scorecard-min = 6.5
             exclude = ["pre-commit*"]
             exclude-kind = ["conda-source"]
+            skip-input = ["javascript", "uv"]
             vulnerabilities = "osv"
             kev = true
             epss = true
@@ -589,6 +600,7 @@ mod tests {
         assert_eq!(a.scorecard_min, 6.5);
         assert_eq!(a.exclude, ["pre-commit*"]);
         assert_eq!(a.exclude_kind, [Kind::CondaSource]);
+        assert_eq!(a.skip_input, [SkipInput::Javascript, SkipInput::Uv]);
         assert_eq!(a.vulnerabilities, Some(VulnerabilitySource::Osv));
         assert!(a.kev);
         assert!(a.epss);

@@ -358,6 +358,49 @@ pub enum DiffSection {
     Pip,
 }
 
+/// An input a directory's lockfiles are found as, as `--skip-input` names it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum SkipInput {
+    /// pixi.lock.
+    Pixi,
+    /// uv.lock.
+    Uv,
+    /// pylock.toml and its named pylock.<name>.toml files.
+    Pylock,
+    /// poetry.lock.
+    Poetry,
+    /// pdm.lock.
+    Pdm,
+    /// conda-lock.yml.
+    CondaLock,
+    /// package-lock.json.
+    Npm,
+    /// pnpm-lock.yaml.
+    Pnpm,
+    /// yarn.lock, from yarn 1 or yarn 2 and later.
+    Yarn,
+    /// Every JavaScript lockfile: npm, pnpm and yarn.
+    Javascript,
+}
+
+impl SkipInput {
+    /// Whether this value leaves out the lockfile named `name` (a file name, not a path).
+    pub fn covers(self, name: &str) -> bool {
+        match self {
+            SkipInput::Pixi => name == "pixi.lock",
+            SkipInput::Uv => name == "uv.lock",
+            SkipInput::Pylock => crate::pylock::is_pylock_name(std::path::Path::new(name)),
+            SkipInput::Poetry => name == "poetry.lock",
+            SkipInput::Pdm => name == "pdm.lock",
+            SkipInput::CondaLock => name == "conda-lock.yml",
+            SkipInput::Npm => name == "package-lock.json",
+            SkipInput::Pnpm => name == "pnpm-lock.yaml",
+            SkipInput::Yarn => name == "yarn.lock",
+            SkipInput::Javascript => crate::jslock::LOCKFILE_NAMES.contains(&name),
+        }
+    }
+}
+
 /// A package kind, as `--exclude-kind` names it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum Kind {
@@ -446,8 +489,8 @@ pub struct Args {
     #[arg(help_heading = "Input", long, requires = "scan")]
     pub merge: bool,
 
-    /// Describe every pixi workspace under this directory: one document per `pixi.lock`
-    /// found, in sorted order. Hidden directories, node_modules, target, build, dist, venv and
+    /// Describe every project under this directory: one document per directory with a lockfile,
+    /// in sorted order, read as a single run reads one. Hidden directories, node_modules, target, build, dist, venv and
     /// __pycache__ are never entered and symlinked directories are not followed. With
     /// --output the documents land under it, mirroring each workspace's path.
     #[arg(help_heading = "Input", long, value_name = "DIR", conflicts_with_all = ["lockfile", "prefix"])]
@@ -456,6 +499,13 @@ pub struct Args {
     /// With --scan: how far below the directory to walk (0 is the directory itself).
     #[arg(help_heading = "Input", long, value_name = "N", requires = "scan")]
     pub scan_depth: Option<usize>,
+
+    /// Leave this input out when finding lockfiles (repeatable). A directory's conda or Python
+    /// lockfile and its JavaScript lockfile are both read into one document by default; a skipped
+    /// one is never read, and the next of the same ecosystem takes its place. `javascript` skips
+    /// all three JavaScript lockfiles.
+    #[arg(help_heading = "Input", long, value_enum, value_name = "INPUT", conflicts_with_all = ["prefix", "from_sbom"])]
+    pub skip_input: Vec<SkipInput>,
 
     /// Describe an installed environment instead of a lockfile: a `pixi global` environment
     /// (~/.pixi/envs/<name>), a conda / mamba environment, a venv, or a Python installation
@@ -589,11 +639,6 @@ pub struct Args {
     /// --fetch-licenses does.
     #[arg(help_heading = "Enrichment", long)]
     pub embedded_sboms: bool,
-
-    /// Also describe the JavaScript project beside the lockfile: the packages its package-lock.json,
-    /// pnpm-lock.yaml or yarn.lock locks join the document, and its direct dependencies are the root's.
-    #[arg(help_heading = "Enrichment", long)]
-    pub javascript: bool,
 
     /// With --prefix, infer which extras each Python package was installed with: an extra counts
     /// when every requirement it gates is installed. Labelled pixi:python-extras-inferred, since

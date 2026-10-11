@@ -1070,7 +1070,7 @@ pub fn build_sbom(lock: &JsLock, platform: Option<&str>, root: Root, lockfile_na
     })
 }
 
-/// Add a JavaScript lockfile's packages to another input's document (`--javascript`): its
+/// Add a JavaScript lockfile's packages to another input's document (#42): its
 /// project's direct dependencies and workspaces become direct dependencies of the document's root.
 pub fn merge_into(sbom: &mut Sbom, lock: &JsLock) -> Result<usize, JsLockError> {
     let (packages, scopes) = packages(lock)?;

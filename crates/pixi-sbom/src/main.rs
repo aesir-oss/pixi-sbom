@@ -85,7 +85,12 @@ fn main() -> Result<()> {
         // each workspace.
         (Some(_), _, _) | (_, _, Some(_)) => cwd.join(discover::LOCKFILE_NAME),
         (None, Some(dir), None) => dir.join(discover::LOCKFILE_NAME),
-        (None, None, None) => discover::resolve_lockfile(args.lockfile.as_deref(), &cwd)?,
+        // The lockfile itself is picked once the configuration is in, since `skip-input` may
+        // come from it; until then a stand-in in the project's directory finds that configuration.
+        (None, None, None) => match &args.lockfile {
+            Some(_) => discover::resolve_lockfile(args.lockfile.as_deref(), &cwd, &[])?,
+            None => discover::project_dir(&cwd)?.join(discover::LOCKFILE_NAME),
+        },
     };
     let config_dir = lockfile.parent().unwrap_or(Path::new(".")).to_path_buf();
     let config_layers: Vec<config::Loaded>;
@@ -112,6 +117,12 @@ fn main() -> Result<()> {
             tracing::info!(paths, "applied the configuration");
         }
     }
+    let lockfile = match (&args.prefix, &args.scan, args.from_sbom.first()) {
+        (None, None, None) if !args.doctor => {
+            discover::resolve_lockfile(args.lockfile.as_deref(), &cwd, &args.skip_input)?
+        }
+        _ => lockfile,
+    };
     describe_input(&args, &lockfile, &cwd);
     tracing::debug!(?args, "effective arguments");
     // How many things may happen at once, before anything starts happening.
@@ -273,7 +284,7 @@ fn main() -> Result<()> {
     // One workspace normally; with --scan, one per lockfile found under the directory.
     let workspaces: Vec<Workspace> = match &args.scan {
         Some(dir) => {
-            let found = discover::scan(dir, args.scan_depth)?;
+            let found = discover::scan(dir, args.scan_depth, &args.skip_input)?;
             tracing::info!(lockfiles = found.len(), dir = %dir.display(), "scanned for workspaces");
             let workspaces: Vec<Workspace> = found
                 .into_iter()
@@ -359,7 +370,7 @@ fn main() -> Result<()> {
             };
             vec![Workspace {
                 lockfile: lockfile.clone(),
-                javascript: javascript_beside(&args, &lockfile, &input)?,
+                javascript: javascript_beside(&lockfile, &input, &args.skip_input)?,
                 input,
                 targets,
             }]
@@ -1787,7 +1798,7 @@ fn archive_services(lockfile: Option<&std::path::Path>) -> Vec<http::Service> {
 /// rather than an error.
 fn doctor_lockfile(args: &cli::Args) -> Option<std::path::PathBuf> {
     let start = std::env::current_dir().ok()?;
-    discover::resolve_lockfile(args.lockfile.as_deref(), &start).ok()
+    discover::resolve_lockfile(args.lockfile.as_deref(), &start, &args.skip_input).ok()
 }
 
 /// Every upstream this build can reach, for a `--doctor` run that named no flags.
@@ -1890,19 +1901,22 @@ struct Workspace {
     lockfile: std::path::PathBuf,
     input: Input,
     targets: Vec<Target>,
-    /// The JavaScript lockfile beside it, read for `--javascript`.
+    /// The JavaScript lockfile beside it, which joins its document (#42).
     javascript: Option<jslock::JsLock>,
 }
 
-/// The JavaScript lockfile beside `lockfile`, for `--javascript`: none without the flag, for an input
-/// that is one already or has no lockfile directory, or when the directory has none (said once).
-fn javascript_beside(args: &cli::Args, lockfile: &Path, input: &Input) -> Result<Option<jslock::JsLock>> {
-    if !args.javascript || matches!(input, Input::JavaScript { .. } | Input::Document(_)) {
+/// The JavaScript lockfile that joins `lockfile`'s document: the one beside it, whether it was
+/// found or named with `--lockfile`, unless `--skip-input` leaves it out or the input is a
+/// JavaScript lockfile, an installed environment or a document.
+fn javascript_beside(lockfile: &Path, input: &Input, skip: &[cli::SkipInput]) -> Result<Option<jslock::JsLock>> {
+    if matches!(
+        input,
+        Input::JavaScript { .. } | Input::Document(_) | Input::Prefix { .. }
+    ) {
         return Ok(None);
     }
     let dir = lockfile.parent().unwrap_or(Path::new("."));
-    let Some(found) = jslock::lockfile_in(dir) else {
-        tracing::warn!(dir = %dir.display(), "--javascript: no package-lock.json, pnpm-lock.yaml or yarn.lock beside the lockfile");
+    let Some(found) = discover::javascript_in(dir, lockfile, skip) else {
         return Ok(None);
     };
     Ok(Some(jslock::load(&found)?.lock))
@@ -2020,23 +2034,15 @@ fn scanned_workspace(args: &cli::Args, scanned: &Path, lockfile: std::path::Path
                 Input::Pylock { .. } => pylock::environment_name(&lockfile),
                 _ => "default".to_string(),
             };
-            // A JavaScript project that shares its directory with another lockfile's gets its own name.
-            let shared = jslock::is_js_lock_name(&lockfile)
-                && discover::lockfile_in(&dir).is_some_and(|other| other != lockfile);
-            let file_name = if shared {
-                args.format.batch_file_name(["javascript"])
-            } else {
-                args.format.default_file_name().to_string()
-            };
             vec![Target {
                 environment,
                 platform: args.platform.clone(),
-                output: discover::Output::File(output_dir.join(file_name)),
+                output: discover::Output::File(output_dir.join(args.format.default_file_name())),
             }]
         }
     };
     Ok(Workspace {
-        javascript: javascript_beside(args, &lockfile, &input)?,
+        javascript: javascript_beside(&lockfile, &input, &args.skip_input)?,
         lockfile,
         input,
         targets,

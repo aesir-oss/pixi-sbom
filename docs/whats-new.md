@@ -53,8 +53,9 @@ And JavaScript projects:
 
 - **`package-lock.json`, `pnpm-lock.yaml` and `yarn.lock`** are inputs of their own: `pkg:npm` components with the
   dependency graph, SHA-512 hashes from `integrity`, workspace members, and development dependencies marked as such.
-  `--scan` finds them, including beside a pixi or Python lockfile, and `--javascript` adds the project beside a
-  workspace to the workspace's document. ([Reading JavaScript lockfiles](cli.md#reading-javascript-lockfiles))
+  Found beside a pixi or Python lockfile, by the upward search or `--scan`, they join that lockfile's document;
+  `--skip-input` leaves out any lockfile, so `--skip-input javascript` gives the workspace alone and
+  `--skip-input pixi` the JavaScript project alone. ([Reading JavaScript lockfiles](cli.md#reading-javascript-lockfiles))
 
 ## 1.11.0
 

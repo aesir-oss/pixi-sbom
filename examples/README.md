@@ -89,7 +89,7 @@ was read from.
 | Example | Look for |
 |---|---|
 | `npm`, `yarn`, `yarn-berry`, `pnpm` `/19-web-frontend` | the same 29 `pkg:npm` releases from four lockfiles; `semver` and what it needs are development (`scope: optional`); advisories for lodash 4.17.15, minimist 1.2.5, axios 0.21.1 and @babel/traverse 7.22.5 with `--vulnerabilities osv` |
-| `pixi/19-web-frontend` | a pixi workspace (Python with FastAPI, and nodejs) with the frontend's `package.json` and `package-lock.json` beside `pixi.toml`; `--javascript` adds the frontend to the workspace's document, and `--scan` writes it as `sbom-javascript.cdx.json` |
+| `pixi/19-web-frontend` | a pixi workspace (Python with FastAPI, and nodejs) with the frontend's `package.json` and `package-lock.json` beside `pixi.toml`; the frontend joins the workspace's document unless `--skip-input javascript` leaves it out |
 
 ## Trying them
 

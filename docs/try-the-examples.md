@@ -50,7 +50,7 @@ The scenarios worth knowing first:
 | `16-go-tools` | the Go modules inside `go-yq` and `gh`, with `--prefix --embedded-sboms` |
 | `17-node-tools` | the npm packages `nodejs` installs, with `--prefix` |
 | `18-image-wheels` | Pillow 10.0.0, whose wheels bundle libwebp, libpng, zlib and more, with `--prefix --embedded-sboms` |
-| `19-web-frontend` | a JavaScript frontend locked by npm, yarn and pnpm, and a pixi workspace with it beside (`--javascript`) |
+| `19-web-frontend` | a JavaScript frontend locked by npm, yarn and pnpm, and a pixi workspace with it beside, merged into one document |
 
 15 to 18 describe what an installed environment holds, so install one first and point `--prefix` at it:
 
@@ -101,11 +101,12 @@ pixi sbom --lockfile examples/projects/yarn-berry/19-web-frontend/yarn.lock --re
 pixi sbom --lockfile examples/projects/pnpm/19-web-frontend/pnpm-lock.yaml --report packages
 ```
 
-The pixi workspace in `pixi/19-web-frontend` has the same frontend beside its `pixi.toml`. Its document is the
-workspace's alone until `--javascript` adds the frontend:
+The pixi workspace in `pixi/19-web-frontend` has the same frontend beside its `pixi.toml`. Read from its directory or
+named with `--lockfile`, the workspace and the frontend are one document, and `--skip-input javascript` leaves the frontend out:
 
 ```sh
-pixi sbom --lockfile examples/projects/pixi/19-web-frontend/pixi.lock -p linux-64 --javascript --report packages
+pixi sbom --lockfile examples/projects/pixi/19-web-frontend/pixi.lock -p linux-64 --report packages
+pixi sbom --lockfile examples/projects/pixi/19-web-frontend/pixi.lock -p linux-64 --skip-input javascript --report packages
 ```
 
 See [Reading JavaScript lockfiles](cli.md#reading-javascript-lockfiles).
@@ -246,8 +247,8 @@ See [How complete the document is](cli.md#how-complete-the-document-is) and
 ## The whole tree at once
 
 `--scan` finds every project with a lockfile of a fixed name under a directory: the pixi, uv,
-Poetry, PDM, pylock and conda-lock examples, and the JavaScript ones (the frontend beside the pixi workspace is a
-project of its own, written to `sbom-javascript.cdx.json`), 98 in all. Explicit specs and requirements files have
+Poetry, PDM, pylock and conda-lock examples, and the JavaScript ones (the frontend beside the pixi workspace joins
+that workspace's document), 97 in all. Explicit specs and requirements files have
 no fixed name, so a scan doesn't pick them up.
 
 ```sh

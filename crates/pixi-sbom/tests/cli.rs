@@ -4028,7 +4028,7 @@ fn javascript_lockfiles_are_inputs_of_their_own() {
 }
 
 #[test]
-fn a_javascript_project_beside_a_workspace_joins_it_only_when_asked() {
+fn a_javascript_project_beside_a_workspace_joins_it_unless_skipped() {
     let dir = workspace("with-pypi");
     for file in ["package.json", "package-lock.json"] {
         std::fs::copy(tests_dir().join("fixtures/js/npm-v3").join(file), dir.path().join(file)).unwrap();
@@ -4037,15 +4037,16 @@ fn a_javascript_project_beside_a_workspace_joins_it_only_when_asked() {
         &tests_dir().join("fixtures/js/npm-v3/packages"),
         &dir.path().join("packages"),
     );
-    let run = |args: &[&str]| -> Value {
+    let run_in = |cwd: &Path, args: &[&str]| -> Value {
         let assert = pixi_sbom()
-            .current_dir(dir.path())
+            .current_dir(cwd)
             .args(["-e", "web", "-p", "linux-64", "--output", "-"])
             .args(args)
             .assert()
             .success();
         serde_json::from_slice(&assert.get_output().stdout).unwrap()
     };
+    let run = |args: &[&str]| run_in(dir.path(), args);
     let npm = |doc: &Value| -> Vec<String> {
         doc["components"]
             .as_array()
@@ -4055,9 +4056,10 @@ fn a_javascript_project_beside_a_workspace_joins_it_only_when_asked() {
             .map(|c| c["name"].as_str().unwrap().to_string())
             .collect()
     };
-    let plain = run(&[]);
-    assert!(npm(&plain).is_empty(), "pixi.lock is still the input");
-    let doc = run(&["--javascript"]);
+    let count = |doc: &Value| doc["components"].as_array().unwrap().len();
+
+    // Found beside pixi.lock, it joins the workspace's document without a flag.
+    let doc = run(&[]);
     assert_valid(&cyclonedx_validator(), &doc);
     assert_eq!(npm(&doc).len(), 5);
     let root_deps = doc["dependencies"]
@@ -4071,23 +4073,45 @@ fn a_javascript_project_beside_a_workspace_joins_it_only_when_asked() {
         root_deps.as_array().unwrap().iter().any(|d| d == "pkg:npm/debug@4.3.4"),
         "{root_deps}"
     );
-    assert!(
-        plain["components"].as_array().unwrap().len() + 6 == doc["components"].as_array().unwrap().len(),
+
+    // --skip-input leaves either side out; --lockfile names the workspace's and the frontend still joins.
+    let plain = run(&["--skip-input", "javascript"]);
+    assert!(npm(&plain).is_empty());
+    assert_eq!(
+        count(&plain) + 6,
+        count(&doc),
         "the workspace's own components are all still there"
     );
-
-    // Nothing beside it: said, and the document is the workspace's alone.
-    let bare = workspace("with-pypi");
-    pixi_sbom()
-        .current_dir(bare.path())
-        .args(["-e", "web", "-p", "linux-64", "--output", "-", "--javascript"])
+    assert!(npm(&run(&["--skip-input", "npm"])).is_empty());
+    assert_eq!(npm(&run(&["--lockfile", "pixi.lock"])).len(), 5);
+    assert!(npm(&run(&["--lockfile", "pixi.lock", "--skip-input", "javascript"])).is_empty());
+    let alone = pixi_sbom()
+        .current_dir(dir.path())
+        .args(["--skip-input", "pixi", "--output", "-"])
         .assert()
-        .success()
-        .stderr(predicate::str::contains(
-            "no package-lock.json, pnpm-lock.yaml or yarn.lock",
-        ));
+        .success();
+    let alone: Value = serde_json::from_slice(&alone.get_output().stdout).unwrap();
+    assert_eq!(alone["metadata"]["component"]["name"], "js-demo");
+    assert_eq!(npm(&alone).len(), 5);
+    assert!(
+        alone["components"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|c| !c["purl"].as_str().unwrap().starts_with("pkg:conda/"))
+    );
 
-    // A scan reads it as a project of its own, named apart from the workspace's document.
+    // The configuration key does what the flag does.
+    std::fs::create_dir_all(dir.path().join(".pixi")).unwrap();
+    std::fs::write(
+        dir.path().join(".pixi/pixi-sbom-config.toml"),
+        "skip-input = [\"javascript\"]\n",
+    )
+    .unwrap();
+    assert!(npm(&run(&[])).is_empty(), "skip-input from the configuration");
+    std::fs::remove_file(dir.path().join(".pixi/pixi-sbom-config.toml")).unwrap();
+
+    // A scan merges it into the directory's one document.
     let scanned = tempfile::tempdir().unwrap();
     pixi_sbom()
         .current_dir(dir.path())
@@ -4098,11 +4122,19 @@ fn a_javascript_project_beside_a_workspace_joins_it_only_when_asked() {
         .args(["-e", "web", "-p", "linux-64"])
         .assert()
         .success();
-    let js: Value =
-        serde_json::from_str(&std::fs::read_to_string(scanned.path().join("sbom-javascript.cdx.json")).unwrap())
-            .unwrap();
-    assert_eq!(js["metadata"]["component"]["name"], "js-demo");
-    assert!(scanned.path().join("sbom.cdx.json").is_file());
+    assert!(!scanned.path().join("sbom-javascript.cdx.json").exists());
+    let merged: Value =
+        serde_json::from_str(&std::fs::read_to_string(scanned.path().join("sbom.cdx.json")).unwrap()).unwrap();
+    assert_eq!(npm(&merged).len(), 5);
+
+    // Skipping everything a directory has is an error that names what was skipped.
+    pixi_sbom()
+        .current_dir(dir.path())
+        .args(["--skip-input", "pixi", "--skip-input", "javascript", "--output", "-"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("pixi_sbom::discover::all_skipped"))
+        .stderr(predicate::str::contains("pixi.lock, package-lock.json"));
 }
 
 fn copy_dir(from: &Path, to: &Path) {
@@ -8838,7 +8870,9 @@ fn a_scan_reads_every_kind_of_lockfile_once_per_project() {
         .success();
     let stderr = String::from_utf8(assert.get_output().stderr.clone()).unwrap();
     assert!(
-        stderr.contains("several lockfiles in one directory") && stderr.contains("chosen=pixi.lock"),
+        stderr.contains("several lockfiles in one directory")
+            && stderr.contains("reading=pixi.lock")
+            && stderr.contains("not_read=uv.lock"),
         "{stderr}"
     );
     for (dir, lockfile) in [
@@ -9516,10 +9550,10 @@ fn every_javascript_example_describes_the_same_frontend() {
             "{reader} locked the same releases"
         );
     }
-    // The pixi workspace with the frontend beside it: the frontend joins only with --javascript.
+    // The pixi workspace with the frontend beside it: the frontend joins unless skipped.
     let workspace = examples.join("pixi/19-web-frontend");
-    assert!(purls(&[], &workspace).is_empty());
-    assert_eq!(purls(&["--javascript"], &workspace), npm);
+    assert_eq!(purls(&[], &workspace), npm);
+    assert!(purls(&["--skip-input", "javascript"], &workspace).is_empty());
 }
 
 #[test]
@@ -9549,8 +9583,8 @@ fn the_whole_examples_tree_scans_clean() {
     let text = String::from_utf8(output).unwrap();
     assert_eq!(
         text.matches("\"report\": \"packages\"").count(),
-        98,
-        "one report per lockfile, a JavaScript lockfile beside a pixi workspace's included"
+        97,
+        "one report per directory with a lockfile, the JavaScript project beside a pixi workspace merged into it"
     );
 }
 
