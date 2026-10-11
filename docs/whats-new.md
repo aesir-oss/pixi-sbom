@@ -23,6 +23,15 @@ Since 1.0, pixi-sbom has:
   credentials are used, and `--doctor` says which host is the problem.
 - **Learned tab completion** in bash, zsh, fish and PowerShell, for `pixi-sbom` and `pixi sbom`.
 
+## Unreleased
+
+**Every environment in a container image, in one command.** `--scan` now finds installed environments as well as
+lockfiles: a conda environment, a venv or a Python installation anywhere under the directory, each named by its path
+(`/opt/conda/envs/app`). Unpack an image and scan it, and every conda environment and venv in it is one document:
+`docker export … | tar -x -C rootfs`, then `pixi sbom --scan rootfs --merge`. A project's own `.pixi/envs` and
+`.venv` are left to its lockfile, so a source tree lists nothing twice, and `--skip-input installed` turns it off.
+The image's operating system packages are still syft's.
+
 ## 1.12.0
 
 pixi-sbom has a new home, [aesir-oss/pixi-ext-contrib](https://github.com/aesir-oss/pixi-ext-contrib), a

@@ -84,7 +84,8 @@ matches those packages by their PyPI identity, as it does from syft's SBOM.
 pixi-sbom describes Python and conda projects and environments. syft catalogs much more, and remains the tool for it:
 
 - **Container images**, read from a registry or a tarball, layer by layer.
-- **Operating system packages**: dpkg, rpm, apk.
+- **Operating system packages**: dpkg, rpm, apk. `pixi sbom --scan` on an unpacked image finds its conda environments,
+  venvs and Python installations ([how](cli.md#an-unpacked-container-image)); the OS packages beside them are syft's.
 - **Other ecosystems**: Java, Rust crates and Go modules outside a conda environment, a JavaScript project's
   installed `node_modules`, and many more. pixi-sbom reads a JavaScript project's `package-lock.json`, `pnpm-lock.yaml`
   or `yarn.lock`, and inside a conda environment `--prefix` lists its installed npm packages and

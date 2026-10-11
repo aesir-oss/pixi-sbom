@@ -185,8 +185,9 @@ pub enum DiscoverError {
     #[diagnostic(
         code(pixi_sbom::discover::none_found),
         help(
-            "--scan skips hidden directories and {skipped}, and stops at --scan-depth; check the \
-             directory, or pass --lockfile for a single workspace"
+            "--scan skips hidden directories and {skipped} (an installed environment is still found in a \
+             hidden directory or venv outside any project), and stops at --scan-depth; check the directory, or \
+             pass --lockfile for a single workspace"
         )
     )]
     NoneFound {
@@ -201,23 +202,54 @@ pub enum DiscoverError {
 /// other ecosystems. Hidden directories (`.pixi`, `.git`, `.venv`) are skipped by their dot.
 pub const SCAN_SKIPPED_DIRS: &[&str] = &["node_modules", "target", "build", "dist", "venv", "__pycache__"];
 
-/// One lockfile per project under `dir`, sorted by path so a scan is reproducible.
+/// Directly under a filesystem root (a directory holding `etc/` and `usr/`, such as an unpacked
+/// container image or `/` itself), the kernel's pseudo-filesystems: never entered there, and
+/// entered like any other directory anywhere else.
+pub const SCAN_SKIPPED_ROOT_DIRS: &[&str] = &["proc", "sys", "dev"];
+
+/// What a scan found: a project's lockfile, or an installed environment outside any project (#25).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Found {
+    Lockfile(PathBuf),
+    /// Read as `--prefix` reads one.
+    Environment(PathBuf),
+}
+
+impl Found {
+    /// The lockfile, or the environment's directory.
+    pub fn path(&self) -> &Path {
+        match self {
+            Found::Lockfile(path) | Found::Environment(path) => path,
+        }
+    }
+}
+
+/// One lockfile per project under `dir`, and every installed environment outside a project,
+/// sorted by path so a scan is reproducible.
 ///
 /// A project keeps its lockfile next to its manifest, so one directory is one project, and the
 /// lockfile read for it is the one [`lockfile_in`] picks; a JavaScript lockfile beside it joins
 /// its document ([`javascript_in`]). Hidden directories and [`SCAN_SKIPPED_DIRS`] are never
 /// entered, symlinked directories are not followed (a cycle would never end), and `depth` caps
 /// how far below `dir` the walk goes (`0` is `dir` itself).
-pub fn scan(dir: &Path, depth: Option<usize>, skip: &[SkipInput]) -> Result<Vec<PathBuf>, DiscoverError> {
+///
+/// Unless `skip` names [`SkipInput::Installed`], a directory that is an environment ([`is_environment`])
+/// is found too, as long as no directory at or above it (within `dir`) has a lockfile that was read:
+/// a project's `.pixi/envs` and `.venv` are what its lockfile describes, and listing both would
+/// count everything twice. Outside a project, hidden directories and `venv` are searched for
+/// environments only (`/app/.pixi/envs/prod`, `/root/.conda/envs/x`), never for lockfiles, and
+/// `.git` is never entered. Nothing inside an environment is another one, except a conda
+/// installation's `envs/`.
+pub fn scan(dir: &Path, depth: Option<usize>, skip: &[SkipInput]) -> Result<Vec<Found>, DiscoverError> {
     if !dir.is_dir() {
         return Err(DiscoverError::NotADirectory {
             path: dir.to_path_buf(),
         });
     }
     let mut walked = Walked::default();
-    walk(dir, 0, depth.unwrap_or(usize::MAX), skip, &mut walked);
+    walk(dir, 0, depth.unwrap_or(usize::MAX), skip, false, false, &mut walked);
     let Walked { mut found, skipped } = walked;
-    found.sort();
+    found.sort_by(|a, b| a.path().cmp(b.path()));
     if found.is_empty() {
         if !skipped.is_empty() {
             return Err(DiscoverError::AllSkipped {
@@ -237,23 +269,85 @@ pub fn scan(dir: &Path, depth: Option<usize>, skip: &[SkipInput]) -> Result<Vec<
 /// `--skip-input` all left out (as `dir: names`, for a message).
 #[derive(Default)]
 struct Walked {
-    found: Vec<PathBuf>,
+    found: Vec<Found>,
     skipped: Vec<String>,
 }
 
-fn walk(dir: &Path, level: usize, max: usize, skip: &[SkipInput], walked: &mut Walked) {
-    match lockfile_in(dir, skip) {
-        Some(lockfile) => walked.found.push(lockfile),
-        None => {
-            let skipped = skipped_in(dir, skip);
-            if !skipped.is_empty() {
-                walked.skipped.push(format!("{}: {skipped}", dir.display()));
+/// Whether `dir` is an installed environment a scan reads: a conda environment, a venv, or a Python
+/// installation with at least one package. A `lib` that is a link (a merged-`/usr` root's
+/// `lib -> usr/lib`) does not make the directory an installation; the directory it points into is
+/// found on its own.
+pub fn is_environment(dir: &Path) -> bool {
+    match crate::prefix::layout(dir) {
+        Some(crate::prefix::Layout::Conda | crate::prefix::Layout::Venv) => true,
+        Some(crate::prefix::Layout::Python) => {
+            !dir.join("lib").is_symlink() && !crate::prefix::dist_infos(dir).is_empty()
+        }
+        None => false,
+    }
+}
+
+/// A directory holding `etc/` and `usr/`: the root of a filesystem.
+fn is_filesystem_root(dir: &Path) -> bool {
+    dir.join("etc").is_dir() && dir.join("usr").is_dir()
+}
+
+/// Never entered even when looking for environments only: version control and caches.
+const ENVIRONMENT_SEARCH_SKIPPED_DIRS: &[&str] = &[".git", "node_modules", "__pycache__"];
+
+/// `owned`: a directory at or above this one had a lockfile that was read, so environments here are
+/// that project's and are not looked for. `environments_only`: inside a hidden directory or a `venv`
+/// outside any project (`/app/.pixi/envs/prod`, `/root/.conda/envs/x`, `~/.local`), where only
+/// environments are looked for and a lockfile is not a project.
+fn walk(
+    dir: &Path,
+    level: usize,
+    max: usize,
+    skip: &[SkipInput],
+    owned: bool,
+    environments_only: bool,
+    walked: &mut Walked,
+) {
+    let mut owned = owned;
+    if !environments_only {
+        match lockfile_in(dir, skip) {
+            Some(lockfile) => {
+                walked.found.push(Found::Lockfile(lockfile));
+                owned = true;
+            }
+            None => {
+                let skipped = skipped_in(dir, skip);
+                if !skipped.is_empty() {
+                    walked.skipped.push(format!("{}: {skipped}", dir.display()));
+                }
             }
         }
+    }
+    let installed = !owned && !skip.contains(&SkipInput::Installed);
+    if environments_only && !installed {
+        return;
+    }
+    if installed && is_environment(dir) {
+        walked.found.push(Found::Environment(dir.to_path_buf()));
+        // A conda installation (Miniforge's /opt/conda) keeps its other environments in envs/.
+        let envs = dir.join("envs");
+        if level + 2 <= max
+            && envs.is_dir()
+            && !envs.is_symlink()
+            && let Ok(entries) = std::fs::read_dir(&envs)
+        {
+            for entry in entries.flatten() {
+                if entry.file_type().is_ok_and(|kind| kind.is_dir()) {
+                    walk(&entry.path(), level + 2, max, skip, false, true, walked);
+                }
+            }
+        }
+        return;
     }
     if level >= max {
         return;
     }
+    let at_filesystem_root = level == 0 && is_filesystem_root(dir);
     let entries = match std::fs::read_dir(dir) {
         Ok(entries) => entries,
         Err(err) => {
@@ -268,10 +362,21 @@ fn walk(dir: &Path, level: usize, max: usize, skip: &[SkipInput], walked: &mut W
             continue;
         }
         let name = entry.file_name().to_string_lossy().into_owned();
-        if name.starts_with('.') || SCAN_SKIPPED_DIRS.contains(&name.as_str()) {
+        if at_filesystem_root && SCAN_SKIPPED_ROOT_DIRS.contains(&name.as_str()) {
             continue;
         }
-        walk(&path, level + 1, max, skip, walked);
+        if environments_only {
+            if !ENVIRONMENT_SEARCH_SKIPPED_DIRS.contains(&name.as_str()) {
+                walk(&path, level + 1, max, skip, owned, true, walked);
+            }
+        } else if name.starts_with('.') || SCAN_SKIPPED_DIRS.contains(&name.as_str()) {
+            // Outside a project, a hidden directory or a `venv` can still be or hold an environment.
+            if installed && !ENVIRONMENT_SEARCH_SKIPPED_DIRS.contains(&name.as_str()) {
+                walk(&path, level + 1, max, skip, owned, true, walked);
+            }
+        } else {
+            walk(&path, level + 1, max, skip, owned, false, walked);
+        }
     }
 }
 
@@ -459,7 +564,7 @@ mod tests {
         let found: Vec<PathBuf> = scan(dir.path(), None, &[])
             .unwrap()
             .into_iter()
-            .map(|p| p.strip_prefix(dir.path()).unwrap().to_path_buf())
+            .map(|p| p.path().strip_prefix(dir.path()).unwrap().to_path_buf())
             .collect();
         let found: Vec<&str> = found.iter().map(|p| p.to_str().unwrap()).collect();
         let expected = [
@@ -520,15 +625,17 @@ mod tests {
         assert!(matches!(err, DiscoverError::AllSkipped { .. }), "{err}");
         assert_eq!(
             scan(dir.path(), None, &[SkipInput::Pixi]).unwrap(),
-            [dir.path().join("uv.lock")]
+            [Found::Lockfile(dir.path().join("uv.lock"))]
         );
     }
 
     #[test]
     fn every_skip_input_value_names_its_own_lockfiles() {
         use clap::ValueEnum;
+        // `installed` leaves out environments rather than lockfiles (#25), and names none.
         for input in SkipInput::value_variants() {
-            assert!(LOCKFILE_KINDS.into_iter().any(|n| input.covers(n)), "{input:?}");
+            let lockfiles = LOCKFILE_KINDS.into_iter().any(|n| input.covers(n));
+            assert_eq!(lockfiles, *input != SkipInput::Installed, "{input:?}");
         }
         assert!(SkipInput::Pylock.covers("pylock.dev.toml"));
         assert!(!SkipInput::Pixi.covers("uv.lock"));
@@ -654,7 +761,13 @@ mod tests {
         let found = scan(dir.path(), None, &[]).unwrap();
         let relative: Vec<String> = found
             .iter()
-            .map(|p| p.strip_prefix(dir.path()).unwrap().to_string_lossy().replace('\\', "/"))
+            .map(|p| {
+                p.path()
+                    .strip_prefix(dir.path())
+                    .unwrap()
+                    .to_string_lossy()
+                    .replace('\\', "/")
+            })
             .collect();
         assert_eq!(
             relative,
@@ -674,6 +787,130 @@ mod tests {
         assert_eq!(names(Some(0)), 1, "the directory itself");
         assert_eq!(names(Some(1)), 2);
         assert_eq!(names(None), 3);
+    }
+
+    /// Relative paths of what a scan found, `L` for a lockfile and `E` for an environment.
+    fn found(dir: &Path, depth: Option<usize>, skip: &[SkipInput]) -> Vec<String> {
+        scan(dir, depth, skip)
+            .unwrap()
+            .iter()
+            .map(|found| {
+                let kind = if matches!(found, Found::Lockfile(_)) { "L" } else { "E" };
+                let path = found
+                    .path()
+                    .strip_prefix(dir)
+                    .unwrap()
+                    .to_string_lossy()
+                    .replace('\\', "/");
+                format!("{kind} {path}")
+            })
+            .collect()
+    }
+
+    #[test]
+    fn a_container_root_filesystem_has_each_environment_found_once() {
+        let dir = tempfile::tempdir().unwrap();
+        tree(
+            dir.path(),
+            &[
+                "app/.venv/pyvenv.cfg",
+                // A plain Python installation with a package: found. One with an empty
+                // site-packages describes nothing, and is not.
+                "usr/local/lib/python3.12/site-packages/requests-2.32.0.dist-info/METADATA",
+                // The kernel's pseudo-filesystems at a filesystem root are never entered.
+                "proc/1/root/pyvenv.cfg",
+                // A conda installation's own package cache is inside it, so never looked at.
+                "opt/conda/pkgs/numpy-2.0-py312/lib/python3.12/site-packages/numpy-2.0.dist-info/METADATA",
+                // pixi's production layout: the environment copied without its lockfile, under a
+                // hidden directory; and a user's conda and pip --user installs under their home.
+                "app/.pixi/envs/prod/conda-meta/history",
+                "root/.conda/envs/tools/conda-meta/history",
+                "root/.local/lib/python3.12/site-packages/httpx-0.28.0.dist-info/METADATA",
+                // A lockfile inside a hidden directory is never a project.
+                "root/.cache/uv/pixi.lock",
+                // A project: its lockfile is read, and its environments are what that lockfile describes.
+                "srv/web/pixi.lock",
+                "srv/web/.pixi/envs/default/conda-meta/history",
+                "srv/web/.venv/pyvenv.cfg",
+            ],
+            &[
+                "etc",
+                "opt/conda/conda-meta",
+                "opt/conda/envs/app/conda-meta",
+                "opt/conda/envs/tools/conda-meta",
+                "usr/lib/python3.12/site-packages",
+                "home/user/venv/conda-meta",
+            ],
+        );
+        assert_eq!(
+            found(dir.path(), None, &[]),
+            [
+                "E app/.pixi/envs/prod",
+                "E app/.venv",
+                "E home/user/venv",
+                "E opt/conda",
+                "E opt/conda/envs/app",
+                "E opt/conda/envs/tools",
+                "E root/.conda/envs/tools",
+                "E root/.local",
+                "L srv/web/pixi.lock",
+                "E usr/local",
+            ]
+        );
+        assert_eq!(
+            found(dir.path(), None, &[SkipInput::Installed]),
+            ["L srv/web/pixi.lock"]
+        );
+        assert_eq!(
+            found(dir.path(), Some(2), &[]),
+            [
+                "E app/.venv",
+                "E opt/conda",
+                "E root/.local",
+                "L srv/web/pixi.lock",
+                "E usr/local"
+            ]
+        );
+    }
+
+    #[test]
+    fn proc_sys_and_dev_are_skipped_only_at_a_filesystem_root() {
+        let dir = tempfile::tempdir().unwrap();
+        tree(dir.path(), &["dev/pixi.lock", "proc/tool/pixi.lock"], &[]);
+        assert_eq!(
+            found(dir.path(), None, &[]),
+            ["L dev/pixi.lock", "L proc/tool/pixi.lock"]
+        );
+        tree(dir.path(), &[], &["etc", "usr"]);
+        assert!(matches!(
+            scan(dir.path(), None, &[]),
+            Err(DiscoverError::NoneFound { .. })
+        ));
+    }
+
+    #[test]
+    fn an_environment_is_found_unless_a_lockfile_above_it_was_read() {
+        let dir = tempfile::tempdir().unwrap();
+        tree(dir.path(), &["pixi.lock", "sub/.venv/pyvenv.cfg"], &[]);
+        assert_eq!(found(dir.path(), None, &[]), ["L pixi.lock"]);
+        // Skipped, the lockfile describes nothing, so the environment is found after all.
+        assert_eq!(found(dir.path(), None, &[SkipInput::Pixi]), ["E sub/.venv"]);
+        // The scanned directory can be an environment itself.
+        let venv = dir.path().join("sub/.venv");
+        assert_eq!(found(&venv, None, &[]), ["E "]);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_linked_lib_does_not_make_a_root_a_python_installation() {
+        let dir = tempfile::tempdir().unwrap();
+        tree(
+            dir.path(),
+            &["usr/lib/python3.12/site-packages/six-1.17.0.dist-info/METADATA"],
+            &["etc"],
+        );
+        std::os::unix::fs::symlink("usr/lib", dir.path().join("lib")).unwrap();
+        assert_eq!(found(dir.path(), None, &[]), ["E usr"]);
     }
 
     #[cfg(unix)]

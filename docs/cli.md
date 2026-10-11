@@ -31,9 +31,9 @@ Grouped as `--help` groups them.
 | `--lockfile <PATH>` | upward search from cwd | Lockfile to read: a `pixi.lock`, a `uv.lock` (see [Reading uv.lock](#reading-uvlock)), a `poetry.lock` (see [Reading poetry.lock](#reading-poetrylock)), a `pdm.lock` (see [Reading pdm.lock](#reading-pdmlock)), a `conda-lock.yml` (see [Reading conda-lock.yml](#reading-conda-lockyml)), an explicit conda spec file (see [Reading an explicit spec file](#reading-an-explicit-spec-file)), a fully pinned `requirements.txt` (see [Reading a pinned requirements.txt](#reading-a-pinned-requirementstxt)), or a PEP 751 `pylock.toml` / `pylock.<name>.toml` (see [Reading pylock.toml](#reading-pylocktoml)), or a JavaScript project's `package-lock.json`, `pnpm-lock.yaml` or `yarn.lock` (see [Reading JavaScript lockfiles](#reading-javascript-lockfiles)). The file must exist; there is no fallback search when this is given. Without it, the nearest directory at or above the current one that has a lockfile is used, and within a directory the first in the order of [Which lockfile is found](#which-lockfile-is-found). |
 | `--from-sbom <FILE>` | | Read an existing document (CycloneDX 1.4–1.7, SPDX 2.x or SPDX 3.0 JSON) instead of a lockfile and run the reports, the license policy and the vulnerability gate on it. Repeatable: several documents are merged into one, see [Merging documents](#merging-documents). |
 | `--merge` | off | With `--scan`: write one document for the whole tree instead of one per workspace (and then `--output -` and `--against` apply). See [Merging documents](#merging-documents). |
-| `--scan <DIR>` | | Describe every project under the directory: one document per directory with a lockfile of any kind it finds (see [Which lockfile is found](#which-lockfile-is-found)). Cannot be combined with `--lockfile` or `--prefix`, nor, without `--merge`, with `--against` or `--output -`. |
+| `--scan <DIR>` | | Describe every project under the directory: one document per directory with a lockfile of any kind it finds (see [Which lockfile is found](#which-lockfile-is-found)), and one per installed environment outside a project (see [An unpacked container image](#an-unpacked-container-image)). Cannot be combined with `--lockfile` or `--prefix`, nor, without `--merge`, with `--against` or `--output -`. |
 | `--scan-depth <N>` | unlimited | With `--scan`: how far below the directory to walk (`0` is the directory itself). |
-| `--skip-input <INPUT>` | | Repeatable. Leave a lockfile out when finding them: `pixi`, `uv`, `pylock`, `poetry`, `pdm`, `conda-lock`, `npm`, `pnpm`, `yarn`, or `javascript` for all three JavaScript ones. A skipped lockfile is never read, and the next of the same ecosystem takes its place. See [Which lockfile is found](#which-lockfile-is-found). |
+| `--skip-input <INPUT>` | | Repeatable. Leave a lockfile out when finding them: `pixi`, `uv`, `pylock`, `poetry`, `pdm`, `conda-lock`, `npm`, `pnpm`, `yarn`, or `javascript` for all three JavaScript ones; `installed` leaves out the installed environments `--scan` finds. A skipped lockfile is never read, and the next of the same ecosystem takes its place. See [Which lockfile is found](#which-lockfile-is-found). |
 | `--prefix <DIR>` | | Describe an installed environment instead of a lockfile: a conda environment, a venv or a Python installation (see below). Cannot be combined with `--lockfile` or the `--all-*` flags; `--environment` only names the lockfile side of `--against`. |
 | `--root-name <NAME>`, `--root-version <VERSION>` | directory name, none | With `--prefix`: what the described application is called. |
 
@@ -605,8 +605,8 @@ pixi sbom --lockfile pylock.toml -p win-64 --vulnerabilities osv --report vulner
 ```
 
 The file is recognised by its name, `pylock.toml` or `pylock.<name>.toml` (a named lock records `<name>` as the
-environment). The upward search finds `pylock.toml` when a directory has none of `pixi.lock`, `uv.lock`, `poetry.lock` or `pdm.lock`; a named lock is
-read through `--lockfile`, and `--scan` still looks for `pixi.lock` only.
+environment). The upward search and `--scan` find `pylock.toml`, then the named locks in sorted order, when a
+directory has neither `pixi.lock` nor `uv.lock` ([Which lockfile is found](#which-lockfile-is-found)).
 
 One `pylock.toml` describes every environment it was resolved for, with an environment marker on each package
 that is not needed everywhere. A document is for one platform, so the markers are evaluated for it, as pip and uv
@@ -1722,7 +1722,8 @@ pixi sbom --scan . --pypi-mapping prefix --vulnerabilities osv --fail-on-severit
 
 The walk never enters hidden directories (`.pixi/`, `.git/`, `.venv/`), `node_modules`, `target`, `build`, `dist`,
 `venv` or `__pycache__`, and does not follow symlinked directories, so an installed environment's copy of a
-lockfile is never mistaken for a workspace. `--scan-depth <N>` caps the recursion. Finding nothing is an error
+lockfile is never mistaken for a workspace. Outside a project, an installed environment is found as well, in one of
+those directories too (see [An unpacked container image](#an-unpacked-container-image)). `--scan-depth <N>` caps the recursion. Finding nothing is an error
 (`pixi_sbom::discover::none_found`) naming the directory, so a mistyped path cannot quietly produce no documents.
 
 With `--output <DIR>` each document lands at `<DIR>/<the workspace's path in the tree>/<the usual file name>`, so
@@ -1735,6 +1736,39 @@ workspace's manifest, `pixi:lockfile` stays relative to its own root, and the do
 Reports, the license policy and the vulnerability gate cover the whole run: one report with a section per
 workspace (the `workspace` column names it), and one exit code for all of them. The configuration file is read
 once, from the scanned directory rather than from each workspace, so one setting applies to the whole tree.
+
+
+## An unpacked container image
+
+`--scan` also finds **installed environments**: a directory with `conda-meta/` (a conda, mamba or pixi
+environment), a venv (`pyvenv.cfg`), or a Python installation with packages in its `site-packages`. Each is read as
+[`--prefix`](#describing-an-installed-environment) reads one, so a container image's every conda environment and venv
+is one command:
+
+```sh
+docker export "$(docker create app:latest)" | tar -x -C rootfs
+pixi sbom --scan rootfs --merge --output app.cdx.json
+grype sbom:app.cdx.json
+```
+
+- **Named by its path.** Each environment's root component is its absolute path in the scanned tree
+  (`/opt/conda/envs/app`, `/app/.venv`, `/usr/local`); with `--merge`, those are the components the merged root
+  depends on. Without `--merge`, each document lands at its path under `--output`, or inside the environment
+  without it.
+- **A project's environments are its lockfile's.** An environment inside a directory whose lockfile was read
+  (a workspace's `.pixi/envs/default`, a uv project's `.venv`) is what that lockfile describes, so it is not read
+  again; a source tree lists nothing twice. A skipped lockfile describes nothing, so its environments are found.
+- **Where it looks.** Outside a project, hidden directories and `venv` are searched for environments only, never
+  for lockfiles, which finds pixi's production layout (`/app/.pixi/envs/prod` with no lockfile beside it), a user's
+  `~/.conda/envs/<name>` and `~/.pixi/envs/<name>`, and `pip --user`'s `~/.local`; `.git` is never entered. Nothing
+  inside an environment is another one, except a conda installation's `envs/`
+  (`/opt/conda/envs/<name>`). At a filesystem root (a directory with `etc/` and `usr/`), `proc`, `sys` and `dev` are
+  never entered. A Python installation counts only with at least one package, and a `lib` that is a link (a
+  merged-`/usr` root's `lib -> usr/lib`) does not make its parent one.
+- **Leaving them out.** `--skip-input installed` reads lockfiles only, as before 1.13.0.
+
+This covers the conda and Python environments in an image, not the image itself: operating system packages (dpkg,
+rpm, apk) and anything else syft catalogs are still syft's ([what syft does that pixi-sbom does not](syft.md#what-syft-does-that-pixi-sbom-does-not)).
 
 ## One document per environment and platform
 

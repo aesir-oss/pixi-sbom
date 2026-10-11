@@ -30,10 +30,13 @@ pub struct Input {
 fn root_package(input: &Input, top_level: Vec<String>) -> Package {
     let root = &input.sbom.root;
     let version = root.version.clone();
-    let purl = version
-        .as_deref()
-        .and_then(|v| crate::purl::generic(&root.name, v).ok())
-        .unwrap_or_else(|| format!("pkg:generic/{}", root.name));
+    // Through the purl builder with or without a version, so a name with a `/` in it (an
+    // environment a scan named by its path, `/opt/conda`) is encoded rather than read as a namespace.
+    let purl = match version.as_deref() {
+        Some(v) => crate::purl::generic(&root.name, v).ok(),
+        None => crate::purl::generic_unversioned(&root.name).ok(),
+    }
+    .unwrap_or_else(|| format!("pkg:generic/{}", root.name));
     let mut properties = BTreeMap::new();
     properties.insert(SOURCE_DOCUMENT_PROPERTY.to_string(), input.name.clone());
     Package {

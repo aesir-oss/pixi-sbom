@@ -20,6 +20,7 @@ expression: "surface.join(\"\\n\")"
           - pnpm:       pnpm-lock.yaml
           - yarn:       yarn.lock, from yarn 1 or yarn 2 and later
           - javascript: Every JavaScript lockfile: npm, pnpm and yarn
+          - installed:  Installed environments a `--scan` finds outside any project: a directory with conda-meta/, a venv (pyvenv.cfg), or a Python installation with packages in site-packages
       --prefix <DIR>
       --root-name <NAME>
       --root-version <VERSION>

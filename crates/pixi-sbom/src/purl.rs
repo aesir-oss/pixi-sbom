@@ -118,6 +118,16 @@ pub fn generic(name: &str, version: &str) -> Result<String, PurlError> {
     Ok(purl.to_string())
 }
 
+/// Build a `pkg:generic/...` purl with no version, for a merged document's input that has none.
+pub fn generic_unversioned(name: &str) -> Result<String, PurlError> {
+    PackageUrl::new("generic", name.to_string())
+        .map(|purl| purl.to_string())
+        .map_err(|source| PurlError {
+            name: name.to_string(),
+            source,
+        })
+}
+
 /// Build a `pkg:generic/...` purl for a first-party JavaScript package: a workspace member no registry
 /// has released. A scoped name puts its scope in the namespace, as [`npm`] does.
 pub fn generic_js(name: &str, version: &str) -> Result<String, PurlError> {

@@ -286,10 +286,22 @@ fn main() -> Result<()> {
     let workspaces: Vec<Workspace> = match &args.scan {
         Some(dir) => {
             let found = discover::scan(dir, args.scan_depth, &args.skip_input)?;
-            tracing::info!(lockfiles = found.len(), dir = %dir.display(), "scanned for workspaces");
+            let environments = found
+                .iter()
+                .filter(|found| matches!(found, discover::Found::Environment(_)))
+                .count();
+            tracing::info!(
+                lockfiles = found.len() - environments,
+                environments,
+                dir = %dir.display(),
+                "scanned for workspaces"
+            );
             let workspaces: Vec<Workspace> = found
                 .into_iter()
-                .map(|lockfile| scanned_workspace(&args, dir, lockfile))
+                .map(|found| match found {
+                    discover::Found::Lockfile(lockfile) => scanned_workspace(&args, dir, lockfile),
+                    discover::Found::Environment(environment) => Ok(scanned_environment(&args, dir, environment)),
+                })
                 .collect::<Result<_>>()?;
             if args.merge {
                 vec![merge_workspaces(&args, dir, &workspaces)?]
@@ -2048,6 +2060,44 @@ fn scanned_workspace(args: &cli::Args, scanned: &Path, lockfile: std::path::Path
         input,
         targets,
     })
+}
+
+/// One installed environment a `--scan` found (#25), read as `--prefix` reads one. Its root component is named
+/// by where it is in the scanned tree, as an absolute path (`/opt/conda/envs/app`), which in an unpacked container
+/// image is where it is in the image; the scanned directory itself is named as `--prefix` would name it.
+fn scanned_environment(args: &cli::Args, scanned: &Path, dir: std::path::PathBuf) -> Workspace {
+    let relative = dir.strip_prefix(scanned).unwrap_or(Path::new(""));
+    let path: Vec<String> = relative
+        .components()
+        .map(|c| c.as_os_str().to_string_lossy().into_owned())
+        .collect();
+    let name = if path.is_empty() {
+        prefix::environment_name(&dir)
+    } else {
+        format!("/{}", path.join("/"))
+    };
+    let output_dir = match &args.output {
+        Some(output) => output.join(relative),
+        None => dir.clone(),
+    };
+    Workspace {
+        targets: vec![Target {
+            environment: prefix::environment_name(&dir),
+            platform: args.platform.clone(),
+            output: discover::Output::File(output_dir.join(args.format.default_file_name())),
+        }],
+        input: Input::Prefix {
+            dir: dir.clone(),
+            root: model::Root {
+                name,
+                version: args.root_version.clone(),
+                ..model::Root::default()
+            },
+            infer_extras: args.infer_extras,
+        },
+        lockfile: dir,
+        javascript: None,
+    }
 }
 
 #[derive(Debug)]

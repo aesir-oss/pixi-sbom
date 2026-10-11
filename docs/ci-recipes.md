@@ -133,6 +133,21 @@ their own, so they are not lost among ordinary additions.
 docker run --rm -v "$PWD:/w" -w /w myimage   pixi-sbom --prefix /opt/conda/envs/app --against pixi.lock --report diff --fail-on-diff pip build
 ```
 
+## Every environment in a container image
+
+`--scan` on an unpacked image finds each conda environment, venv and Python installation in it and, merged, describes
+them in one document ([An unpacked container image](cli.md#an-unpacked-container-image)). The image's operating
+system packages are syft's, so a full picture is both documents.
+
+```yaml
+- name: SBOM of the image's environments
+  run: |
+    mkdir rootfs
+    docker export "$(docker create "$IMAGE")" | tar -x -C rootfs
+    pixi sbom --scan rootfs --merge --pypi-mapping prefix --primary-purl pypi --output image.cdx.json
+    grype sbom:image.cdx.json --fail-on high
+```
+
 ## Diffing SBOMs between commits
 
 With `SOURCE_DATE_EPOCH` set, two runs over the same lockfile are byte-identical (the serial number is derived from

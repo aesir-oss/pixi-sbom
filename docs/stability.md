@@ -245,8 +245,8 @@ These change without a major version, and nothing should be parsed out of them:
 - **Recommendation and diagnostic wording.** `recommendation` text in a document, the phrasing of a
   miette diagnostic, the help text of a flag.
 - **Which lockfiles are read without `--lockfile`.** A directory's lockfiles are read one per ecosystem, and
-  the ecosystems found and read this way may grow in a minor release. `--skip-input` (or the `skip-input` key)
-  pins it to the ones you want.
+  the ecosystems found and read this way may grow in a minor release, as may what `--scan` finds besides lockfiles
+  (installed environments since 1.13.0). `--skip-input` (or the `skip-input` key) pins it to the ones you want.
 - **Progress output.** Bars, spinners, what they count.
 - **`--timings` output.** The phases, their names, the table.
 - **`--doctor` output.** What it checks and how it says so; only the exit code is frozen.

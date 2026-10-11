@@ -8573,6 +8573,119 @@ fn dependency_groups_and_extras_set_the_scope_in_every_format() {
     );
 }
 
+/// #25: `--scan` on an unpacked container image finds every installed environment in it, each once, and
+/// leaves a project's own environments to its lockfile.
+#[test]
+fn a_scan_of_a_container_root_filesystem_finds_each_installed_environment_once() {
+    let work = tempfile::tempdir().unwrap();
+    let fixtures = tests_dir().join("fixtures");
+    let rootfs = work.path().join("rootfs");
+    for dir in ["etc", "usr", "proc"] {
+        std::fs::create_dir_all(rootfs.join(dir)).unwrap();
+    }
+    copy_dir(&fixtures.join("prefix"), &rootfs.join("opt/conda"));
+    copy_dir(&fixtures.join("prefix"), &rootfs.join("opt/conda/envs/app"));
+    copy_dir(&fixtures.join("venv-posix"), &rootfs.join("app/.venv"));
+    copy_dir(&fixtures.join("site-packages"), &rootfs.join("usr/local"));
+    copy_dir(&fixtures.join("venv-posix"), &rootfs.join("proc/1/root"));
+    std::fs::create_dir_all(rootfs.join("srv/proj")).unwrap();
+    std::fs::copy(fixtures.join("conda-only/pixi.lock"), rootfs.join("srv/proj/pixi.lock")).unwrap();
+    copy_dir(&fixtures.join("venv-posix"), &rootfs.join("srv/proj/.venv"));
+    let run = |args: &[&str]| {
+        let mut command = pixi_sbom();
+        command
+            .current_dir(work.path())
+            .env("PIXI_CACHE_DIR", work.path().join("empty-pkgs-cache"))
+            .env("PIXI_SBOM_CACHE_DIR", work.path().join("cache"))
+            .env("PIXI_SBOM_OFFLINE", "1")
+            // The project's lockfile has linux-64 and osx-arm64; the host's platform is the default.
+            .args(["--platform", "linux-64"])
+            .args(args);
+        command
+    };
+    let merged = |extra: &[&str], format: &str| -> Value {
+        let mut args = vec!["--scan", "rootfs", "--merge", "--format", format, "--output", "-"];
+        args.extend_from_slice(extra);
+        serde_json::from_slice(&run(&args).assert().success().get_output().stdout).unwrap()
+    };
+
+    let doc = merged(&[], "cyclonedx");
+    assert_valid(&cyclonedx_validator(), &doc);
+    let mut documents: Vec<String> = doc["components"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .flat_map(|c| c["properties"].as_array().cloned().unwrap_or_default())
+        .filter(|p| p["name"] == "pixi:source-document")
+        // A package more than one input has lists them all.
+        .flat_map(|p| {
+            p["value"]
+                .as_str()
+                .unwrap()
+                .split(", ")
+                .map(str::to_string)
+                .collect::<Vec<_>>()
+        })
+        .collect();
+    documents.sort();
+    documents.dedup();
+    assert_eq!(
+        documents,
+        [
+            "app/.venv",
+            "opt/conda",
+            "opt/conda/envs/app",
+            "srv/proj/pixi.lock",
+            "usr/local"
+        ],
+        "each environment once; the project's .venv is its lockfile's, and proc is never entered"
+    );
+    let roots: Vec<(&str, &str)> = doc["components"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|c| c["name"].as_str().is_some_and(|n| n.starts_with('/')))
+        .map(|c| (c["name"].as_str().unwrap(), c["purl"].as_str().unwrap()))
+        .collect();
+    assert!(
+        roots.contains(&("/opt/conda/envs/app", "pkg:generic/%2Fopt%2Fconda%2Fenvs%2Fapp")),
+        "named by its path in the image, with a valid purl: {roots:?}"
+    );
+    for name in ["tzdata", "requests", "numpy"] {
+        assert!(
+            doc["components"].as_array().unwrap().iter().any(|c| c["name"] == name),
+            "{name} is in the merged document"
+        );
+    }
+    let text = doc.to_string();
+    assert!(
+        !text.contains(&work.path().display().to_string()),
+        "no path on this machine"
+    );
+    assert_valid(&spdx_validator(), &merged(&[], "spdx"));
+
+    // Left out, only the project is read.
+    let only_lockfiles = merged(&["--skip-input", "installed"], "cyclonedx");
+    assert!(
+        !only_lockfiles["components"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|c| c["name"] == "requests")
+    );
+
+    // Not merged, each environment's document lands under --output at its path in the image.
+    run(&["--scan", "rootfs", "--output", "out"]).assert().success();
+    for path in [
+        "out/opt/conda/envs/app",
+        "out/app/.venv",
+        "out/usr/local",
+        "out/srv/proj",
+    ] {
+        assert!(work.path().join(path).join("sbom.cdx.json").is_file(), "{path}");
+    }
+}
+
 #[test]
 fn prefix_reads_venvs_and_plain_site_packages() {
     // #323: a venv (POSIX and Windows layouts) and a plain site-packages are environments too.

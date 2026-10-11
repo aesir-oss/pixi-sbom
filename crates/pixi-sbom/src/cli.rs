@@ -381,6 +381,9 @@ pub enum SkipInput {
     Yarn,
     /// Every JavaScript lockfile: npm, pnpm and yarn.
     Javascript,
+    /// Installed environments a `--scan` finds outside any project: a directory with conda-meta/,
+    /// a venv (pyvenv.cfg), or a Python installation with packages in site-packages.
+    Installed,
 }
 
 impl SkipInput {
@@ -397,6 +400,7 @@ impl SkipInput {
             SkipInput::Pnpm => name == "pnpm-lock.yaml",
             SkipInput::Yarn => name == "yarn.lock",
             SkipInput::Javascript => crate::jslock::LOCKFILE_NAMES.contains(&name),
+            SkipInput::Installed => false,
         }
     }
 }
@@ -490,9 +494,13 @@ pub struct Args {
     pub merge: bool,
 
     /// Describe every project under this directory: one document per directory with a lockfile,
-    /// in sorted order, read as a single run reads one. Hidden directories, node_modules, target, build, dist, venv and
-    /// __pycache__ are never entered and symlinked directories are not followed. With
-    /// --output the documents land under it, mirroring each workspace's path.
+    /// in sorted order, read as a single run reads one, and one per installed environment outside a
+    /// project (conda-meta/, a venv, a Python installation), read as --prefix reads one and named by
+    /// its path, as in an unpacked container image. Hidden directories, node_modules, target,
+    /// build, dist, venv and __pycache__ are never entered for lockfiles (outside a project, hidden
+    /// directories and venv are searched for environments),
+    /// nor are proc, sys and dev at a filesystem root, and symlinked directories are not followed.
+    /// With --output the documents land under it, mirroring each one's path.
     #[arg(help_heading = "Input", long, value_name = "DIR", conflicts_with_all = ["lockfile", "prefix"])]
     pub scan: Option<PathBuf>,
 
