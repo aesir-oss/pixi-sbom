@@ -118,9 +118,22 @@ def changelog(meta: dict[str, Any], name: str, tag: str | None = None, root: Pat
     return text
 
 
-def notes(meta: dict[str, Any], name: str, root: Path = ROOT) -> str:
-    """Return the section of the extension's newest final release, without the header, for its release notes."""
-    args = ["--tag-pattern", f"^{name}-{VERSION}", "--latest", "--strip", "header"]
+def is_candidate(tag: str) -> bool:
+    """Whether a release tag is a pre-release: a hyphen after its version (`pixi-sbom-v1.13.0-rc.1`)."""
+    return "-" in tag.rsplit("-v", 1)[-1]
+
+
+def notes(meta: dict[str, Any], name: str, root: Path = ROOT, tag: str | None = None) -> str:
+    """Return the release notes' section, without the header: a final release's own section, or for a release
+    candidate (#88) everything since the last final release, headed with the candidate's version.
+
+    Release candidates are invisible to the tag pattern, so a final's section spans final to final; for a candidate
+    that same pattern made `--latest` print the previous final's section."""
+    args = ["--tag-pattern", f"^{name}-{VERSION}", "--strip", "header"]
+    if tag and is_candidate(tag):
+        args += ["--unreleased", "--tag", tag]
+    else:
+        args.append("--latest")
     for path in include_paths(meta, name):
         args += ["--include-path", path]
     return _cliff(root, args)
@@ -136,14 +149,16 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("command", choices=["write", "notes", "paths"])
     parser.add_argument("extension")
-    parser.add_argument("--tag", help="the tag of the release being made, which does not exist yet")
+    parser.add_argument(
+        "--tag", help="write: the tag of the release being made, which does not exist yet; notes: the release's tag"
+    )
     args = parser.parse_args(argv)
     try:
         meta = metadata()
         if args.command == "paths":
             sys.stdout.write("\n".join(include_paths(meta, args.extension)) + "\n")
         elif args.command == "notes":
-            sys.stdout.write(notes(meta, args.extension))
+            sys.stdout.write(notes(meta, args.extension, tag=args.tag))
         else:
             target = changelog_file(meta, args.extension)
             target.write_text(changelog(meta, args.extension, args.tag), encoding="utf-8")

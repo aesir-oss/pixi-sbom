@@ -236,7 +236,7 @@ jobs:
           else
             : > RELEASE_NOTES.md
           fi
-          pixi run changelog-of notes pixi-sbom >> RELEASE_NOTES.md
+          pixi run changelog-of notes pixi-sbom --tag "$TAG" >> RELEASE_NOTES.md
           {
             echo
             echo "---"

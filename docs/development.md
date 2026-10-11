@@ -507,7 +507,8 @@ What the two do, in order:
    which commit, in which workflow run. It runs in the archive's job, before the artifact upload, so the claim covers
    the round trip through artifact storage as well. The statement goes to the repository's attestation store, and
    the Sigstore bundle also ships beside the archive as `.sigstore.json` for anyone verifying offline.
-7. **Publish.** Creates the GitHub release with this version's changelog section (from `changelog-of notes pixi-sbom`) plus an
+7. **Publish.** Creates the GitHub release with this version's changelog section (from `changelog-of notes pixi-sbom --tag <tag>`:
+   a final's own section, or for a release candidate everything since the last final, #88) plus an
    artifact table as the notes and the packages as assets, marked pre-release when the tag carries a suffix.
    `release-artifacts.yml` only triggers on `pixi-sbom-vX.Y.Z` tags. The action reads releases from both this
    repository and `millsks/pixi-sbom` (1.11.x and older, tagged `vX.Y.Z`), and downloads each version from the
@@ -637,7 +638,7 @@ paths it touches, and its issue's label.
 
 **A new extension** gets its changelog with no setup: its first `write` creates `crates/<extension>/CHANGELOG.md`.
 Give its release workflow `changelog-of write <extension> --tag <extension>-vX.Y.Z` and `changelog-of notes
-<extension>`, add a row to the root `CHANGELOG.md`, and claim any paths outside its crate in its `Cargo.toml`.
+<extension> --tag <tag>`, add a row to the root `CHANGELOG.md`, and claim any paths outside its crate in its `Cargo.toml`.
 
 **The shared crate**, `aesir-pixi-ext-contrib-common` in `crates/aesir-pixi-ext-contrib-common`, holds the code the
 extensions share. It is published to crates.io, because crates.io refuses a crate whose dependencies are not there,

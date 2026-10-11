@@ -53,6 +53,14 @@ class Workspace:
         self.git("commit", "-q", "-m", message)
 
 
+class CandidateTest(unittest.TestCase):
+    def test_a_hyphen_after_the_version_is_a_release_candidate(self) -> None:
+        self.assertTrue(changelog.is_candidate("pixi-sbom-v1.13.0-rc.1"))
+        self.assertTrue(changelog.is_candidate("v1.0.0-beta.2"))
+        self.assertFalse(changelog.is_candidate("pixi-sbom-v1.13.0"))
+        self.assertFalse(changelog.is_candidate("aesir-pixi-ext-contrib-common-v0.1.0"))
+
+
 class IncludePathsTest(unittest.TestCase):
     def test_a_crate_brings_the_crates_it_depends_on_and_the_paths_it_claims(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -117,6 +125,17 @@ class ChangelogTest(unittest.TestCase):
             notes = changelog.notes(meta, "alpha", ws.root)
             self.assertIn("## 1.0.0", notes)
             self.assertNotIn("# Changelog", notes)
+
+            # #88: a release candidate's notes are what it adds since the last final, under its own version.
+            candidate = changelog.notes(meta, "alpha", ws.root, tag="alpha-v1.1.0-rc.1")
+            self.assertIn("## 1.1.0-rc.1", candidate)
+            self.assertIn("Alpha candidate work", candidate)
+            self.assertIn("The shared code is fixed", candidate)
+            self.assertNotIn("## 1.0.0", candidate)
+            self.assertNotIn("Alpha learns a trick", candidate)
+            self.assertNotIn("Beta alone changes", candidate)
+            # A final's are its own section, as before.
+            self.assertEqual(changelog.notes(meta, "alpha", ws.root, tag="alpha-v1.0.0"), notes)
 
     def test_history_before_the_move_is_kept_whole(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
