@@ -42,6 +42,7 @@ jobs:
     permissions:
       contents: write
       actions: read # reading back whether the tag started release-artifacts.yml
+      checks: read # whether CI passed on the commit being released
 
     steps:
       - name: Generate GitHub App token
@@ -181,12 +182,36 @@ jobs:
       # -----------------------------------------------------------------------
       # Pixi environment and version bump
       # -----------------------------------------------------------------------
+      # The commit being released already went through the full CI on main: `CI result` passed or the
+      # release stops here. Its run is not repeated (#92); only what the bump changes is checked below.
+      - name: Require main's CI to have passed on this commit
+        if: steps.should_skip.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          sha=$(git rev-parse HEAD)
+          read -r status conclusion < <(gh api "repos/${GITHUB_REPOSITORY}/commits/${sha}/check-runs?check_name=CI%20result" \
+            --jq '.check_runs | sort_by(.started_at) | last | "\(.status // "missing") \(.conclusion // "none")"')
+          if [ "$status" != "completed" ] || [ "$conclusion" != "success" ]; then
+            echo "::error::CI result on ${sha} is ${status}/${conclusion}; release a commit whose CI passed on main, or wait for it"
+            exit 1
+          fi
+          echo "CI result passed on ${sha}"
+
       - name: Set up pixi
         if: steps.should_skip.outputs.skip != 'true'
         uses: prefix-dev/setup-pixi@v0.8.1
         with:
           environments: default
           cache: true
+          activate-environment: true
+      # Restored from main's debug cache, never saved: nothing built here is shipped.
+      - uses: Swatinem/rust-cache@v2
+        if: steps.should_skip.outputs.skip != 'true'
+        with:
+          shared-key: debug
+          save-if: false
 
       - name: Bump version in crates/pixi-sbom/Cargo.toml, Cargo.lock and pixi.toml
         if: steps.should_skip.outputs.skip != 'true'
@@ -196,11 +221,14 @@ jobs:
           git diff --stat
 
       # -----------------------------------------------------------------------
-      # Quality gate - the authoritative local gate, run in CI before releasing.
+      # What the bump touched: the versions in the manifests and the lockfile. The rest of the gate already
+      # passed on this commit (above).
       # -----------------------------------------------------------------------
-      - name: Run the full CI gate
+      - name: Check the bumped workspace
         if: steps.should_skip.outputs.skip != 'true'
-        run: pixi run ci
+        run: |
+          pixi run cargo check --workspace --all-targets --locked
+          pixi run cargo test --test stability --locked
 
       # -----------------------------------------------------------------------
       # Changelog & tag (git-cliff via cliff.toml)

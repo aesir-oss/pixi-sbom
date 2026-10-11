@@ -475,7 +475,10 @@ What the two do, in order:
    `force_recreate` is set. For a final release, refuses to go on unless `docs/whats-new.md` has a non-empty
    `## Unreleased` section.
 2. **Bump.** Writes the version into `crates/pixi-sbom/Cargo.toml`, `Cargo.lock` (via `cargo update --workspace`) and `pixi.toml`.
-3. **Gate.** Runs `pixi run ci` on the bumped tree; a red gate stops the release before anything is pushed.
+3. **Gate.** Requires the commit being released to have passed CI on `main`: its `CI result` check must be
+   complete and green, or the release stops before anything is pushed. Wait for `main`'s run to finish before
+   releasing a commit that was just merged. CI is not run again (#92); after the bump, `cargo check --workspace` and
+   the stability tests check what the bump changed.
 4. **Changelog.** Regenerates `crates/pixi-sbom/CHANGELOG.md` with `pixi run changelog-of write pixi-sbom --tag
    pixi-sbom-vX.Y.Z` (see [Changelogs](#changelogs)), renames What's
    new's `## Unreleased` to `## X.Y.Z` (final releases only), commits the bump, changelog and page as
