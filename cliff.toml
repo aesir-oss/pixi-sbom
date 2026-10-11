@@ -9,11 +9,22 @@ body = """
 {% for group, commits in commits | group_by(attribute="group") %}
 ### {{ group | striptags | trim | upper_first }}
 {% for commit in commits %}
-- {% if commit.scope %}**{{ commit.scope }}:** {% endif %}{{ commit.message | upper_first }} ([{{ commit.id | truncate(length=7, end="") }}](https://github.com/aesir-oss/pixi-ext-contrib/commit/{{ commit.id }}))
+{%- set message = commit.message | upper_first %}
+{%- if version and version is starting_with("v") %}
+{%- set message = message | replace(from="(#", to="(millsks/pixi-sbom#") %}
+{%- endif %}
+- {% if commit.scope %}**{{ commit.scope }}:** {% endif %}{{ message }} ([{{ commit.id | truncate(length=7, end="") }}](https://github.com/aesir-oss/pixi-ext-contrib/commit/{{ commit.id }}))
 {%- endfor %}
 {% endfor %}
 """
 trim = true
+# Releases up to 1.11.0 (tagged vX.Y.Z) were made in millsks/pixi-sbom, so their (#N) references link there; the
+# template marks them, and everything from 1.12.0 (tagged pixi-sbom-vX.Y.Z) links to this repository. GitHub
+# redirects an /issues/N link to the pull request when N is one.
+postprocessors = [
+  { pattern = '\(millsks/pixi-sbom#([0-9]+)\)', replace = "([millsks/pixi-sbom#${1}](https://github.com/millsks/pixi-sbom/issues/${1}))" },
+  { pattern = '\(#([0-9]+)\)', replace = "([#${1}](https://github.com/aesir-oss/pixi-ext-contrib/issues/${1}))" },
+]
 
 [git]
 conventional_commits = true
