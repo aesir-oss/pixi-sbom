@@ -275,7 +275,7 @@ fn collect_files(dir: &Path, prefix: &Path, texts: bool, out: &mut Vec<LicenseFi
         }
         let name = relative.to_string_lossy().replace('\\', "/");
         let size = std::fs::metadata(&path).map(|meta| meta.len()).unwrap_or(u64::MAX) as usize;
-        let within_budget = !texts || crate::license::keep_text(size);
+        let within_budget = !texts || common::license::keep_text(size);
         if !within_budget {
             tracing::debug!(path = %path.display(), size, "the document is already holding its fill of license text");
         }

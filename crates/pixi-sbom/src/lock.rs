@@ -204,7 +204,7 @@ pub fn sbom_from_lock_with_extras(
     record_extras(&locked, &mut packages, manifest_extras);
     for package in &mut packages {
         if let Some(raw) = &package.license
-            && crate::license::is_rewritten(raw)
+            && common::license::is_rewritten(raw)
         {
             package.properties.insert("pixi:license-raw".into(), raw.clone());
         }

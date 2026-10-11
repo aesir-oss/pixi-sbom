@@ -61,6 +61,8 @@ name = "pixi-sbom"
 path = "src/main.rs"
 
 [dependencies]
+# The code the extensions share (#56), under a short name: `use common::license`.
+common = { package = "aesir-pixi-ext-contrib-common", path = "../aesir-pixi-ext-contrib-common", version = "0.1.0" }
 anstream = "1.0.0"
 anstyle = "1.0.14"
 bzip2 = "0.6.1"

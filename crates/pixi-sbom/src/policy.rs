@@ -13,8 +13,8 @@ use miette::Diagnostic;
 use spdx::{LicenseItem, LicenseReq, ParseMode};
 use thiserror::Error;
 
-use crate::license::{self, License};
 use crate::model::Sbom;
+use common::license::{self, License};
 
 /// Exit code of a run whose documents were written but whose policy was violated.
 pub const VIOLATION_EXIT_CODE: i32 = 3;

@@ -5,8 +5,8 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use serde::Serialize;
 
 use super::{WriteContext, top_level_ids};
-use crate::license::{self, License};
 use crate::model::{Author, Package, PackageKind, Sbom, Supplier};
+use common::license::{self, License};
 
 const DOCUMENT_ID: &str = "SPDXRef-DOCUMENT";
 const ROOT_ID: &str = "SPDXRef-Package-root";

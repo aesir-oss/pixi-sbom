@@ -12,9 +12,9 @@ use comfy_table::Row as TableRow;
 use comfy_table::{Cell, ColumnConstraint, ContentArrangement, LineStyle, Table, TableStyle, Width};
 use serde::Serialize;
 
-use crate::license::{self, License};
 use crate::model::{Package, Sbom, Severity, Vulnerability};
-use crate::style::{Palette, Role};
+use common::license::{self, License};
+use common::style::{Palette, Role};
 
 /// Which report to print.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]

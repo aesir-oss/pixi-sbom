@@ -9,9 +9,10 @@
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use std::hint::black_box;
 
+use common::license;
+use common::style::Palette;
+use pixi_sbom::pkgcache;
 use pixi_sbom::report::{Report, ReportFormat, ReportKind};
-use pixi_sbom::style::Palette;
-use pixi_sbom::{license, pkgcache};
 
 mod support;
 

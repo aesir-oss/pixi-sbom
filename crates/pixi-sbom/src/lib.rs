@@ -73,8 +73,6 @@ pub mod jslock;
 #[doc(hidden)]
 pub mod kev;
 #[doc(hidden)]
-pub mod license;
-#[doc(hidden)]
 pub mod lock;
 #[doc(hidden)]
 pub mod manifest;
@@ -93,8 +91,6 @@ pub mod outdated;
 #[doc(hidden)]
 pub mod pdm;
 pub mod phantom;
-#[doc(hidden)]
-pub mod pipe;
 #[doc(hidden)]
 pub mod pkgcache;
 pub mod poetry;
@@ -120,8 +116,6 @@ pub mod scope;
 pub mod scorecard;
 #[doc(hidden)]
 pub mod stdlib;
-#[doc(hidden)]
-pub mod style;
 #[doc(hidden)]
 pub mod timings;
 pub mod unlocked;

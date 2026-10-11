@@ -4,11 +4,12 @@
 // See the note in lib.rs: the shipped binary contains no `unsafe`, held by the compiler.
 #![cfg_attr(not(test), forbid(unsafe_code))]
 
+use common::{license, pipe, style};
 use pixi_sbom::{
     auditable, batch, bundled, cache, cli, concurrency, condaarchive, condalock, config, cran, diff, discover, doctor,
-    embedded, epss, explain, explicit, filter, format, fromsbom, gobuild, http, imports, jslock, kev, license, lock,
-    manifest, mapping, merge, mirror, model, npm, osv, outdated, pdm, phantom, pipe, pkgcache, poetry, policy, prefix,
-    progress, pylock, pypi, report, requirements, scorecard, style, timings, uv, verify, vexin, vulnpolicy, wheel,
+    embedded, epss, explain, explicit, filter, format, fromsbom, gobuild, http, imports, jslock, kev, lock, manifest,
+    mapping, merge, mirror, model, npm, osv, outdated, pdm, phantom, pkgcache, poetry, policy, prefix, progress,
+    pylock, pypi, report, requirements, scorecard, timings, uv, verify, vexin, vulnpolicy, wheel,
 };
 
 /// The system allocator on macOS and Windows is slow under the many small allocations a

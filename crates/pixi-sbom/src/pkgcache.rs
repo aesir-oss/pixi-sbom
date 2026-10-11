@@ -90,7 +90,7 @@ fn collect_license_files(dir: &Path, prefix: &Path, texts: bool, out: &mut Vec<L
             tracing::debug!(path = %path.display(), size, "skipping oversized license file");
             continue;
         }
-        if !crate::license::keep_text(size as usize) {
+        if !common::license::keep_text(size as usize) {
             tracing::debug!(path = %path.display(), size, "the document is already holding its fill of license text");
             out.push(LicenseFile { name, text: None });
             continue;

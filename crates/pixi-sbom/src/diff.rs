@@ -126,10 +126,10 @@ fn entry_of(package: &crate::model::Package) -> Entry {
     let license = package
         .license
         .as_deref()
-        .map(crate::license::normalize)
+        .map(common::license::normalize)
         .map(|l| match l {
-            crate::license::License::Expression(e) => e,
-            crate::license::License::Text(t) => t,
+            common::license::License::Expression(e) => e,
+            common::license::License::Text(t) => t,
         });
     Entry {
         kind: kind_of(Some(&package.purl)),
