@@ -1,0 +1,16 @@
+{
+  "name": "web-frontend-example",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A web frontend locked by npm, yarn and pnpm, and a pixi workspace with it beside",
+  "license": "MIT",
+  "dependencies": {
+    "@babel/traverse": "7.22.5",
+    "axios": "0.21.1",
+    "lodash": "4.17.15",
+    "minimist": "1.2.5"
+  },
+  "devDependencies": {
+    "semver": "7.5.1"
+  }
+}

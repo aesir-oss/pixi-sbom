@@ -8573,6 +8573,87 @@ fn dependency_groups_and_extras_set_the_scope_in_every_format() {
     );
 }
 
+/// #36: a JavaScript project with no lockfile is read from its installed node_modules, whichever tool
+/// installed it, into the document its lockfile gives.
+#[test]
+fn an_installed_node_modules_without_a_lockfile_gives_the_lockfile_s_document() {
+    let work = tempfile::tempdir().unwrap();
+    let run = |dir: &Path, args: &[&str]| -> Value {
+        let output = pixi_sbom()
+            .current_dir(dir)
+            .env("PIXI_SBOM_CACHE_DIR", work.path().join("cache"))
+            .env("PIXI_SBOM_OFFLINE", "1")
+            .args(args)
+            .args(["--output", "-"])
+            .assert()
+            .success()
+            .get_output()
+            .stdout
+            .clone();
+        serde_json::from_slice(&output).unwrap()
+    };
+    let graph = |doc: &Value| -> Vec<String> {
+        let mut edges: Vec<String> = doc["dependencies"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|d| {
+                let mut on: Vec<&str> = d["dependsOn"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|v| v.as_str().unwrap())
+                    .collect();
+                on.sort();
+                format!("{} -> {}", d["ref"], on.join(","))
+            })
+            .collect();
+        edges.sort();
+        edges
+    };
+    let scopes = |doc: &Value| -> Vec<String> {
+        let mut out: Vec<String> = doc["components"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|c| format!("{} {}", c["purl"], c["scope"]))
+            .collect();
+        out.sort();
+        out
+    };
+    let locked = run(&repo_root().join("examples/projects/npm/19-web-frontend"), &[]);
+    let mut tools = vec!["npm", "yarn"];
+    // pnpm's store is links, which a Windows checkout does not make.
+    if cfg!(unix) {
+        tools.push("pnpm");
+    }
+    for tool in tools {
+        let dir = tests_dir().join("fixtures/node-modules").join(tool);
+        let doc = run(&dir, &[]);
+        assert_valid(&cyclonedx_validator(), &doc);
+        assert_eq!(doc["components"].as_array().unwrap().len(), 29, "{tool}");
+        assert_eq!(graph(&doc), graph(&locked), "{tool}: the lockfile's graph");
+        assert_eq!(scopes(&doc), scopes(&locked), "{tool}: the lockfile's scopes");
+        assert_valid(&spdx_validator(), &run(&dir, &["--format", "spdx"]));
+    }
+
+    // Beside a pixi workspace with no JavaScript lockfile, the installed tree joins its document.
+    let project = work.path().join("project");
+    copy_dir(&tests_dir().join("fixtures/conda-only"), &project);
+    copy_dir(&tests_dir().join("fixtures/node-modules/npm"), &project);
+    let joined = run(&project, &["-p", "linux-64"]);
+    let purls: Vec<&str> = joined["components"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|c| c["purl"].as_str())
+        .collect();
+    assert!(purls.contains(&"pkg:npm/lodash@4.17.15"), "{purls:?}");
+    assert!(purls.iter().any(|p| p.starts_with("pkg:conda/")));
+    let alone = run(&project, &["-p", "linux-64", "--skip-input", "javascript"]);
+    assert!(!alone.to_string().contains("pkg:npm/"));
+}
+
 /// #25: `--scan` on an unpacked container image finds every installed environment in it, each once, and
 /// leaves a project's own environments to its lockfile.
 #[test]

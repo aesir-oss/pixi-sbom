@@ -379,7 +379,7 @@ pub enum SkipInput {
     Pnpm,
     /// yarn.lock, from yarn 1 or yarn 2 and later.
     Yarn,
-    /// Every JavaScript lockfile: npm, pnpm and yarn.
+    /// Every JavaScript lockfile (npm, pnpm and yarn), and a project's installed node_modules.
     Javascript,
     /// Installed environments a `--scan` finds outside any project: a directory with conda-meta/,
     /// a venv (pyvenv.cfg), or a Python installation with packages in site-packages.
@@ -399,7 +399,9 @@ impl SkipInput {
             SkipInput::Npm => name == "package-lock.json",
             SkipInput::Pnpm => name == "pnpm-lock.yaml",
             SkipInput::Yarn => name == "yarn.lock",
-            SkipInput::Javascript => crate::jslock::LOCKFILE_NAMES.contains(&name),
+            SkipInput::Javascript => {
+                crate::jslock::LOCKFILE_NAMES.contains(&name) || name == crate::jsinstalled::DIR_NAME
+            }
             SkipInput::Installed => false,
         }
     }

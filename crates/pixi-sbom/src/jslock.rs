@@ -25,11 +25,12 @@ use crate::scope::{self, Scope};
 /// The JavaScript lockfiles, in the order one directory prefers them.
 pub const LOCKFILE_NAMES: [&str; 3] = ["package-lock.json", "pnpm-lock.yaml", "yarn.lock"];
 
-/// Whether a path names a JavaScript lockfile this module reads.
+/// Whether a path names a JavaScript lockfile this module reads, or a project's installed
+/// `node_modules`, which stands for one when there is none (#36).
 pub fn is_js_lock_name(path: &Path) -> bool {
     path.file_name()
         .and_then(|n| n.to_str())
-        .is_some_and(|n| LOCKFILE_NAMES.contains(&n))
+        .is_some_and(|n| LOCKFILE_NAMES.contains(&n) || n == crate::jsinstalled::DIR_NAME)
 }
 
 /// The JavaScript lockfile in `dir`, if there is one, in [`LOCKFILE_NAMES`] order.
@@ -131,10 +132,14 @@ pub struct Loaded {
     pub contents: String,
 }
 
-const MEMBER: &str = "workspace:";
+pub(crate) const MEMBER: &str = "workspace:";
 
-/// Read and parse the lockfile at `path`, with the `package.json` files beside it.
+/// Read and parse the lockfile at `path`, with the `package.json` files beside it; or, for a
+/// project's `node_modules`, the installed tree.
 pub fn load(path: &Path) -> Result<Loaded, JsLockError> {
+    if crate::jsinstalled::is_installed_tree(path) {
+        return crate::jsinstalled::read(path);
+    }
     let contents = std::fs::read_to_string(path).map_err(|source| JsLockError::Read {
         path: path.display().to_string(),
         source,
@@ -179,7 +184,7 @@ pub struct PackageJson {
 impl PackageJson {
     /// What it declares, by name, with the scope each is declared in. A name declared twice
     /// counts as its least scope: a runtime dependency also listed for development is required.
-    fn declared(&self) -> BTreeMap<String, (String, Scope)> {
+    pub(crate) fn declared(&self) -> BTreeMap<String, (String, Scope)> {
         let mut out = BTreeMap::new();
         for (map, scope) in [
             (&self.dev_dependencies, Scope::Development),
@@ -194,7 +199,7 @@ impl PackageJson {
         out
     }
 
-    fn license_text(&self) -> Option<String> {
+    pub(crate) fn license_text(&self) -> Option<String> {
         match &self.license {
             Some(serde_json::Value::String(s)) => Some(s.clone()),
             Some(serde_json::Value::Object(o)) => o.get("type").and_then(|t| t.as_str()).map(str::to_string),
@@ -203,7 +208,7 @@ impl PackageJson {
     }
 
     /// The `workspaces` globs, in either spelling (`["packages/*"]` or `{"packages": [...]}`).
-    fn workspace_globs(&self) -> Vec<String> {
+    pub(crate) fn workspace_globs(&self) -> Vec<String> {
         let list = match &self.workspaces {
             Some(serde_json::Value::Array(a)) => a.clone(),
             Some(serde_json::Value::Object(o)) => o
@@ -225,7 +230,7 @@ fn manifest(dir: &Path, relative: &str) -> Option<PackageJson> {
 
 /// The member directories a `workspaces` list names: literal paths, and `dir/*` globs expanded
 /// one level, the form npm, yarn and pnpm projects use.
-fn expand_workspaces(dir: &Path, globs: &[String]) -> Vec<String> {
+pub(crate) fn expand_workspaces(dir: &Path, globs: &[String]) -> Vec<String> {
     let mut out = BTreeSet::new();
     for glob in globs {
         let glob = glob.trim_end_matches('/').trim_start_matches("./");

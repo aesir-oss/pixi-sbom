@@ -434,7 +434,8 @@ by `;`, when a release is installed in more than one place), and the license, de
 `package.json` declares. A dependency points at the copy Node would load: the package's own `node_modules`, then each
 enclosing one outward. A `package.json` inside a package (`esm/`, `dist/`) is a file of that package, a `private`
 one is not a release, and a build-time lockfile is not installed code: none of them is listed. A project's own
-`node_modules`, outside the environment, is not read.
+`node_modules`, outside the environment, is read only when the project has no lockfile, as the project's packages
+rather than an environment's ([A project with no lockfile](cli.md#a-project-with-no-lockfile)).
 
 ### Documents derived from documents
 

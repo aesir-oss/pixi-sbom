@@ -51,6 +51,12 @@ fn lockfiles_in(dir: &Path) -> Vec<PathBuf> {
             found.extend(named);
         }
     }
+    // A JavaScript project with no lockfile is read from what it installed (#36).
+    if !found.iter().any(|p| crate::jslock::is_js_lock_name(p))
+        && let Some(tree) = crate::jsinstalled::in_dir(dir)
+    {
+        found.push(tree);
+    }
     found
 }
 
@@ -102,6 +108,13 @@ pub fn javascript_in(dir: &Path, lockfile: &Path, skip: &[SkipInput]) -> Option<
         .iter()
         .map(|name| dir.join(name))
         .find(|p| p.is_file() && !is_skipped(p, skip))
+        .or_else(|| {
+            // Only with no JavaScript lockfile at all: a skipped one is not replaced by the tree.
+            let any_lockfile = crate::jslock::LOCKFILE_NAMES
+                .iter()
+                .any(|name| dir.join(name).is_file());
+            crate::jsinstalled::in_dir(dir).filter(|tree| !any_lockfile && !is_skipped(tree, skip))
+        })
 }
 
 /// The names of the lockfiles in `dir` that `skip` leaves out, for a message.
@@ -805,6 +818,39 @@ mod tests {
                 format!("{kind} {path}")
             })
             .collect()
+    }
+
+    #[test]
+    fn an_installed_node_modules_stands_in_for_a_missing_javascript_lockfile() {
+        let dir = tempfile::tempdir().unwrap();
+        let tree = dir.path().join("node_modules");
+        tree_with(dir.path(), &["package.json"], &["node_modules"]);
+        // Alone, it is the project.
+        assert_eq!(lockfile_in(dir.path(), &[]), Some(tree.clone()));
+        assert_eq!(lockfile_in(dir.path(), &[SkipInput::Javascript]), None);
+        // Beside a pixi workspace, it joins it.
+        tree_with(dir.path(), &["pixi.lock"], &[]);
+        let pixi = dir.path().join("pixi.lock");
+        assert_eq!(lockfile_in(dir.path(), &[]), Some(pixi.clone()));
+        assert_eq!(javascript_in(dir.path(), &pixi, &[]), Some(tree.clone()));
+        assert_eq!(javascript_in(dir.path(), &pixi, &[SkipInput::Javascript]), None);
+        // A lockfile wins, and a skipped one is not replaced by the tree.
+        tree_with(dir.path(), &["package-lock.json"], &[]);
+        assert_eq!(
+            javascript_in(dir.path(), &pixi, &[]),
+            Some(dir.path().join("package-lock.json"))
+        );
+        assert_eq!(javascript_in(dir.path(), &pixi, &[SkipInput::Npm]), None);
+    }
+
+    /// Like [`tree`], with any file names.
+    fn tree_with(dir: &Path, files: &[&str], dirs: &[&str]) {
+        for file in files {
+            std::fs::write(dir.join(file), "{}").unwrap();
+        }
+        for relative in dirs {
+            std::fs::create_dir_all(dir.join(relative)).unwrap();
+        }
     }
 
     #[test]

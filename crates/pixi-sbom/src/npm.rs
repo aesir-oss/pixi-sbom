@@ -8,7 +8,8 @@
 //! (`node_modules/<name>` or `node_modules/@<scope>/<name>`); a `package.json` deeper inside a
 //! package (`esm/`, `dist/`) is a file of that package, not another one. Build-time lockfiles and
 //! test fixtures inside packages are not under `node_modules` and are never read: only installed
-//! code counts. A project's own `node_modules`, outside the environment, is #493's business.
+//! code counts. A project's own `node_modules`, outside the environment, is read by
+//! [`crate::jsinstalled`] when the project has no lockfile.
 
 use std::collections::{BTreeMap, HashMap};
 use std::path::Path;

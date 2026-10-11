@@ -32,6 +32,11 @@ lockfiles: a conda environment, a venv or a Python installation anywhere under t
 `.venv` are left to its lockfile, so a source tree lists nothing twice, and `--skip-input installed` turns it off.
 The image's operating system packages are still syft's.
 
+**A JavaScript project with no lockfile.** When a project has a `package.json` and an installed `node_modules` but
+no `package-lock.json`, `pnpm-lock.yaml` or `yarn.lock`, pixi-sbom now reads what is installed: every package, the
+dependency graph as Node resolves it and development scope from `devDependencies`, whether npm, yarn or pnpm installed
+it. It joins a pixi workspace's document like a lockfile would; a lockfile, when there is one, still wins.
+
 ## 1.12.0
 
 pixi-sbom has a new home, [aesir-oss/pixi-ext-contrib](https://github.com/aesir-oss/pixi-ext-contrib), a

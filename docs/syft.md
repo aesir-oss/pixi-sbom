@@ -86,9 +86,9 @@ pixi-sbom describes Python and conda projects and environments. syft catalogs mu
 - **Container images**, read from a registry or a tarball, layer by layer.
 - **Operating system packages**: dpkg, rpm, apk. `pixi sbom --scan` on an unpacked image finds its conda environments,
   venvs and Python installations ([how](cli.md#an-unpacked-container-image)); the OS packages beside them are syft's.
-- **Other ecosystems**: Java, Rust crates and Go modules outside a conda environment, a JavaScript project's
-  installed `node_modules`, and many more. pixi-sbom reads a JavaScript project's `package-lock.json`, `pnpm-lock.yaml`
-  or `yarn.lock`, and inside a conda environment `--prefix` lists its installed npm packages and
+- **Other ecosystems**: Java, Rust crates and Go modules outside a conda environment, and many more. pixi-sbom reads
+  a JavaScript project's `package-lock.json`, `pnpm-lock.yaml` or `yarn.lock`, or its installed `node_modules` when it
+  has none ([how](cli.md#a-project-with-no-lockfile)), and inside a conda environment `--prefix` lists its installed npm packages and
   `--prefix --embedded-sboms` reads a binary's Rust crates and Go modules, as syft does.
 - **Binary classification** of native code in general. pixi-sbom recognizes nine common libraries when a wheel or
   package bundles a copy ([which ones](output-format.md#bundled-native-libraries)), and finds the libwebp inside

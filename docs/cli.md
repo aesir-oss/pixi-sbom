@@ -673,7 +673,26 @@ otherwise.
 A JavaScript project found beside any other lockfile joins that lockfile's document (see
 [Which lockfile is found](#which-lockfile-is-found)): its packages are added (one already there is not added twice),
 and its direct dependencies and workspace members become direct dependencies of the root. `--skip-input javascript`
-leaves it out, and `--skip-input pixi` (or whichever the other lockfile is) describes the JavaScript project alone. A project's `node_modules` is not read, with or without a lockfile.
+leaves it out, and `--skip-input pixi` (or whichever the other lockfile is) describes the JavaScript project alone.
+
+### A project with no lockfile
+
+A JavaScript project with a `package.json` and an installed `node_modules` but none of the three lockfiles is read
+from what is installed, in the lockfile's place: found the same way, joining a pixi workspace's document the same way,
+and left out by `--skip-input javascript`. A lockfile, when there is one, is read alone and the installed tree is not
+compared with it; a lockfile `--skip-input` leaves out is not replaced by the tree.
+
+- **Packages.** Every installed package with a `package.json` naming a version is a `pkg:npm` component, whether
+  anything reaches it or not; npm's and yarn's nested and hoisted layouts and pnpm's `.pnpm` store are all read.
+  An installed tree has no tarball URLs or integrity hashes.
+- **Graph.** Each dependency, of the project and of every package, is the copy Node would load: `node_modules/<name>`
+  beside the code, then in each enclosing directory. pnpm's packages reach their dependencies through the links
+  beside them in the store. A link out of the project (`npm link`) is not followed; a link to one of the project's
+  own `workspaces` (or `pnpm-workspace.yaml` packages) is that member.
+- **Scopes.** As for a lockfile: what the project declares only in `devDependencies` is development, followed through
+  the graph.
+- The document records `node_modules (npm)`, `(yarn)`, `(pnpm)` or `(unknown tool)` as what it was read from, from
+  the marker files each tool leaves in the tree. Yarn Plug'n'Play installs no `node_modules` and is not read.
 
 ## Describing an installed environment
 
