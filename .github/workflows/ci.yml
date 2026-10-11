@@ -20,6 +20,11 @@ jobs:
         with:
           environments: default
           cache: true
+          activate-environment: true
+      # Compiled dependencies, restored from what main saved; a pull request never writes its own (#89).
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: pre-commit
         run: pixi run pre-commit-run
       - name: cargo fmt / clippy / check
@@ -43,6 +48,11 @@ jobs:
         with:
           environments: default
           cache: true
+          activate-environment: true
+      # Compiled dependencies, restored from what main saved; a pull request never writes its own (#89).
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Unit + integration tests
         run: pixi run test
 
@@ -55,6 +65,11 @@ jobs:
         with:
           environments: default
           cache: true
+          activate-environment: true
+      # Compiled dependencies, restored from what main saved; a pull request never writes its own (#89).
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: cargo llvm-cov (>= 90% lines)
         run: pixi run cov
 
@@ -84,6 +99,11 @@ jobs:
         with:
           environments: msrv
           cache: true
+          activate-environment: true
+      # Compiled dependencies, restored from what main saved; a pull request never writes its own (#89).
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: cargo check on the oldest supported toolchain
         run: pixi run -e msrv msrv-check
 
@@ -99,7 +119,12 @@ jobs:
         with:
           environments: default
           cache: true
-      - name: cargo bench --test
+          activate-environment: true
+      # Compiled dependencies, restored from what main saved; a pull request never writes its own (#89).
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Every benchmark runs once (debug, test mode)
         run: pixi run bench-test
       # Which release `@v0`, `@v0.12.0` or a branch installs; a wrong answer ships every user the wrong binary.
       - name: The action's version resolution
@@ -147,6 +172,11 @@ jobs:
         with:
           environments: default
           cache: true
+          activate-environment: true
+      # Compiled dependencies, restored from what main saved; a pull request never writes its own (#89).
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       # conda-forge's zsh is built without zsh/zpty, which driving its completion needs.
       - name: Install zsh
         if: runner.os == 'Linux'
@@ -167,6 +197,11 @@ jobs:
         with:
           environments: default
           cache: true
+          activate-environment: true
+      # Compiled dependencies, restored from what main saved; a pull request never writes its own (#89).
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Release build
         run: pixi run build
       - name: Smoke test
@@ -279,11 +314,17 @@ jobs:
         with:
           environments: default
           cache: true
-      - run: pixi run build
+          activate-environment: true
+      # Compiled dependencies, restored from what main saved; a pull request never writes its own (#89).
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      # A debug build: what the action is tested with here is its handling of a binary, not the binary's speed.
+      - run: pixi run cargo build
       - uses: actions/upload-artifact@v4
         with:
           name: action-head-binary
-          path: target/release/pixi-sbom
+          path: target/debug/pixi-sbom
 
   action-uv:
     name: Action on a uv project, without pixi

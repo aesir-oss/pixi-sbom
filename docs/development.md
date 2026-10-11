@@ -325,7 +325,7 @@ release containing them exists; keep `action.yml` inputs and the CLI in step at 
 | Coverage gate | ubuntu | `pixi run cov` |
 | Dependency advisories and licenses | ubuntu | `pixi run -e lint deny`: RUSTSEC advisories, license terms, banned crates and unexpected sources |
 | Builds on the MSRV | ubuntu | `pixi run -e msrv msrv-check`: the oldest toolchain `crates/pixi-sbom/Cargo.toml` claims |
-| Benchmarks compile and run | ubuntu | `pixi run bench-test`: every benchmark runs once, untimed |
+| Benchmarks compile and run | ubuntu | `pixi run bench-test`: every benchmark runs once, untimed, in a debug build |
 | Performance (separate workflow) | all five release platforms | `pixi run perf`: builds two refs on one runner and compares them; fails on binary size or peak memory, reports wall time. On demand, weekly and on pushes to `main` — not on pull requests. See [benchmarks.md](benchmarks.md) |
 | Build | same three | `pixi run build` and `--version` smoke test |
 | Docs | ubuntu | `pixi run docs-build`: the site must build with `--strict` |
@@ -351,7 +351,11 @@ The `github-pages` environment's deployment branch policy must allow the `v*` ta
 (Settings → Environments → github-pages), because a release event runs on the tag; without it the deploy job fails
 with "Branch ... is not allowed to deploy to github-pages".
 
-All jobs use `prefix-dev/setup-pixi` with caching, so they run the same pinned toolchain as local development. CI
+All jobs use `prefix-dev/setup-pixi` with caching, so they run the same pinned toolchain as local development. Every
+CI job that compiles also restores the compiled dependencies with `Swatinem/rust-cache` (#89), keyed by job,
+operating system, toolchain and `Cargo.lock`. Only pushes to `main` save it, so a pull request starts from `main`'s
+cache and never writes one of its own: the 10 GB a repository gets holds one set, not one per branch. The release
+workflows use no build cache on purpose: what goes into a signed archive or wheel is compiled from the tag alone. CI
 sticks to the `-latest` labels (x64 Linux and Windows, arm64 macOS) for the jobs that compile and test the code,
 which has no platform-specific paths. The two jobs that are *about* a platform rather than merely running on one —
 `sbom`, which tests the action's runner-to-archive mapping, and the separate performance workflow — use all five,

@@ -22,7 +22,8 @@ build = "cargo build --release"
 changelog-of = { cmd = "python scripts/changelog.py", description = "one extension's changelog, from the commits that touched it: changelog-of write|notes|paths <extension> [--tag <tag>]" }
 changelog-test = { cmd = "python -m unittest discover -s scripts -p 'test_changelog.py' -v", description = "the per-extension changelog's own tests" }
 # The full criterion run, which takes a few minutes; `bench-test` only checks that every
-# benchmark still runs, which is what CI needs and what the change harness can afford.
+# benchmark still runs, once each in criterion's test mode and in a debug build, which is what CI
+# needs and what the change harness can afford.
 # What the binary costs to run, measured the same way on every platform a release is built
 # for. `--compare` diffs two of its JSON outputs and is what the Performance workflow gates on.
 perf = "python scripts/perf.py"
@@ -44,7 +45,7 @@ repo-release = { cmd = "python scripts/repo_release.py", description = "plan the
 repo-release-test = { cmd = "python -m unittest discover -s scripts -p 'test_repo_release.py' -v", description = "the repository release planner's own tests" }
 action-test = { cmd = "python -m unittest discover -s scripts -p 'test_action_version.py' -v", description = "which binary the GitHub Action installs for a given ref" }
 bench = "cargo bench --benches"
-bench-test = "cargo bench --benches -- --test"
+bench-test = "cargo test --bench '*'"
 
 # The oldest toolchain the crate claims to build on. Its own environment, because it pins a
 # different rust than the one everything else uses; `pixi run -e msrv msrv-check` is what

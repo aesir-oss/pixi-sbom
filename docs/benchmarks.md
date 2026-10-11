@@ -1,8 +1,8 @@
 # Benchmarks
 
 `pixi run bench` runs the [criterion](https://bheisler.github.io/criterion.rs/book/) suite in `crates/pixi-sbom/benches/` and
-writes a report to `target/criterion/`. `pixi run bench-test` runs every benchmark once without timing it, which
-is what CI does: a shared runner's numbers say more about the runner than about the code, but a benchmark that no
+writes a report to `target/criterion/`. `pixi run bench-test` runs every benchmark once without timing it, in a debug build
+(criterion's test mode, `cargo test --bench '*'`), which is what CI does: a shared runner's numbers say more about the runner than about the code, but a benchmark that no
 longer compiles or panics on its inputs is a real break.
 
 ## What is measured, and against what
