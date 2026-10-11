@@ -16,7 +16,10 @@ pixi-sbom is a Rust pixi extension (`pixi-sbom` binary -> `pixi sbom`). Decision
 
 Since 2026-10-11 the crate is `crates/pixi-sbom` in the `aesir-oss/pixi-ext-contrib` Cargo workspace (one `Cargo.lock`,
 the release profile in the root `Cargo.toml`), and these decisions hold for it unchanged. Code shared with pixi-policy
-goes into a `pixi-ext-common` crate rather than into either tool.
+goes into the `aesir-pixi-ext-contrib-common` crate (`crates/aesir-pixi-ext-contrib-common`, used as `common`) rather than
+into either tool. It is published to crates.io as an internal crate, because the extensions are and crates.io refuses
+unpublished dependencies; it is named after the owner, not `pixi-`, so it is not taken for a prefix.dev crate (decided
+2026-10-11).
 
 **Why:** keeps the dependency tree small, gets current spec versions, and matches what downstream SBOM tools expect (one env/platform per document).
 **How to apply:** do not introduce `cyclonedx-bom`, `spdx-rs`, or pixi git deps without revisiting these notes.

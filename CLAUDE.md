@@ -19,8 +19,9 @@ A Cargo workspace of pixi extensions. Each is a `pixi-<name>` binary that pixi r
 | `scripts/` | Python maintenance and release tooling, each with a `test_*.py` |
 | `Cargo.toml` | The workspace manifest; the release profile lives here |
 
-Planned: `crates/pixi-policy` (dependency policy, takes over pixi-sbom's license gate) and `crates/pixi-ext-common`
-(code both share). Docs per extension are tracked in #6.
+Planned: `crates/pixi-policy` (dependency policy, takes over pixi-sbom's license gate) and
+`crates/aesir-pixi-ext-contrib-common` (code both share, published to crates.io as an internal crate; see
+`docs/development.md`). Docs per extension are tracked in #6.
 
 ## Commands
 

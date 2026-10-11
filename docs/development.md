@@ -600,6 +600,16 @@ paths it touches, and its issue's label.
 
 **A new extension** gets its changelog with no setup: its first `write` creates `crates/<extension>/CHANGELOG.md`.
 Give its release workflow `changelog-of write <extension> --tag <extension>-vX.Y.Z` and `changelog-of notes
-<extension>`, add a row to the root `CHANGELOG.md`, and claim any paths outside its crate in its `Cargo.toml`. A
-shared crate that is compiled into the extensions and never released itself is created with `publish = false` and
-needs no changelog or tags of its own.
+<extension>`, add a row to the root `CHANGELOG.md`, and claim any paths outside its crate in its `Cargo.toml`.
+
+**The shared crate**, `aesir-pixi-ext-contrib-common` in `crates/aesir-pixi-ext-contrib-common`, holds the code the
+extensions share. It is published to crates.io, because crates.io refuses a crate whose dependencies are not there,
+and the extensions are published there. It is published as an internal crate: its README and crate docs say it is
+not an API, carries no semver promise and is not affiliated with prefix.dev, which is why its name starts with the
+owner rather than `pixi-`. It has its own tags (`aesir-pixi-ext-contrib-common-vX.Y.Z`) and changelog, and a version of
+it is published before any extension release that needs it. Extensions depend on it under a short name:
+
+```toml
+[dependencies]
+common = { package = "aesir-pixi-ext-contrib-common", path = "../aesir-pixi-ext-contrib-common", version = "0.1" }
+```
