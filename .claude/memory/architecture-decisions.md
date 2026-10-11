@@ -21,5 +21,12 @@ into either tool. It is published to crates.io as an internal crate, because the
 unpublished dependencies; it is named after the owner, not `pixi-`, so it is not taken for a prefix.dev crate (decided
 2026-10-11).
 
+Release binaries (#93, decided 2026-10-11): every platform is compiled once, as its PyPI wheel (maturin,
+`bindings = "bin"`), and the release archive carries the binary from that wheel. Linux archives use the manylinux
+wheel's binary, built against glibc 2.17 so it runs on every glibc distribution from CentOS 7 / Amazon Linux 2 on,
+newer ones included; the runner-built archives needed glibc 2.28. The `archive` job checks the 2.17 floor. Do not
+go back to building the Linux archives with `pixi run build` on the runner without revisiting this: it raises the
+floor to conda-forge's sysroot and splits pip and archive users onto two binaries.
+
 **Why:** keeps the dependency tree small, gets current spec versions, and matches what downstream SBOM tools expect (one env/platform per document).
 **How to apply:** do not introduce `cyclonedx-bom`, `spdx-rs`, or pixi git deps without revisiting these notes.

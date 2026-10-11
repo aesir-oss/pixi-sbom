@@ -377,8 +377,8 @@ workflows use no build cache on purpose: what goes into a signed archive or whee
 sticks to the `-latest` labels (x64 Linux and Windows, arm64 macOS) for the jobs that compile and test the code,
 which has no platform-specific paths. The two jobs that are *about* a platform rather than merely running on one —
 `sbom`, which tests the action's runner-to-archive mapping, and the separate performance workflow — use all five,
-adding `ubuntu-24.04-arm` and `macos-15-intel` for linux-aarch64 and osx-64. The release build uses the same five,
-since it must produce a native binary for each.
+adding `ubuntu-24.04-arm` and `macos-15-intel` for linux-aarch64 and osx-64. The release builds every platform's
+binary once, as a wheel (step 5), cross-compiling osx-64 on the arm runner.
 
 ## The README recording
 
@@ -488,11 +488,23 @@ What the two do, in order:
 
    *`release-artifacts.yml` takes over here, triggered by the tag.*
 
-5. **Build.** Checks out the tag on five runners and builds `pixi-sbom` for linux-64, linux-aarch64, osx-64,
-   osx-arm64 and win-64, packaged with `LICENSE`, pixi-sbom's `README.md` and `CHANGELOG.md` and a `.sha256` each. Archives
-   keep their names, `pixi-sbom-vX.Y.Z-<platform>`, which is now also the tag.
+5. **Build, once per platform.** Every platform's binary is compiled once, as that platform's wheel (step 9), and
+   the archive for linux-64, linux-aarch64, osx-64, osx-arm64 and win-64 carries the binary from its wheel (#93),
+   packaged with `LICENSE`, pixi-sbom's `README.md` and `CHANGELOG.md` and a `.sha256` each. Archives keep their
+   names, `pixi-sbom-vX.Y.Z-<platform>`, which is also the tag.
+   - **Linux uses the manylinux wheel's binary** (decided 2026-10-11). It is built in maturin's manylinux2014
+     container against glibc 2.17, so the archive runs on every glibc distribution from CentOS 7 and Amazon Linux 2
+     on, newer ones included: glibc keeps every old symbol version. Archives built on the runner with conda-forge's
+     sysroot needed glibc 2.28 (measured on 1.13.0), so this widened who can run them, and pip and archive users
+     now get the same binary. The `archive` job fails a Linux binary that needs anything newer than 2.17. Alpine
+     and other musl systems are covered by the musllinux wheels, not by an archive.
+   - **osx-64 is cross-compiled on the arm runner** (`x86_64-apple-darwin`) and smoke-tested there under Rosetta
+     by running the binary itself as x86-64 (`arch -x86_64`); the Intel runner was the release's slowest job.
+   - **A dry run** (`gh workflow run release-artifacts.yml -f tag=<tag> -f dry-run=true`, with `--ref <branch>` to
+     try a branch's version of the workflow) builds the wheels and archives as artifacts of the run and stops:
+     nothing is attested, released or published.
 6. **Attest.** `actions/attest-build-provenance` signs a provenance statement for each archive: what built it, from
-   which commit, in which workflow run. It runs on the build runner, before the artifact upload, so the claim covers
+   which commit, in which workflow run. It runs in the archive's job, before the artifact upload, so the claim covers
    the round trip through artifact storage as well. The statement goes to the repository's attestation store, and
    the Sigstore bundle also ships beside the archive as `.sigstore.json` for anyone verifying offline.
 7. **Publish.** Creates the GitHub release with this version's changelog section (from `changelog-of notes pixi-sbom`) plus an

@@ -26,6 +26,11 @@ on:
         description: "Release tag to (re)build and publish (e.g. v1.2.0)"
         required: true
         type: string
+      dry-run:
+        description: "Build the wheels and archives only: no attestation, no release, nothing published"
+        required: false
+        type: boolean
+        default: false
 
 concurrency:
   group: release-artifacts-${{ inputs.tag || github.ref_name }}
@@ -60,12 +65,20 @@ jobs:
           fi
 
   # ---------------------------------------------------------------------------
-  # Native binaries for every pixi platform, built from the tagged commit.
+  # The release archives, one per pixi platform, each holding the binary from that platform's wheel
+  # (#93). Every platform is compiled once, in `wheels`, and the archive and the wheel carry the same
+  # binary. Linux uses the manylinux wheel's: built against glibc 2.17, it runs on every glibc
+  # distribution from CentOS 7 and Amazon Linux 2 on, newer ones included, where a binary built on
+  # the runner with conda-forge's sysroot needed 2.28 (decided 2026-10-11, measured on 1.13.0).
+  # The wheel jobs smoke-test each binary on its own platform, so packaging runs on one OS.
   # ---------------------------------------------------------------------------
-  build:
-    name: Build (${{ matrix.target }})
-    needs: tag
-    runs-on: ${{ matrix.os }}
+  archive:
+    name: Archive (${{ matrix.target }})
+    needs: [tag, wheels]
+    # Each archive needs only its own wheel: a musl wheel that fails holds back none of them, and an
+    # archive whose wheel is missing fails at its download.
+    if: ${{ !cancelled() && needs.tag.result == 'success' }}
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       # Signing the provenance: id-token mints the OIDC token that identifies this workflow run
@@ -76,30 +89,45 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { os: ubuntu-latest, target: linux-64, ext: "", arc: "tar.gz" }
-          - { os: ubuntu-24.04-arm, target: linux-aarch64, ext: "", arc: "tar.gz" }
-          - { os: macos-15-intel, target: osx-64, ext: "", arc: "tar.gz" }
-          - { os: macos-latest, target: osx-arm64, ext: "", arc: "tar.gz" }
-          - { os: windows-latest, target: win-64, ext: ".exe", arc: "zip" }
+          - { target: linux-64, wheel: manylinux-x86_64, ext: "", arc: "tar.gz" }
+          - { target: linux-aarch64, wheel: manylinux-aarch64, ext: "", arc: "tar.gz" }
+          - { target: osx-64, wheel: macos-x86_64, ext: "", arc: "tar.gz" }
+          - { target: osx-arm64, wheel: macos-arm64, ext: "", arc: "tar.gz" }
+          - { target: win-64, wheel: windows-x86_64, ext: ".exe", arc: "zip" }
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ needs.tag.outputs.tag }}
-      - uses: prefix-dev/setup-pixi@v0.8.1
+      - uses: actions/download-artifact@v4
         with:
-          environments: default
-          cache: true
-      - name: Release build
-        run: pixi run build
-      - name: Smoke test
-        run: pixi run cargo run --release -- --version
+          name: wheel-${{ matrix.wheel }}
+          path: wheel
+      - name: Take the binary out of the wheel
+        shell: bash
+        run: |
+          set -euo pipefail
+          unzip -q wheel/*.whl -d wheel/unpacked
+          binary=$(find wheel/unpacked -path "*.data/scripts/pixi-sbom${{ matrix.ext }}" -type f)
+          test -n "$binary"
+          mkdir -p bin && cp "$binary" "bin/pixi-sbom${{ matrix.ext }}" && chmod +x "bin/pixi-sbom${{ matrix.ext }}"
+      # The floor the manylinux tag promises, checked on the binary that ships in the archive.
+      - name: The Linux binary needs nothing newer than glibc 2.17
+        if: startsWith(matrix.target, 'linux')
+        shell: bash
+        run: |
+          set -euo pipefail
+          needs=$(strings bin/pixi-sbom | grep -oE 'GLIBC_[0-9]+\.[0-9]+(\.[0-9]+)?' | sed 's/GLIBC_//' | sort -V | tail -n 1)
+          echo "needs glibc ${needs}"
+          if [ "$(printf '%s\n2.17\n' "$needs" | sort -V | tail -n 1)" != "2.17" ]; then
+            echo "::error::the ${{ matrix.target }} binary needs glibc ${needs}, newer than the 2.17 the archive promises"
+            exit 1
+          fi
       # Tracked release to release: a dependency that doubles the download should be visible
       # in the run that shipped it, not discovered by someone downloading it.
       - name: Record the binary size
         shell: bash
         run: |
-          binary="target/release/pixi-sbom${{ matrix.ext }}"
-          bytes=$(wc -c < "$binary" | tr -d ' ')
+          bytes=$(wc -c < "bin/pixi-sbom${{ matrix.ext }}" | tr -d ' ')
           {
             echo "### Binary size"
             echo
@@ -115,20 +143,19 @@ jobs:
           set -euo pipefail
           name="${TAG}-${{ matrix.target }}"
           mkdir -p dist/"$name"
-          cp "target/release/pixi-sbom${{ matrix.ext }}" LICENSE crates/pixi-sbom/README.md crates/pixi-sbom/CHANGELOG.md dist/"$name"/
+          cp "bin/pixi-sbom${{ matrix.ext }}" LICENSE crates/pixi-sbom/README.md crates/pixi-sbom/CHANGELOG.md dist/"$name"/
           cd dist
-          if [[ "${{ matrix.target }}" == win-64 ]]; then
-            7z a "$name.zip" "$name" > /dev/null
-            sha256sum "$name.zip" > "$name.zip.sha256"
+          if [[ "${{ matrix.arc }}" == zip ]]; then
+            zip -qr "$name.zip" "$name"
           else
             tar czf "$name.tar.gz" "$name"
-            shasum -a 256 "$name.tar.gz" > "$name.tar.gz.sha256"
           fi
+          sha256sum "$name.${{ matrix.arc }}" > "$name.${{ matrix.arc }}.sha256"
           rm -rf "$name"
 
       # A .sha256 says the file did not change on the way down. It says nothing about where the
       # file came from — anyone can publish a file and a checksum of it. This signs a statement
-      # that this archive was built by this workflow, from this tag's commit, on this runner.
+      # that this archive was built by this workflow, from this tag's commit.
       #
       # Signed here rather than in `publish` so the claim covers the artifact round trip too: a
       # digest computed after the upload could not tell you the upload was honest. And signed in
@@ -136,6 +163,7 @@ jobs:
       # the top of this file.
       - name: Attest the archive's provenance
         id: attest
+        if: ${{ !inputs.dry-run }}
         uses: actions/attest-build-provenance@v2
         with:
           subject-path: dist/${{ needs.tag.outputs.tag }}-${{ matrix.target }}.${{ matrix.arc }}
@@ -144,6 +172,7 @@ jobs:
       # ships beside the archive, because the machine that most needs to check a binary is often
       # the one that cannot reach api.github.com: `--bundle <file>` verifies offline.
       - name: Ship the attestation beside the archive
+        if: ${{ !inputs.dry-run }}
         shell: bash
         env:
           BUNDLE: ${{ steps.attest.outputs.bundle-path }}
@@ -162,7 +191,9 @@ jobs:
   # ---------------------------------------------------------------------------
   publish:
     name: Publish ${{ needs.tag.outputs.tag }}
-    needs: [tag, build]
+    needs: [tag, archive]
+    # A dry run stops at the archives; everything that publishes needs this job, so it stops too.
+    if: ${{ !inputs.dry-run }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -183,9 +214,8 @@ jobs:
         with:
           environments: default
           cache: true
-      # Only the archives: the wheel jobs run beside `build`, and an unnamed download takes whatever
-      # artifacts exist at that moment, so the release got a different set of wheels each time.
-      # `attach-wheels` adds them once they all exist.
+      # Only the archives, by name: an unnamed download takes every artifact, wheels included, and
+      # `attach-wheels` adds those itself.
       - uses: actions/download-artifact@v4
         with:
           pattern: pixi-sbom-*
@@ -281,9 +311,9 @@ jobs:
       tag: ${{ needs.tag.outputs.tag }}
 
   # ---------------------------------------------------------------------------
-  # The same binary as platform wheels for PyPI (maturin, `bindings = "bin"`), so `uvx pixi-sbom`
-  # and `pip install pixi-sbom` work for projects that do not use pixi. Built from the tagged
-  # commit with the toolchain the archives use, and attested like them.
+  # Every platform's one compile: the binary as a platform wheel for PyPI (maturin, `bindings = "bin"`),
+  # so `uvx pixi-sbom` and `pip install pixi-sbom` work for projects that do not use pixi, and from the
+  # same wheel the archive (`archive`). Built from the tagged commit with the Rust pixi.toml pins.
   # ---------------------------------------------------------------------------
   wheels:
     name: Wheel (${{ matrix.platform }})
@@ -301,7 +331,9 @@ jobs:
           - { os: ubuntu-24.04-arm, platform: manylinux-aarch64, target: aarch64-unknown-linux-gnu, manylinux: auto, run: true }
           - { os: ubuntu-latest, platform: musllinux-x86_64, target: x86_64-unknown-linux-musl, manylinux: musllinux_1_2, run: false }
           - { os: ubuntu-24.04-arm, platform: musllinux-aarch64, target: aarch64-unknown-linux-musl, manylinux: musllinux_1_2, run: false }
-          - { os: macos-15-intel, platform: macos-x86_64, target: x86_64-apple-darwin, manylinux: "off", run: true }
+          # Cross-compiled on the arm runner (the Intel runner was the release's slowest job, #93), and
+          # smoke-tested there by running the binary itself under Rosetta.
+          - { os: macos-latest, platform: macos-x86_64, target: x86_64-apple-darwin, manylinux: "off", run: false, rosetta: true }
           - { os: macos-latest, platform: macos-arm64, target: aarch64-apple-darwin, manylinux: "off", run: true }
           - { os: windows-latest, platform: windows-x86_64, target: x86_64-pc-windows-msvc, manylinux: "off", run: true }
     steps:
@@ -318,6 +350,19 @@ jobs:
           manylinux: ${{ matrix.manylinux }}
           args: --release --locked --out dist --manifest-path crates/pixi-sbom/Cargo.toml
       # A musllinux wheel cannot run on the glibc runner; the others are installed and run.
+      # pip's own platform matching is not what is under test, and an x86-64 Python under Rosetta found no
+      # wheel it would install: the binary is checked to be x86-64 and run directly instead.
+      - name: Smoke test (x86-64 under Rosetta)
+        if: matrix.rosetta
+        shell: bash
+        run: |
+          set -euo pipefail
+          /usr/bin/pgrep -q oahd || softwareupdate --install-rosetta --agree-to-license
+          unzip -q dist/*.whl -d smoke
+          binary=$(find smoke -path '*.data/scripts/pixi-sbom' -type f)
+          test "$(lipo -archs "$binary")" = x86_64
+          chmod +x "$binary"
+          arch -x86_64 "$binary" --version
       - uses: actions/setup-python@v5
         if: matrix.run
         with:
@@ -332,6 +377,7 @@ jobs:
           "$bin/python" -m pip install --no-index --find-links dist pixi-sbom
           "$bin/pixi-sbom" --version
       - name: Attest the wheel's provenance
+        if: ${{ !inputs.dry-run }}
         uses: actions/attest-build-provenance@v2
         with:
           subject-path: dist/*.whl
@@ -341,7 +387,7 @@ jobs:
           path: dist/*.whl
 
   # The wheels as release assets too, once the release and every wheel exist. A job of its own so a
-  # wheel that fails to build holds back neither the archives nor the release; the wheels' own
+  # musl wheel that fails to build holds back neither the archives nor the release; the wheels' own
   # provenance was attested where they were built.
   attach-wheels:
     name: Attach the wheels to the release
