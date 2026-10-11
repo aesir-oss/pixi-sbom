@@ -5,6 +5,11 @@ metadata:
   type: project
 ---
 
+**Reading this after the move (2026-10-11):** everything below was written in `millsks/pixi-sbom`. Issue and PR
+numbers in it are that repository's (the 25 issues still open were copied here, see `.github/moved-issues.md`), and
+`src/`, `tests/`, `benches/`, `data/` now live under `crates/pixi-sbom/`. Tags up to `v1.11.0` are plain `vX.Y.Z`; from
+1.12.0 they are `pixi-sbom-vX.Y.Z`.
+
 Review of v0.1.0 on 2026-09-19 (tests green, CycloneDX 1.6 + SPDX 2.3 schema-valid, binaries for 5 platforms).
 
 Key evidence: a real 120-package conda-only Python env (`~/openteams`) yields 0 `pkg:pypi` purls, yet 69/120 (58%)
@@ -309,3 +314,11 @@ rc.1 private-network checklist values came back. The perf allowance against v1.6
 release. Follow-ups offered, not filed: read a fully pinned requirements.txt directly; point unlocked inputs
 (requirements.txt with ranges, a lone pyproject.toml or environment.yml) to the command that locks them; scorecard
 repositories from PyPI project_urls for poetry.lock / pdm.lock.
+
+2026-10-11: moved to `aesir-oss/pixi-ext-contrib`, a Cargo workspace for pixi extensions (pixi-sbom first, pixi-policy
+next). The move shipped as its own release, 1.12.0, with no behaviour change but the tool URL in SBOMs, cut before any
+feature work so a release candidate could only find migration problems; rc.1's archives failed to sign (an archive
+name still prefixed `pixi-sbom-` to the new tag), fixed in #33. The action is published from `aesir-oss/pixi-sbom-action`,
+the hooks from `aesir-oss/pixi-sbom-pre-commit`, both synced on release. The 1.12.0 and 1.13.0 milestones keep their
+features (#23, #24, #29, #30; #25, #31) for after the move is validated. pixi-policy will take over the license gate:
+deprecate `--deny-license` in 1.13, remove it in 2.0.
