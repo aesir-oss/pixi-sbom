@@ -252,6 +252,8 @@ jobs:
           body_path: RELEASE_NOTES.md
           draft: false
           prerelease: ${{ needs.tag.outputs.prerelease }}
+          # A monorepo: no component's release is ever the repository's "Latest".
+          make_latest: false
           files: dist/*
           token: ${{ steps.app-token.outputs.token }}
 

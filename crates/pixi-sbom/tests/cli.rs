@@ -9588,6 +9588,18 @@ fn the_whole_examples_tree_scans_clean() {
     );
 }
 
+/// A monorepo: no component's release is ever the repository's "Latest", final or candidate.
+#[test]
+fn no_release_is_marked_latest() {
+    let workflow = std::fs::read_to_string(repo_root().join(".github/workflows/release-artifacts.yml")).unwrap();
+    assert_eq!(
+        workflow.matches("uses: softprops/action-gh-release").count(),
+        workflow.matches("make_latest: false").count(),
+        "every release step sets make_latest: false"
+    );
+    assert!(workflow.contains("make_latest: false"));
+}
+
 /// The release archives are named after the tag (`pixi-sbom-vX.Y.Z-<platform>`), and every step that
 /// names an archive spells it the same way. 1.12.0-rc.1's build failed at the attestation because one
 /// step still prefixed `pixi-sbom-` to a tag that already carries it.
