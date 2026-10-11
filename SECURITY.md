@@ -37,7 +37,7 @@ about; when one does, what happens to 1.x will be stated here with a date, befor
 asked for.
 
 Practically: stay on the latest release. `pixi global update pixi-sbom` follows the conda-forge feedstock, and
-`uses: millsks/pixi-sbom@v1` follows the newest 1.x.y release on its own.
+`uses: aesir-oss/pixi-sbom-action@v1` follows the newest 1.x.y release on its own.
 
 ## Scope
 

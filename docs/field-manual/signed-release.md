@@ -14,7 +14,7 @@ permissions:
   attestations: write
 steps:
   - uses: actions/checkout@v4
-  - uses: millsks/pixi-sbom@v1
+  - uses: aesir-oss/pixi-sbom-action@v1
     with:
       platform: linux-64
       pypi-mapping: prefix

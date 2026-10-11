@@ -1,4 +1,4 @@
-"""Tests for scripts/action-version.sh, which picks the binary the GitHub Action installs.
+"""Tests for actions/pixi-sbom/action-version.sh, which picks the binary the GitHub Action installs.
 
 Run with `pixi run action-test`. The GitHub API is replaced by fixture files served over `file://`, so what a
 floating `@v0` resolves to is checked without a network or a real tag.
@@ -13,7 +13,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-SCRIPT = Path(__file__).with_name("action-version.sh")
+SCRIPT = Path(__file__).resolve().parent.parent / "actions" / "pixi-sbom" / "action-version.sh"
 
 RELEASES = [
     {"tag_name": "v1.0.0-rc.1"},

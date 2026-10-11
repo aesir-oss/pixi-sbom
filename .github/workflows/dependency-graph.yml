@@ -11,7 +11,7 @@ on:
     paths:
       - pixi.toml
       - pixi.lock
-      - action.yml
+      - actions/pixi-sbom/**
       - .github/workflows/dependency-graph.yml
   workflow_dispatch:
 
@@ -30,7 +30,7 @@ jobs:
       - uses: actions/checkout@v4
       # One snapshot per environment, each under its own correlator. The action installs the newest
       # release; the CycloneDX documents it also writes are not kept.
-      - uses: ./
+      - uses: ./actions/pixi-sbom
         with:
           all-environments: "true"
           platform: linux-64

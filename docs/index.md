@@ -48,7 +48,7 @@ pixi sbom --fetch-licenses --deny-license GPL-3.0-only --require-license   # a l
 
 -   **[GitHub Action](github-action.md)**
 
-    `uses: millsks/pixi-sbom@v1`: inputs, outputs, the policy gate, a worked example.
+    `uses: aesir-oss/pixi-sbom-action@v1`: inputs, outputs, the policy gate, a worked example.
 
 -   **[CI recipes](ci-recipes.md)**
 

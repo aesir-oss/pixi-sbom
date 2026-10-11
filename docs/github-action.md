@@ -1,15 +1,16 @@
 # GitHub Action
 
-Listed on the [GitHub Marketplace](https://github.com/marketplace/actions/pixi-sbom); the source is `action.yml` at
-the root of the [repository](https://github.com/aesir-oss/pixi-ext-contrib).
+Published as [aesir-oss/pixi-sbom-action](https://github.com/aesir-oss/pixi-sbom-action), from
+[`actions/pixi-sbom`](https://github.com/aesir-oss/pixi-ext-contrib/tree/main/actions/pixi-sbom) in this repository.
+`uses: millsks/pixi-sbom@v1`, the action's original home, keeps working.
 
-This repository doubles as a GitHub Action. It downloads the pinned release binary for the runner (verifying the
+The action downloads the pinned release binary for the runner (verifying the
 checksum), runs it, and uploads the documents as a workflow artifact; pixi itself is not needed, and neither is
 `pixi install`, since the lockfile is the only input:
 
 ```yaml
 - uses: actions/checkout@v4
-- uses: millsks/pixi-sbom@v1
+- uses: aesir-oss/pixi-sbom-action@v1
   with:
     all-environments: "true"
     fetch-licenses: "true"
@@ -24,7 +25,7 @@ checksum), runs it, and uploads the documents as a workflow artifact; pixi itsel
 
 `@v1` follows the newest 1.x.y release: each release moves the tag once its binaries are published, and the action
 installs the binary of the release the tag points at. For a build that never changes underneath you, pin an exact
-release (`@v1.0.0`) or a commit sha and let Dependabot bump it.
+release (`@v1.12.0`) or a commit sha and let Dependabot bump it.
 
 ### Without pixi: uv, Poetry, PDM, pylock and venvs
 
@@ -34,14 +35,14 @@ Nothing about the action needs pixi, so a project that does not use it needs not
 ```yaml
 - uses: actions/checkout@v4
 # A uv project: the lockfile is found by the upward search, or named.
-- uses: millsks/pixi-sbom@v1
+- uses: aesir-oss/pixi-sbom-action@v1
   with:
     lockfile: uv.lock
     fetch-licenses: "true"
     vulnerabilities: osv
 # What is actually installed: the venv this job built, checked against the lock.
 - run: uv sync --frozen
-- uses: millsks/pixi-sbom@v1
+- uses: aesir-oss/pixi-sbom-action@v1
   with:
     prefix: .venv
     output: sbom-installed
@@ -96,7 +97,7 @@ warning like the others), and `--min-quality` fails the step with exit code 10. 
 contain spaces, because the value is split on whitespace.
 
 ```yaml
-- uses: millsks/pixi-sbom@v1
+- uses: aesir-oss/pixi-sbom-action@v1
   with:
     from-sbom: vendor/sbom.cdx.json
     vulnerabilities: osv
@@ -143,7 +144,7 @@ permissions:
   security-events: write
 steps:
   - uses: actions/checkout@v4
-  - uses: millsks/pixi-sbom@v1
+  - uses: aesir-oss/pixi-sbom-action@v1
     with:
       pypi-mapping: prefix
       vulnerabilities: osv
@@ -174,7 +175,7 @@ permissions:
   contents: write
 steps:
   - uses: actions/checkout@v4
-  - uses: millsks/pixi-sbom@v1
+  - uses: aesir-oss/pixi-sbom-action@v1
     with:
       pypi-mapping: prefix
       dependency-submission: "true"
@@ -205,7 +206,7 @@ permissions:
   attestations: write
 steps:
   - uses: actions/checkout@v4
-  - uses: millsks/pixi-sbom@v1
+  - uses: aesir-oss/pixi-sbom-action@v1
     with:
       attest: "true"
 ```
@@ -227,7 +228,7 @@ list that is known to trip (`Python-2.0`) proves the `policy-violated` output wi
 second step with a satisfiable policy proves exit 0:
 
 ```yaml
-- uses: millsks/pixi-sbom@v1
+- uses: aesir-oss/pixi-sbom-action@v1
   id: sbom
   with:
     all-environments: "true"

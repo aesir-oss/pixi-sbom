@@ -305,7 +305,7 @@ It downloads the release binary, generates the documents and uploads them as an 
 
 ```yaml
 - uses: actions/checkout@v4
-- uses: millsks/pixi-sbom@v1
+- uses: aesir-oss/pixi-sbom-action@v1
   with:
     all-environments: "true"
     fetch-licenses: "true"

@@ -277,7 +277,8 @@ thirty seconds without an API key); `pixi run cpe-upkeep-test` tests them.
 
 ## The GitHub Action
 
-`action.yml` at the repository root is a composite action: it resolves the version (the action's own tag, an
+`actions/pixi-sbom/action.yml` is a composite action, published on each release to
+[aesir-oss/pixi-sbom-action](https://github.com/aesir-oss/pixi-sbom-action) (see the release steps): it resolves the version (the action's own tag, an
 explicit `version` input, or the latest release), downloads the matching release archive and its `.sha256`,
 verifies it, puts the binary on `PATH`, maps the inputs to CLI flags and runs it, then uploads the output with
 `actions/upload-artifact`. The `sbom` job in `ci.yml` dogfoods it on **all five release platforms** with the
@@ -436,11 +437,13 @@ What the two do, in order:
    the Sigstore bundle also ships beside the archive as `.sigstore.json` for anyone verifying offline.
 7. **Publish.** Creates the GitHub release with this version's changelog section (from `git-cliff --latest`) plus an
    artifact table as the notes and the packages as assets, marked pre-release when the tag carries a suffix.
-   A final release then moves the floating major tag (`pixi-sbom-v1`) to itself; a rebuild of an older release
-   leaves it alone. `release-artifacts.yml` only triggers on `pixi-sbom-vX.Y.Z` tags and the version lookups match
-   full versions only, so the floating tag starts nothing and is never taken for the latest release. The action
-   reads releases from both this repository and `millsks/pixi-sbom` (1.11.x and older, tagged `vX.Y.Z`), and
-   downloads each version from the repository that published it.
+   `release-artifacts.yml` only triggers on `pixi-sbom-vX.Y.Z` tags. The action reads releases from both this
+   repository and `millsks/pixi-sbom` (1.11.x and older, tagged `vX.Y.Z`), and downloads each version from the
+   repository that published it.
+   Once the release exists, the `action-repo` job copies `actions/pixi-sbom/` (with `LICENSE`) into
+   [aesir-oss/pixi-sbom-action](https://github.com/aesir-oss/pixi-sbom-action), tags it `vX.Y.Z` and, for the newest
+   final release of its major, moves the floating `vX` tag that `uses: aesir-oss/pixi-sbom-action@v1` follows; a
+   rebuild of an older release leaves it alone. The release GitHub App must be installed on that repository.
 8. **Crate.** `publish-crate.yml` (reusable, also dispatchable by hand with a `tag` input to republish) checks the
    tag out clean and runs `cargo publish -p pixi-sbom --locked` with a short-lived token from crates.io trusted
    publishing (`rust-lang/crates-io-auth-action`); no API token is stored. The crate's crates.io settings list
@@ -514,8 +517,10 @@ and our copy still said plain `cargo install`. A second recipe that is authorita
 
 Publishing a release also deploys the documentation site (see [Continuous integration](#continuous-integration)).
 
-It also updates the action's [Marketplace listing](https://github.com/marketplace/actions/pixi-sbom), which was
-published by hand from the v1.0.0 release page and is updated by every release after it. Listing it was a one-time
+The action's original [Marketplace listing](https://github.com/marketplace/actions/pixi-sbom) belongs to
+`millsks/pixi-sbom`, published by hand from its v1.0.0 release page. A listing for `aesir-oss/pixi-sbom-action` is
+published the same way from a release page of that repository, and its `name` must differ from the original
+listing's while both exist. Listing it was a one-time
 manual step with no API behind it: it needs the Marketplace Developer Agreement accepted, and that is tied to a
 person rather than a token. Should it ever need doing again — on a release page, *Edit* → tick *Publish this Action
 to the GitHub Marketplace* → accept the agreement → category *Security* → *Update release*.

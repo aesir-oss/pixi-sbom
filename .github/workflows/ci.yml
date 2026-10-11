@@ -185,7 +185,7 @@ jobs:
       fail-fast: false
       # All five release platforms, not the three `-latest` labels the other jobs use, because
       # what this job exercises is the action's own `RUNNER_OS-RUNNER_ARCH` mapping to a release
-      # archive (action.yml). Two of those five branches used to never run, so a wrong platform
+      # archive (actions/pixi-sbom/action.yml). Two of those five branches used to never run, so a wrong platform
       # string or archive extension in them would have been found by a user rather than here
       # (#225). The job downloads a prebuilt binary rather than compiling, so five legs cost
       # well under a minute each.
@@ -200,7 +200,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Generate SBOMs for every environment
         id: sbom
-        uses: ./
+        uses: ./actions/pixi-sbom
         with:
           all-environments: "true"
           fetch-licenses: "true"
@@ -244,7 +244,7 @@ jobs:
           echo "attested: ${{ steps.sbom.outputs.attestation-url }}"
           gh attestation verify sboms/sbom-default.cdx.json --repo "$GITHUB_REPOSITORY"
       - name: A satisfied policy exits 0
-        uses: ./
+        uses: ./actions/pixi-sbom
         with:
           environment: default
           platform: linux-64
@@ -290,7 +290,7 @@ jobs:
 
       - name: SBOM of a uv.lock
         id: uv
-        uses: ./
+        uses: ./actions/pixi-sbom
         with:
           version: 0.0.0-head
           lockfile: examples/projects/uv/01-django/uv.lock
@@ -313,7 +313,7 @@ jobs:
           venv/bin/pip install --quiet requests==2.32.3
       - name: SBOM of the venv
         id: venv
-        uses: ./
+        uses: ./actions/pixi-sbom
         with:
           version: 0.0.0-head
           prefix: venv
@@ -334,7 +334,7 @@ jobs:
       - name: Two sources at once are refused
         id: both
         continue-on-error: true
-        uses: ./
+        uses: ./actions/pixi-sbom
         with:
           version: 0.0.0-head
           lockfile: examples/projects/uv/01-django/uv.lock

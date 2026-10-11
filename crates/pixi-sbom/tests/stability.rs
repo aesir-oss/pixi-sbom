@@ -152,7 +152,7 @@ fn every_alias_the_page_promises_is_actually_accepted() {
 
 #[test]
 fn the_page_lists_every_action_input_and_output() {
-    let action = read("action.yml");
+    let action = read("actions/pixi-sbom/action.yml");
     // `inputs:` and `outputs:` are top-level, and their keys are indented two spaces.
     let keys = |block: &str| -> BTreeSet<String> {
         let start = match action.find(block) {

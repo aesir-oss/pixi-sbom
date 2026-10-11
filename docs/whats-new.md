@@ -35,7 +35,8 @@ workspace for pixi extensions it now shares with the tools to come. Nothing abou
 - **The docs** live at [aesir-oss.github.io/pixi-ext-contrib](https://aesir-oss.github.io/pixi-ext-contrib/).
 - **pre-commit**: point `repo:` at `https://github.com/aesir-oss/pixi-sbom-pre-commit`. The old mirror
   keeps its existing tags.
-- **The GitHub Action**: `uses: millsks/pixi-sbom@v1` keeps working, and installs releases from either repository.
+- **The GitHub Action** moves to its own repository: `uses: aesir-oss/pixi-sbom-action@v1`. It installs releases
+  from either repository, and `uses: millsks/pixi-sbom@v1` keeps working.
 
 ## 1.11.0
 
