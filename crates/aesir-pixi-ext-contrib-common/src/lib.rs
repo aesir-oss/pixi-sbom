@@ -9,5 +9,6 @@
 #![cfg_attr(not(test), forbid(unsafe_code))]
 
 pub mod license;
+pub mod license_policy;
 pub mod pipe;
 pub mod style;
