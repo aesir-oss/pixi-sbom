@@ -14,8 +14,8 @@ pip install pixi-sbom                 # or into any Python environment
 ```
 
 The PyPI wheels hold the same binary as the release archives (there is no Python code, so any Python works), for
-Linux (glibc and musl) x86_64 and aarch64, macOS x86_64 and arm64, and Windows x86_64, from 1.7.0 on. `cargo
-binstall pixi-sbom`, the release archives and conda-forge are the other ways; see [Installation](installation.md).
+Linux (glibc and musl) x86_64 and aarch64, macOS x86_64 and arm64, and Windows x86_64, from 1.7.0 on. The release
+archives and conda-forge are the other ways; see [Installation](installation.md).
 Installed this way, the command is `pixi-sbom` rather than `pixi sbom`.
 
 ## Getting a lockfile

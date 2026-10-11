@@ -14,9 +14,9 @@ documentation = "https://aesir-oss.github.io/pixi-ext-contrib/"
 readme = "README.md"
 keywords = ["pixi", "sbom", "cyclonedx", "spdx", "conda"]
 categories = ["command-line-utilities", "development-tools"]
-# The crate is the binary and what it needs to build; the fixtures and the pre-commit mirror
-# templates stay out of the crates.io package.
-exclude = ["pre-commit-mirror/", "tests/"]
+# Not on crates.io (#106): conda-forge, PyPI and the release archives all build from this repository, where the
+# shared crate is a path dependency. Versions up to 1.13.0 stay on crates.io as they were.
+publish = false
 
 # What counts toward this crate's CHANGELOG.md beyond its own directory and the workspace crates it
 # depends on (scripts/changelog.py). docs/ and examples/ are pixi-sbom's until the site gets a
@@ -26,29 +26,6 @@ exclude = ["pre-commit-mirror/", "tests/"]
 include = ["actions/pixi-sbom/**", "docs/**", "examples/**"]
 history-before = "v1.11.0"
 
-# `cargo binstall pixi-sbom` fetches the release archive for the host instead of compiling.
-# The archives are named after pixi platforms, so each supported target is spelled out.
-[package.metadata.binstall]
-pkg-url = "{ repo }/releases/download/pixi-sbom-v{ version }/pixi-sbom-v{ version }-linux-64.tar.gz"
-bin-dir = "pixi-sbom-v{ version }-linux-64/{ bin }{ binary-ext }"
-pkg-fmt = "tgz"
-
-[package.metadata.binstall.overrides.aarch64-unknown-linux-gnu]
-pkg-url = "{ repo }/releases/download/pixi-sbom-v{ version }/pixi-sbom-v{ version }-linux-aarch64.tar.gz"
-bin-dir = "pixi-sbom-v{ version }-linux-aarch64/{ bin }{ binary-ext }"
-
-[package.metadata.binstall.overrides.x86_64-apple-darwin]
-pkg-url = "{ repo }/releases/download/pixi-sbom-v{ version }/pixi-sbom-v{ version }-osx-64.tar.gz"
-bin-dir = "pixi-sbom-v{ version }-osx-64/{ bin }{ binary-ext }"
-
-[package.metadata.binstall.overrides.aarch64-apple-darwin]
-pkg-url = "{ repo }/releases/download/pixi-sbom-v{ version }/pixi-sbom-v{ version }-osx-arm64.tar.gz"
-bin-dir = "pixi-sbom-v{ version }-osx-arm64/{ bin }{ binary-ext }"
-
-[package.metadata.binstall.overrides.x86_64-pc-windows-msvc]
-pkg-url = "{ repo }/releases/download/pixi-sbom-v{ version }/pixi-sbom-v{ version }-win-64.zip"
-bin-dir = "pixi-sbom-v{ version }-win-64/{ bin }{ binary-ext }"
-pkg-fmt = "zip"
 
 # The library is the binary's insides, exposed so the benchmarks and tests can reach them; it
 # is not a designed API and makes no stability promise.
@@ -62,7 +39,7 @@ path = "src/main.rs"
 
 [dependencies]
 # The code the extensions share (#56), under a short name: `use common::license`.
-common = { package = "aesir-pixi-ext-contrib-common", path = "../aesir-pixi-ext-contrib-common", version = "0.1.0" }
+common = { package = "pixi-ext-common", path = "../pixi-ext-common" }
 anstream = "1.0.0"
 anstyle = "1.0.14"
 bzip2 = "0.6.1"

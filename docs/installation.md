@@ -11,7 +11,6 @@ runs it when you type `pixi <name>`. There is no plugin registration; installing
 | pixi global (recommended) | `pixi global install pixi-sbom` |
 | Prebuilt binary | Download `pixi-sbom-<version>-<platform>.tar.gz` (or `.zip` on Windows) from the [releases page](https://github.com/aesir-oss/pixi-ext-contrib/releases), check its provenance (below), and put `pixi-sbom` on your `PATH` |
 | PyPI | `uvx pixi-sbom` runs it without installing; `uv tool install pixi-sbom` or `pip install pixi-sbom` installs it. The wheels hold the same binary as the release archives (no Python code), for Linux (glibc and musl) x86_64/aarch64, macOS x86_64/arm64 and Windows x86_64, from 1.7.0 on |
-| cargo binstall | `cargo binstall pixi-sbom` downloads the release binary for your platform from GitHub (no compiler needed); `cargo install pixi-sbom` builds it from crates.io instead |
 | From source | `pixi run build` in a clone, then copy `target/release/pixi-sbom` to `~/.pixi/bin/` |
 
 Check it is picked up:
@@ -88,10 +87,13 @@ It combines with `--bundle` for the offline check. The strict form holds from **
 were signed by `release.yml` on `refs/heads/main`, before the build moved to the tag-triggered workflow (#218), so for
 0.11.0 the plain `--repo` check is as far as verification goes.
 
-Two things are deliberately not attested. The crates.io package is not, because nothing checks an attestation at
-`cargo install` time and that path builds from source regardless. The conda-forge package is not, because the
-feedstock builds on conda-forge's infrastructure rather than ours — the provenance there would be theirs to make.
-The binaries this project builds and hands out are the ones covered, which includes what `cargo binstall` fetches.
+The conda-forge package is deliberately not attested: the feedstock builds on conda-forge's infrastructure rather
+than ours, so the provenance there would be theirs to make. The binaries this project builds and hands out are the
+ones covered.
+
+**Not on crates.io any more.** pixi-sbom is not published to crates.io after 1.13.0 (#106): `cargo install pixi-sbom`
+and `cargo binstall pixi-sbom` stay at 1.13.0. Use `pixi global install pixi-sbom`, `uv tool install pixi-sbom` (or
+`pip`), or a release archive.
 
 ## Shell completion
 

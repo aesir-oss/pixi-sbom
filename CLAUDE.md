@@ -12,7 +12,7 @@ A Cargo workspace of pixi extensions. Each is a `pixi-<name>` binary that pixi r
 
 | Path | What it is |
 |---|---|
-| `crates/aesir-pixi-ext-contrib-common/` | Code the extensions share (`common` in their `Cargo.toml`): license normalization, `pipe`, `style`. Published to crates.io as an internal crate, not an API (#54, #56) |
+| `crates/pixi-ext-common/` | Code the extensions share (`common` in their `Cargo.toml`): license normalization, `pipe`, `style`. Compiled into each extension by path, never published, not an API (#56, #106) |
 | `crates/pixi-sbom/` | The pixi-sbom crate: `src/`, `tests/` (fixtures, schemas, snapshots), `benches/`, `data/` (CPE and CRAN tables compiled in), `pyproject.toml` (maturin `bindings = "bin"` wheels), `pre-commit-mirror/` (templates) |
 | `actions/pixi-sbom/` | The GitHub Action's source, copied to `aesir-oss/pixi-sbom-action` on each release |
 | `docs/`, `mkdocs.yml` | The docs site (MkDocs Material, versioned with mike) at aesir-oss.github.io/pixi-ext-contrib |
@@ -21,8 +21,7 @@ A Cargo workspace of pixi extensions. Each is a `pixi-<name>` binary that pixi r
 | `Cargo.toml` | The workspace manifest; the release profile lives here |
 
 Planned: `crates/pixi-policy` (dependency policy, takes over pixi-sbom's license gate). Docs per extension are tracked
-in #6. Until the shared crate's first version is on crates.io, pixi-sbom cannot be released: crates.io refuses its
-path dependency (see Releases).
+in #6.
 
 ## Commands
 
@@ -41,16 +40,14 @@ Everything runs through pixi.
 
 - Started by the Release workflow (`workflow_dispatch`, `crate` and `version` inputs). It bumps the version,
   regenerates the crate's `CHANGELOG.md`, commits and tags `<crate>-vX.Y.Z` with the release App. A `pixi-sbom-v*`
-  tag triggers `release-artifacts.yml`; an `aesir-pixi-ext-contrib-common-v*` tag triggers `publish-common.yml`
-  (crates.io only, no GitHub release).
-- Release the shared crate before an extension that needs its changes: an extension's release stops if a workspace
-  crate it builds on is untagged, changed since its tag, or not on crates.io (`shared-crates-check`). Its first
-  version is published by hand (trusted publishing cannot create a crate).
+  tag triggers `release-artifacts.yml`.
+- Nothing is published to crates.io (#106): every crate is `publish = false`, and the shared crate is compiled into
+  each extension from this repository, never released.
 - Tags before the move are plain `vX.Y.Z` (made in millsks/pixi-sbom); keep them. Archives are named
   `pixi-sbom-vX.Y.Z-<platform>`, which is also the tag.
 - Extension releases are never marked Latest; after each final one `repository-release.yml` publishes
   `pixi-ext-contrib-YYYY.MM.N`, the only release marked Latest.
-- Release candidates go to TestPyPI, finals to PyPI; crates.io and PyPI use trusted publishing.
+- Release candidates go to TestPyPI, finals to PyPI, with trusted publishing.
 - Ask before cutting any release. After every release candidate, the maintainer runs a private field test; see the
   private (uncommitted) project memory.
 

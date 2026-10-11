@@ -58,7 +58,7 @@ class CandidateTest(unittest.TestCase):
         self.assertTrue(changelog.is_candidate("pixi-sbom-v1.13.0-rc.1"))
         self.assertTrue(changelog.is_candidate("v1.0.0-beta.2"))
         self.assertFalse(changelog.is_candidate("pixi-sbom-v1.13.0"))
-        self.assertFalse(changelog.is_candidate("aesir-pixi-ext-contrib-common-v0.1.0"))
+        self.assertFalse(changelog.is_candidate("pixi-ext-common-v0.1.0"))
 
 
 class IncludePathsTest(unittest.TestCase):

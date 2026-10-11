@@ -23,6 +23,13 @@ Since 1.0, pixi-sbom has:
   credentials are used, and `--doctor` says which host is the problem.
 - **Learned tab completion** in bash, zsh, fish and PowerShell, for `pixi-sbom` and `pixi sbom`.
 
+## Unreleased
+
+**No longer on crates.io.** pixi-sbom is not published to crates.io after 1.13.0: `cargo install pixi-sbom` and
+`cargo binstall pixi-sbom` stay at 1.13.0. Every other way to install it is unchanged and gets new releases as
+before: `pixi global install pixi-sbom` (conda-forge), `uv tool install pixi-sbom` or `pip install pixi-sbom` (PyPI),
+and the release archives.
+
 ## 1.13.0
 
 **Every environment in a container image, in one command.** `--scan` now finds installed environments as well as

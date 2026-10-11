@@ -335,7 +335,12 @@ created with the release App's token after `GITHUB_TOKEN` got HTTP 403 on its fi
 pixi-sbom 1.13.0 shipped the same day: `--scan` finds installed environments in an unpacked container image (#25),
 two example images to scan (#31), and a JavaScript project's `node_modules` read when it has no lockfile (#36). The
 `--deny-license` deprecation was held out of 1.13.0 by the maintainer: it waits until pixi-policy exists (#85, no
-milestone). pixi-policy's plan is on GitHub: milestones `aesir-pixi-ext-contrib-common 0.1.0` and `0.2.0` for the
-shared crate (renamed from `pixi-ext-common`, published to crates.io as an internal crate, #54), and `pixi-policy
+milestone). pixi-policy's plan is on GitHub: milestones `pixi-ext-common 0.1.0` and `0.2.0` for the
+shared crate, and `pixi-policy
 0.1.0`, `0.2.0`, `0.3.0` and `1.0.0` (#56 to #85). CI work is #89 to #93 (build cache, path filters, release builds
 on main, a lighter release gate, one compile per platform).
+
+The same day the maintainer stopped publishing anything to crates.io (#106): every other channel builds from the
+repository, where the shared crate is a path dependency, and crates.io carried about 2% of pixi-sbom's downloads.
+That undid #54's reason for naming the shared crate `aesir-pixi-ext-contrib-common` (a published `pixi-`-prefixed
+crate could be taken for prefix.dev's), so it went back to `pixi-ext-common`, in `crates/pixi-ext-common`.

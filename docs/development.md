@@ -114,9 +114,8 @@ executes each benchmark once without timing it, since a shared runner's timings 
 The benchmarks reach into the crate through the library target (`crates/pixi-sbom/src/lib.rs`), which exists for them and for the
 tests.
 
-**That library is published to crates.io and is deliberately not an API.** The binary depends on it, so it cannot
-be left out of the package; what it gets instead is every module marked `#[doc(hidden)]`, so nothing appears on
-docs.rs, plus a crate-level note saying that none of it is covered by semantic versioning. Modules may move, split
+**That library is deliberately not an API.** It is not published (#106); every module is marked `#[doc(hidden)]`
+anyway, plus a crate-level note saying that none of it is covered by semantic versioning. Modules may move, split
 or disappear in any release, patch releases included.
 
 An `internals` module that everything had to be reached through was tried and rejected: Rust will not re-export a
@@ -445,193 +444,17 @@ extension pattern (`v*`, `pixi-sbom-v*`, `cliff.toml`'s `tag_pattern`, the Actio
 
 | Input | Default | Meaning |
 |---|---|---|
-| `crate` | `pixi-sbom` | What to release: `pixi-sbom`, or the shared crate `aesir-pixi-ext-contrib-common` (see [The shared crate's releases](#the-shared-crates-releases)). |
+| `crate` | `pixi-sbom` | What to release: `pixi-sbom` (pixi-policy joins with #69). The shared crate is never released. |
 | `version` | blank | Version to release without the `v` (e.g. `1.2.0`). Blank auto-increments the patch of the latest `v*` tag; for the very first release it uses `Cargo.toml`'s version. |
 | `force_recreate` | false | Delete an existing tag and release of that version first, then recreate them. |
 
 A **pre-release is expressed in the version**, not by a separate flag: `1.0.0-rc.1` is one and `1.0.0` is not.
 
-### The shared crate's releases
+### The shared crate
 
-`aesir-pixi-ext-contrib-common` is released with the same workflow (`crate: aesir-pixi-ext-contrib-common`, #57), with
-three differences, decided 2026-10-11:
-
-- **Tag and crates.io only.** It is tagged `aesir-pixi-ext-contrib-common-vX.Y.Z` (for its changelog,
-  `crates/aesir-pixi-ext-contrib-common/CHANGELOG.md`) and the tag starts `publish-common.yml`, which publishes it to
-  crates.io through `publish-crate.yml`. No GitHub release, archives or wheels, no What's new notes: nobody installs
-  it, and it never shows in the release list or the repository release's table.
-- **Released only when an extension needs it, and first.** Before an extension's release, `shared-crates-check` (run
-  by the workflow, `scripts/shared_crates.py`) requires every workspace crate the extension builds on to have a tag
-  for its current version, no changes in its directory since that tag, and that version on crates.io; otherwise the
-  extension's release stops before tagging. So when the shared crate changed: release it (0.x: a minor version for
-  new or changed code, a patch for fixes), wait for its publish job, then release the extension.
-- **Its version moves the requirement too.** Releasing version X rewrites the `version = "X"` every crate's
-  `common = { package = "aesir-pixi-ext-contrib-common", ... }` asks for, in the same release commit, since cargo
-  refuses a path dependency whose version does not satisfy the requirement.
-
-**Its first version is published by hand**: crates.io trusted publishing cannot create a crate. `publish-common.yml`
-stops with instructions when the crate is not on crates.io yet: an owner publishes the tag's version with
-`pixi run cargo publish -p aesir-pixi-ext-contrib-common --locked` and their API token, then adds trusted publishers
-for `publish-common.yml` and `publish-crate.yml`, as pixi-sbom has. Until that first version exists, pixi-sbom cannot
-be released, because its own crates.io package depends on it.
-
-**Rerun the comparison with syft** before a release that changes identity or coverage: `pixi run grype-compare`,
-and the syft column of [pixi-sbom and syft](syft.md), then update that page's tables and the date and versions it
-names. Its pixi-sbom lockfile column is checked by `the_syft_page_counts_are_what_pixi_sbom_writes`.
-
-**Write the release up in [What's new](whats-new.md) as you go**, under a `## Unreleased` section at the top of
-the page: a pull request that changes something a user would notice adds its line there, saying what it means for
-someone using the tool, not what the commits were. Before cutting a final release, give the section an editing
-pass in its own pull request. The release workflow refuses to tag a final release whose `## Unreleased` is missing
-or empty (`pixi run whats-new check <version>` asks the same question locally), and renames it to `## <version>`
-in the `chore(release)` commit next to the changelog, so the tag carries its notes and `main` never has a release
-the page does not describe. `the_whats_new_page_covers_every_release_since_1_0` in `crates/pixi-sbom/tests/cli.rs` fails the build
-for a release without a section, for a section naming a release that does not exist, and for an `## Unreleased`
-that is not the only one or not above every release. Release candidates do not get a section, and leave
-`## Unreleased` as it is; their final does. A release with nothing a user would notice still gets one line, such
-as "No changes to behaviour; dependency updates only."
-That is what semver already means by the suffix, and a flag could contradict the version it was attached to.
-
-What the two do, in order:
-
-1. **Version and guard.** Finds the latest release tag (`pixi-sbom-vX.Y.Z`; releases up to 1.11.x were tagged
-   plain `vX.Y.Z` and still count), computes the next version, and exits quietly (no release) if
-   nothing changed on `main` since that tag. Validates the version and refuses to reuse an existing tag unless
-   `force_recreate` is set. For a final release, refuses to go on unless `docs/whats-new.md` has a non-empty
-   `## Unreleased` section.
-2. **Bump.** Writes the version into `crates/pixi-sbom/Cargo.toml`, `Cargo.lock` (via `cargo update --workspace`) and `pixi.toml`.
-3. **Gate.** Requires the commit being released to have passed CI on `main`: its `CI result` check must be
-   complete and green, or the release stops before anything is pushed. Wait for `main`'s run to finish before
-   releasing a commit that was just merged. CI is not run again (#92); after the bump, `cargo check --workspace` and
-   the stability tests check what the bump changed.
-4. **Changelog.** Regenerates `crates/pixi-sbom/CHANGELOG.md` with `pixi run changelog-of write pixi-sbom --tag
-   pixi-sbom-vX.Y.Z` (see [Changelogs](#changelogs)), renames What's
-   new's `## Unreleased` to `## X.Y.Z` (final releases only), commits the bump, changelog and page as
-   `chore(release): pixi-sbom-vX.Y.Z`, tags that commit, and pushes both to `main`. It then waits until
-   `release-artifacts.yml` is visibly running for that tag before going green: a tag that pushed but started
-   nothing would otherwise look like a successful release with no binaries behind it.
-
-   *`release-artifacts.yml` takes over here, triggered by the tag.*
-
-5. **Build, once per platform.** Every platform's binary is compiled once, as that platform's wheel (step 9), and
-   the archive for linux-64, linux-aarch64, osx-64, osx-arm64 and win-64 carries the binary from its wheel (#93),
-   packaged with `LICENSE`, pixi-sbom's `README.md` and `CHANGELOG.md` and a `.sha256` each. Archives keep their
-   names, `pixi-sbom-vX.Y.Z-<platform>`, which is also the tag.
-   - **Linux uses the manylinux wheel's binary** (decided 2026-10-11). It is built in maturin's manylinux2014
-     container against glibc 2.17, so the archive runs on every glibc distribution from CentOS 7 and Amazon Linux 2
-     on, newer ones included: glibc keeps every old symbol version. Archives built on the runner with conda-forge's
-     sysroot needed glibc 2.28 (measured on 1.13.0), so this widened who can run them, and pip and archive users
-     now get the same binary. The `archive` job fails a Linux binary that needs anything newer than 2.17. Alpine
-     and other musl systems are covered by the musllinux wheels, not by an archive.
-   - **osx-64 is cross-compiled on the arm runner** (`x86_64-apple-darwin`) and smoke-tested there under Rosetta
-     by running the binary itself as x86-64 (`arch -x86_64`); the Intel runner was the release's slowest job.
-   - **A dry run** (`gh workflow run release-artifacts.yml -f tag=<tag> -f dry-run=true`, with `--ref <branch>` to
-     try a branch's version of the workflow) builds the wheels and archives as artifacts of the run and stops:
-     nothing is attested, released or published.
-6. **Attest.** `actions/attest-build-provenance` signs a provenance statement for each archive: what built it, from
-   which commit, in which workflow run. It runs in the archive's job, before the artifact upload, so the claim covers
-   the round trip through artifact storage as well. The statement goes to the repository's attestation store, and
-   the Sigstore bundle also ships beside the archive as `.sigstore.json` for anyone verifying offline.
-7. **Publish.** Creates the GitHub release with this version's changelog section (from `changelog-of notes pixi-sbom --tag <tag>`:
-   a final's own section, or for a release candidate everything since the last final, #88) plus an
-   artifact table as the notes and the packages as assets, marked pre-release when the tag carries a suffix.
-   `release-artifacts.yml` only triggers on `pixi-sbom-vX.Y.Z` tags. The action reads releases from both this
-   repository and `millsks/pixi-sbom` (1.11.x and older, tagged `vX.Y.Z`), and downloads each version from the
-   repository that published it.
-   Once the release exists, the `action-repo` job copies `actions/pixi-sbom/` (with `LICENSE`) into
-   [aesir-oss/pixi-sbom-action](https://github.com/aesir-oss/pixi-sbom-action), tags it `vX.Y.Z` and, for the newest
-   final release of its major, moves the floating `vX` tag that `uses: aesir-oss/pixi-sbom-action@v1` follows; a
-   rebuild of an older release leaves it alone. The release GitHub App must be installed on that repository.
-8. **Crate.** `publish-crate.yml` (reusable, also dispatchable by hand with a `tag` input to republish) checks the
-   tag out clean and runs `cargo publish -p pixi-sbom --locked` with a short-lived token from crates.io trusted
-   publishing (`rust-lang/crates-io-auth-action`); no API token is stored. The crate's crates.io settings list
-   `release-artifacts.yml` and `publish-crate.yml` as trusted publishers. The `[package.metadata.binstall]` table in
-   `crates/pixi-sbom/Cargo.toml` points `cargo binstall` at the release archives.
-9. **Wheels.** The `wheels` job builds the same binary into PyPI platform wheels with
-   [maturin](https://www.maturin.rs/) (`pyproject.toml`, `bindings = "bin"`: no Python code, version from
-   `Cargo.toml`, so `1.7.0-rc.1` becomes `1.7.0rc1`), from the tag, with the Rust `pixi.toml` pins: manylinux and
-   musllinux for x86_64 and aarch64, macOS x86_64 and arm64, Windows x86_64. Each is installed into a fresh venv and
-   run (except musllinux, which the glibc runner cannot run) and attested like the archives. Once the GitHub release
-   is out, a release candidate's wheels go to **TestPyPI** (`testpypi` job) and a final release's to **PyPI**
-   (`pypi` job), through trusted publishing: no token, PyPI checks the run's OIDC identity. The
-   `attach-wheels` job also adds them to the GitHub release as assets, once the release and every wheel exist; the
-   `publish` job takes only the archives, so the release's assets never depend on which job finished first. There is no sdist,
-   which would need a Rust toolchain and the crates.io index at install time.
-
-10. **pre-commit mirror.** After a final release's wheels are on PyPI, the `pre-commit-mirror` job renders
-    `pre-commit-mirror/` (the hooks, and a `pyproject.toml` pinning `pixi-sbom==X.Y.Z`) into
-    the `pixi-sbom-pre-commit` repository of the same owner, commits and tags it `vX.Y.Z` (the mirror holds
-    pixi-sbom alone, so its tags keep the plain form).
-    The hooks cannot live here: pre-commit installs a `language: python` hook by `pip install .` of its repository,
-    which here would compile the binary. The mirror repository must exist with the release GitHub App installed on
-    it. To try the hooks before a release: `pre-commit-mirror/render.sh 1.7.0 /tmp/mirror`, commit that in a git
-    repository, and `PIP_FIND_LINKS=<dir with a locally built wheel> pre-commit try-repo /tmp/mirror pixi-sbom` in a
-    project.
-
-**PyPI's side of trusted publishing** is set up once per index, by the maintainer, under the project's
-*Publishing* settings (or as a *pending publisher* before the first upload creates the project):
-
-| Field | PyPI | TestPyPI |
-|---|---|---|
-| Project name | `pixi-sbom` | `pixi-sbom` |
-| Owner / repository | `millsks` / `pixi-sbom` | `millsks` / `pixi-sbom` |
-| Workflow | `release-artifacts.yml` | `release-artifacts.yml` |
-| Environment | `pypi` | `testpypi` |
-
-The two GitHub environments of the same names are created on the first run that uses them; a required reviewer on
-`pypi` turns the final upload into a click.
-
-**Why the split exists.** `actions/attest-build-provenance` signs the OIDC identity of the run it is in, and that
-identity comes from the event, not from what the job checked out. While the build lived in the `workflow_dispatch`
-run, the provenance named `refs/heads/main` at the commit the release was dispatched from — one commit before the
-`chore(release):` bump that the build job then checked out. The v0.11.0 archives are attested to `05fc3c8` although
-they were built from `4029b71` (#218). Following the recorded commit gets you a tree whose `Cargo.toml` still says
-the previous version, which is precisely the question an attestation exists to answer. Triggered by the tag, the
-run being signed *is* the run that built the binaries, and the provenance names `refs/tags/pixi-sbom-vX.Y.Z` at the right
-commit.
-
-This works because the tag is pushed with the release GitHub App's token. A push made with the default
-`GITHUB_TOKEN` deliberately does not start workflows; an App installation token does. If that ever changes, step 4's
-handover check fails the release rather than letting it end quietly with nothing built, and
-`release-artifacts.yml` can be dispatched by hand with a `tag` input.
-
-**What is not attested, and why.** The wheels are attested twice over: the build provenance above, and the
-publish attestations PyPI shows beside each file. The crates.io publish is not: crates.io has no attestation verification, so a
-statement about the uploaded `.crate` would be one nobody could check at install time, and `cargo install` builds
-from source anyway. Neither is the conda-forge package: the feedstock builds on conda-forge's own infrastructure
-from the source tarball, so any provenance there is theirs to make, not ours. What is attested is the set of
-binaries we build and hand out ourselves — which is also what `cargo binstall` downloads.
-
-**conda-forge is not ours to release.** The package is built by
-[`conda-forge/pixi-sbom-feedstock`](https://github.com/conda-forge/pixi-sbom-feedstock), whose autotick bot opens the
-version bump against the new source tarball on its own, usually within hours of a release; nothing in this repository
-takes part. A change to how the conda package is built — a build dependency, a platform, the build script — is a pull
-request against the feedstock's own `recipe/recipe.yaml`.
-
-This repository used to carry a copy of that recipe under `recipe/`, from the original `staged-recipes` submission. It
-was removed in #219: it had a placeholder `sha256` that was never going to be filled, and it had drifted from the real
-one in ways that mattered — the feedstock builds with `cargo auditable` so the binary carries its own dependency list,
-and our copy still said plain `cargo install`. A second recipe that is authoritative nowhere is worse than none.
-
-Publishing a release also deploys the documentation site (see [Continuous integration](#continuous-integration)).
-
-The action's original [Marketplace listing](https://github.com/marketplace/actions/pixi-sbom) belongs to
-`millsks/pixi-sbom`, published by hand from its v1.0.0 release page. A listing for `aesir-oss/pixi-sbom-action` is
-published the same way from a release page of that repository, and its `name` must differ from the original
-listing's while both exist. Listing it was a one-time
-manual step with no API behind it: it needs the Marketplace Developer Agreement accepted, and that is tied to a
-person rather than a token. Should it ever need doing again — on a release page, *Edit* → tick *Publish this Action
-to the GitHub Marketplace* → accept the agreement → category *Security* → *Update release*.
-
-The Marketplace validates `action.yml` on that form, and all three currently pass: the `name` must be unique among
-actions and must not match a GitHub user or organization (`pixi-sbom` is free on both counts), `branding` must be set
-(`icon: shield`, `color: blue`), and the `description` must be at most 125 characters — it is 117, so keep the long
-form in the README and the docs rather than growing that line.
-
-Operator prerequisite: the release commit and tag land on `main` under the branch ruleset, so the workflow
-authenticates with the release GitHub App (already in the ruleset's bypass list) rather than `GITHUB_TOKEN`. The
-App's credentials must be present as the repository secrets `APP_ID` and `APP_PRIVATE_KEY`; the workflow mints a
-short-lived token from them per run.
+`pixi-ext-common` is never released (#106). Each extension compiles it from this repository as a path
+dependency, so a release of an extension carries whatever the shared crate holds at that commit, and its changes
+appear in the extension's changelog (#51).
 
 ### Changelogs
 
@@ -665,14 +488,11 @@ paths it touches, and its issue's label.
 Give its release workflow `changelog-of write <extension> --tag <extension>-vX.Y.Z` and `changelog-of notes
 <extension> --tag <tag>`, add a row to the root `CHANGELOG.md`, and claim any paths outside its crate in its `Cargo.toml`.
 
-**The shared crate**, `aesir-pixi-ext-contrib-common` in `crates/aesir-pixi-ext-contrib-common`, holds the code the
-extensions share. It is published to crates.io, because crates.io refuses a crate whose dependencies are not there,
-and the extensions are published there. It is published as an internal crate: its README and crate docs say it is
-not an API, carries no semver promise and is not affiliated with prefix.dev, which is why its name starts with the
-owner rather than `pixi-`. It has its own tags (`aesir-pixi-ext-contrib-common-vX.Y.Z`) and changelog, and a version of
-it is published before any extension release that needs it. Extensions depend on it under a short name:
+**The shared crate**, `pixi-ext-common` in `crates/pixi-ext-common`, holds the code the
+extensions share. It is `publish = false` and never released (#106): each extension compiles it from this
+repository, and its README and crate docs say it is not an API. Extensions depend on it by path, under a short name:
 
 ```toml
 [dependencies]
-common = { package = "aesir-pixi-ext-contrib-common", path = "../aesir-pixi-ext-contrib-common", version = "0.1" }
+common = { package = "pixi-ext-common", path = "../pixi-ext-common" }
 ```

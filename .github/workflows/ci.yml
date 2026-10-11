@@ -161,10 +161,6 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: cargo llvm-cov (>= 90% lines)
         run: pixi run cov
-      # The shared crate is published to crates.io (#57); a change that breaks its package is found here, not on
-      # release day. pixi-sbom's own package needs the shared crate's release, so it is checked by the release.
-      - name: The shared crate packages for crates.io
-        run: pixi run cargo package -p aesir-pixi-ext-contrib-common --locked
 
   # What we carry ourselves. A tool that reports other people's vulnerable dependencies has no
   # business not checking its own, and a per-pull-request run cannot see an advisory published
@@ -254,9 +250,6 @@ jobs:
         run: pixi run repo-release-test
       # Which commits each extension's changelog and release notes list; a mistake puts one extension's
       # work in another's notes, or drops a shared crate's change from the extensions built on it.
-      # Whether an extension's release may go ahead: the workspace crates it builds on released and unchanged (#57).
-      - name: The shared-crate release check's own tests
-        run: pixi run shared-crates-test
       - name: The per-extension changelog's own tests
         run: pixi run changelog-test
       - name: The Grype comparison's own tests

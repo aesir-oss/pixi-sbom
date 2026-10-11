@@ -1,7 +1,7 @@
 # The pixi-ext-contrib workspace: one crate per pixi extension, plus the code they share.
 [workspace]
 resolver = "3"
-members = ["crates/aesir-pixi-ext-contrib-common", "crates/pixi-sbom"]
+members = ["crates/pixi-ext-common", "crates/pixi-sbom"]
 
 # Profiles only take effect at the workspace root.
 [profile.release]

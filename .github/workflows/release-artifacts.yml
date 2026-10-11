@@ -299,17 +299,6 @@ jobs:
             echo "bump against the source tarball on its own, usually within a few hours."
           } >> "$GITHUB_STEP_SUMMARY"
 
-  # crates.io, from a clean checkout of the tag (this job's tree holds the downloaded archives,
-  # which cargo would refuse as uncommitted changes).
-  crate:
-    needs: [tag, publish]
-    permissions:
-      contents: read
-      id-token: write # crates.io trusted publishing, granted to the called job
-    uses: ./.github/workflows/publish-crate.yml
-    with:
-      tag: ${{ needs.tag.outputs.tag }}
-
   # ---------------------------------------------------------------------------
   # Every platform's one compile: the binary as a platform wheel for PyPI (maturin, `bindings = "bin"`),
   # so `uvx pixi-sbom` and `pip install pixi-sbom` work for projects that do not use pixi, and from the

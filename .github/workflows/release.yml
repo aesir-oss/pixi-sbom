@@ -6,10 +6,9 @@ name: Release
 # note at the top of it for why the split exists (#218: provenance has to be able to name the
 # commit the binaries were built from, and only a tag-triggered run can).
 #
-# One workflow for every crate (#57): the `crate` input picks pixi-sbom or the shared crate,
-# aesir-pixi-ext-contrib-common, and every crate-specific value comes from the `Resolve the crate` step.
-# pixi-sbom's tag starts release-artifacts.yml; the shared crate's starts publish-common.yml, which only
-# publishes it to crates.io (no GitHub release: it is not something anyone installs).
+# One workflow for every extension: the `crate` input picks which (pixi-sbom now, pixi-policy later, #69), and every
+# crate-specific value comes from the `Resolve the crate` step. Nothing is published to crates.io (#106): the shared
+# crate, pixi-ext-common, is compiled into each extension from this repository and never released.
 #
 # Operator prerequisite: a release commits the version bump + the crate's CHANGELOG.md and pushes a
 # tag to `main` under the branch ruleset, so the default GITHUB_TOKEN is not enough.
@@ -26,7 +25,7 @@ on:
         description: "What to release"
         required: true
         type: choice
-        options: [pixi-sbom, aesir-pixi-ext-contrib-common]
+        options: [pixi-sbom]
         default: pixi-sbom
       version:
         description: "Version to release (e.g. 1.0.0); leave blank to auto-increment the patch"
@@ -79,13 +78,7 @@ jobs:
             echo "CRATE=${CRATE}"
             echo "PREFIX=${CRATE}-v"
             echo "DIR=crates/${CRATE}"
-            if [ "$CRATE" = pixi-sbom ]; then
-              echo "EXTENSION=true"
-              echo "NEXT_WORKFLOW=release-artifacts.yml"
-            else
-              echo "EXTENSION=false"
-              echo "NEXT_WORKFLOW=publish-common.yml"
-            fi
+            echo "NEXT_WORKFLOW=release-artifacts.yml"
           } >> "$GITHUB_ENV"
 
       # -----------------------------------------------------------------------
@@ -128,9 +121,7 @@ jobs:
           if [ "${{ steps.get_tag.outputs.has_tags }}" = "false" ]; then
             echo "No previous tags found - proceeding with first release"
             echo "changed=true" >> "$GITHUB_OUTPUT"
-          # The shared crate's release is about its own directory; an extension's about the whole tree.
-          elif if [ "$EXTENSION" = true ]; then git diff --quiet "${{ steps.get_tag.outputs.tag }}" HEAD; \
-               else git diff --quiet "${{ steps.get_tag.outputs.tag }}" HEAD -- "$DIR"; fi; then
+          elif git diff --quiet "${{ steps.get_tag.outputs.tag }}" HEAD; then
             echo "::notice::No changes since last tag ${{ steps.get_tag.outputs.tag }} - skipping"
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
@@ -194,7 +185,7 @@ jobs:
       # section, checked here so a release without one stops before anything is pushed.
       # Release candidates are skipped by the script.
       - name: Check the What's new notes are written
-        if: steps.should_skip.outputs.skip != 'true' && env.EXTENSION == 'true'
+        if: steps.should_skip.outputs.skip != 'true' && env.CRATE == 'pixi-sbom'
         run: python3 scripts/whats_new.py check "${{ env.NEW_TAG }}"
 
       - name: Remove existing tag and release (force_recreate)
@@ -247,14 +238,7 @@ jobs:
           shared-key: debug
           save-if: false
 
-      # An extension released on a workspace crate that is not on crates.io, or that changed since its release,
-      # would be built from code its crates.io package does not have: release that crate first (#57).
-      - name: Require the workspace crates it builds on to be released
-        if: steps.should_skip.outputs.skip != 'true' && env.EXTENSION == 'true'
-        run: pixi run shared-crates-check "$CRATE"
-
-      # pixi.toml's version follows pixi-sbom. A new version of the shared crate also moves the version every crate
-      # that depends on it asks for, or cargo would refuse the path dependency.
+      # pixi.toml's version follows pixi-sbom.
       - name: Bump the version in the crate's Cargo.toml, Cargo.lock (and pixi.toml for pixi-sbom)
         if: steps.should_skip.outputs.skip != 'true'
         run: |
@@ -262,9 +246,6 @@ jobs:
           files=("${DIR}/Cargo.toml")
           if [ "$CRATE" = pixi-sbom ]; then files+=(pixi.toml); fi
           sed -i -E "0,/^version = /s/^version = \"[^\"]+\"/version = \"${{ env.NEW_TAG }}\"/" "${files[@]}"
-          if [ "$EXTENSION" != true ]; then
-            sed -i -E "/package = \"${CRATE}\"/s/version = \"[^\"]+\"/version = \"${{ env.NEW_TAG }}\"/" crates/*/Cargo.toml
-          fi
           pixi run cargo update --workspace
           git diff --stat
 
@@ -289,7 +270,7 @@ jobs:
       # The notes become the release's section in the same commit as the changelog, so main
       # never has a release the What's new page does not describe.
       - name: Turn the What's new notes into the release's section
-        if: steps.should_skip.outputs.skip != 'true' && env.EXTENSION == 'true'
+        if: steps.should_skip.outputs.skip != 'true' && env.CRATE == 'pixi-sbom'
         run: pixi run whats-new release "${{ env.NEW_TAG }}"
 
       - name: Commit the release and tag it

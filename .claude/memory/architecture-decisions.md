@@ -16,10 +16,12 @@ pixi-sbom is a Rust pixi extension (`pixi-sbom` binary -> `pixi sbom`). Decision
 
 Since 2026-10-11 the crate is `crates/pixi-sbom` in the `aesir-oss/pixi-ext-contrib` Cargo workspace (one `Cargo.lock`,
 the release profile in the root `Cargo.toml`), and these decisions hold for it unchanged. Code shared with pixi-policy
-goes into the `aesir-pixi-ext-contrib-common` crate (`crates/aesir-pixi-ext-contrib-common`, used as `common`) rather than
-into either tool. It is published to crates.io as an internal crate, because the extensions are and crates.io refuses
-unpublished dependencies; it is named after the owner, not `pixi-`, so it is not taken for a prefix.dev crate (decided
-2026-10-11).
+goes into the `pixi-ext-common` crate (`crates/pixi-ext-common`, used as `common`) rather than
+into either tool. Nothing is published to crates.io (#106, decided 2026-10-11): conda-forge, PyPI and the release
+archives all build from this repository, where the shared crate is a path dependency, and crates.io carried about 2%
+of pixi-sbom's downloads. Publishing would have forced the shared crate onto crates.io too (crates.io refuses
+unpublished dependencies), with a release-ordering rule and a manual first publish; #54 and #57 had set that up
+before the decision.
 
 Release binaries (#93, decided 2026-10-11): every platform is compiled once, as its PyPI wheel (maturin,
 `bindings = "bin"`), and the release archive carries the binary from that wheel. Linux archives use the manylinux

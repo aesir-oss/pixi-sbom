@@ -7,7 +7,6 @@ extension (`pixi sbom`) that needs no pixi: the same binary runs as `pixi-sbom`,
 
 [![CI](https://github.com/aesir-oss/pixi-ext-contrib/actions/workflows/ci.yml/badge.svg)](https://github.com/aesir-oss/pixi-ext-contrib/actions/workflows/ci.yml)
 [![conda-forge](https://img.shields.io/conda/vn/conda-forge/pixi-sbom?logo=conda-forge&color=brightgreen)](https://anaconda.org/conda-forge/pixi-sbom)
-[![crates.io](https://img.shields.io/crates/v/pixi-sbom?logo=rust&color=orange)](https://crates.io/crates/pixi-sbom)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Docs](https://img.shields.io/badge/docs-aesir--oss.github.io%2Fpixi--ext--contrib-teal.svg)](https://aesir-oss.github.io/pixi-ext-contrib/)
 
@@ -53,8 +52,7 @@ pixi global install pixi-sbom
 ```
 
 Outside the conda ecosystem, `uvx pixi-sbom` runs it from PyPI without installing anything (or `pip install
-pixi-sbom`, `uv tool install pixi-sbom`), and `cargo binstall pixi-sbom` fetches the same release binary (`cargo
-install pixi-sbom` builds it from crates.io). Or download a binary from the
+pixi-sbom`, `uv tool install pixi-sbom`). Or download a binary from the
 [releases page](https://github.com/aesir-oss/pixi-ext-contrib/releases) and put it on your `PATH`, or build from source:
 
 ```sh

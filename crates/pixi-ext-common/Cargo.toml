@@ -1,5 +1,5 @@
 [package]
-name = "aesir-pixi-ext-contrib-common"
+name = "pixi-ext-common"
 version = "0.1.0"
 edition = "2024"
 # pixi-sbom's: the extensions build on this crate, so it can claim no newer toolchain than they do.
@@ -8,9 +8,8 @@ description = "Internal code shared by the pixi extensions in aesir-oss/pixi-ext
 license = "Apache-2.0"
 repository = "https://github.com/aesir-oss/pixi-ext-contrib"
 readme = "README.md"
-# Published to crates.io only because the extensions are, and crates.io refuses a crate whose dependencies are not
-# (#54). Nothing outside pixi-ext-contrib should depend on it.
-categories = ["development-tools"]
+# Compiled into each extension from this repository, never released on its own (#106).
+publish = false
 
 [dependencies]
 anstyle = "1.0.14"
