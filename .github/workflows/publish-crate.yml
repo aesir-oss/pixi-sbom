@@ -41,4 +41,4 @@ jobs:
           fi
           # A clean checkout of the tag: cargo refuses to publish a dirty tree.
           git status --porcelain
-          pixi run cargo publish --locked
+          pixi run cargo publish -p pixi-sbom --locked

@@ -15,6 +15,16 @@ use serde_json::Value;
 /// say) silently changes what the tests assert against, and the suite passes on CI only because a
 /// fresh runner happens to have no such file. `PIXI_HOME` is what the user layer resolves through,
 /// so pointing it at an empty directory makes these runs depend on the fixture and nothing else.
+/// The repository root: the docs, examples and changelog these tests check live there, not in
+/// the crate.
+fn repo_root() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .ancestors()
+        .nth(2)
+        .unwrap()
+        .to_path_buf()
+}
+
 fn pixi_sbom() -> Command {
     let mut command = Command::cargo_bin("pixi-sbom").expect("binary builds");
     command.env("PIXI_HOME", empty_pixi_home());
@@ -3505,7 +3515,7 @@ fn exclude_drops_packages_and_what_only_they_needed() {
 
 #[test]
 fn excluding_pre_commit_from_this_repository() {
-    let lockfile = tests_dir().parent().unwrap().join("pixi.lock");
+    let lockfile = repo_root().join("pixi.lock");
     let assert = pixi_sbom()
         .args(["--lockfile", lockfile.to_str().unwrap(), "-p", "linux-64"])
         .args([
@@ -7048,7 +7058,7 @@ fn kev_and_accepted_findings_become_spdx_3_assessment_relationships() {
 
 /// A `pylock.toml` from examples/projects, read in place: `--output -` writes nothing beside it.
 fn pylock_example(scenario: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
+    repo_root()
         .join("examples/projects/pylock")
         .join(scenario)
         .join("pylock.toml")
@@ -7215,7 +7225,7 @@ fn uv_lock_is_found_by_the_upward_search_and_read_in_every_format() {
     let doc = |dir: &Path, args: &[&str]| -> Value {
         serde_json::from_slice(&run(dir, args).assert().success().get_output().stdout).unwrap()
     };
-    let examples = Path::new(env!("CARGO_MANIFEST_DIR")).join("examples/projects");
+    let examples = repo_root().join("examples/projects");
     let django = examples.join("uv/01-django");
 
     // No --lockfile: the upward search finds uv.lock beside the project.
@@ -7350,7 +7360,7 @@ fn poetry_lock_is_read_in_every_format_with_its_sources() {
         all.extend_from_slice(args);
         serde_json::from_slice(&command(dir, &all).assert().success().get_output().stdout).unwrap()
     };
-    let examples = Path::new(env!("CARGO_MANIFEST_DIR")).join("examples/projects");
+    let examples = repo_root().join("examples/projects");
     let django = examples.join("poetry/01-django");
 
     // Found by the upward search; every format validates, including components with no location.
@@ -7488,7 +7498,7 @@ fn pdm_lock_is_read_in_every_format_with_extras_folded_in() {
         all.extend_from_slice(args);
         serde_json::from_slice(&command(dir, &all).assert().success().get_output().stdout).unwrap()
     };
-    let examples = Path::new(env!("CARGO_MANIFEST_DIR")).join("examples/projects");
+    let examples = repo_root().join("examples/projects");
     let django = examples.join("pdm/01-django");
 
     let linux = doc(&django, &["-p", "linux-64"]);
@@ -7658,7 +7668,7 @@ package:
     }
 
     // A real conda-lock.yml with conda and pip packages on two platforms.
-    let example = Path::new(env!("CARGO_MANIFEST_DIR")).join("examples/projects/conda-lock/01-django");
+    let example = repo_root().join("examples/projects/conda-lock/01-django");
     let linux = doc(&example, &["--lockfile", "conda-lock.yml", "-p", "linux-64"]);
     assert_valid(&cyclonedx_validator(), &linux);
     assert_valid(
@@ -7851,7 +7861,7 @@ fn explicit_spec_files_are_read_with_whatever_hashes_they_carry() {
 
     // The conda-lock.yml it was rendered from gives the same conda components.
     let lock = doc(
-        &Path::new(env!("CARGO_MANIFEST_DIR")).join("examples/projects/conda-lock/01-django/conda-lock.yml"),
+        &repo_root().join("examples/projects/conda-lock/01-django/conda-lock.yml"),
         &["-p", "linux-64"],
     );
     let conda_from_lock: std::collections::BTreeSet<String> = by_purl(&lock)
@@ -7899,7 +7909,7 @@ fn the_manifest_beside_a_non_pixi_lockfile_says_what_the_project_declared() {
     let stdout = |dir: &Path, args: &[&str]| {
         String::from_utf8(command(dir, args).assert().success().get_output().stdout.clone()).unwrap()
     };
-    let examples = Path::new(env!("CARGO_MANIFEST_DIR")).join("examples/projects");
+    let examples = repo_root().join("examples/projects");
 
     for reader in ["uv", "poetry"] {
         let project = examples.join(reader).join("01-django");
@@ -8030,7 +8040,7 @@ fn python_extras_say_what_was_asked_for_and_what_came_with_it() {
             .collect()
     };
     let some = |s: &str| Some(s.to_string());
-    let examples = Path::new(env!("CARGO_MANIFEST_DIR")).join("examples/projects");
+    let examples = repo_root().join("examples/projects");
 
     for reader in ["uv", "poetry", "pdm"] {
         let found = properties(&examples.join(reader).join("01-django"));
@@ -8077,7 +8087,7 @@ fn dependency_groups_and_extras_set_the_scope_in_every_format() {
     // #331: what only a dependency group needs is development, what only an extra needs is
     // optional, and the rest, shared ones included, is required; each format says so its way.
     let work = tempfile::tempdir().unwrap();
-    let project = Path::new(env!("CARGO_MANIFEST_DIR")).join("examples/projects/uv/01-django");
+    let project = repo_root().join("examples/projects/uv/01-django");
     let document = |args: &[&str]| -> Value {
         let output = pixi_sbom()
             .current_dir(&project)
@@ -8428,7 +8438,7 @@ fn infer_extras_is_opt_in_and_labelled() {
 fn a_scan_reads_every_kind_of_lockfile_once_per_project() {
     // #339: a monorepo of pixi, uv and Poetry projects; one directory has pixi.lock and uv.lock.
     let tree = tempfile::tempdir().unwrap();
-    let examples = Path::new(env!("CARGO_MANIFEST_DIR")).join("examples/projects");
+    let examples = repo_root().join("examples/projects");
     let place = |dir: &str, from: &Path, files: &[&str]| {
         let target = tree.path().join(dir);
         std::fs::create_dir_all(&target).unwrap();
@@ -8632,9 +8642,9 @@ fn the_without_pixi_page_runs_and_shows_the_tested_matrix() {
     // #345: every `pixi-sbom` line in the page's shell blocks runs as written, in a project that
     // has each file it names, and its table is the one tests/matrix.rs produces.
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let page = std::fs::read_to_string(root.join("docs/without-pixi.md")).unwrap();
+    let page = std::fs::read_to_string(repo_root().join("docs/without-pixi.md")).unwrap();
     let project = tempfile::tempdir().unwrap();
-    let examples = root.join("examples/projects");
+    let examples = repo_root().join("examples/projects");
     for (from, files) in [
         ("uv/01-django", &["pyproject.toml", "uv.lock"][..]),
         ("pylock/01-django", &["pylock.toml"]),
@@ -8927,7 +8937,7 @@ fn the_quality_report_grades_a_complete_and_a_sparse_document() {
 /// document each, valid CycloneDX, and the PyPI packages pixi put on top of the conda ones.
 #[test]
 fn every_pixi_example_reads_in_every_environment() {
-    let examples = Path::new(env!("CARGO_MANIFEST_DIR")).join("examples/projects/pixi");
+    let examples = repo_root().join("examples/projects/pixi");
     let work = tempfile::tempdir().unwrap();
     let mut projects: Vec<PathBuf> = std::fs::read_dir(&examples)
         .unwrap()
@@ -9023,7 +9033,7 @@ fn every_pixi_example_reads_in_every_environment() {
 /// compiled for: uv's command says so in its header, pip-compile's header names the Python.
 #[test]
 fn every_requirements_example_reads_for_what_it_was_compiled_for() {
-    let examples = Path::new(env!("CARGO_MANIFEST_DIR")).join("examples/projects/requirements");
+    let examples = repo_root().join("examples/projects/requirements");
     let work = tempfile::tempdir().unwrap();
     let mut projects: Vec<PathBuf> = std::fs::read_dir(&examples)
         .unwrap()
@@ -9064,7 +9074,7 @@ fn every_requirements_example_reads_for_what_it_was_compiled_for() {
 /// one version, and writes nothing.
 #[test]
 fn every_unpinned_requirements_example_is_refused_by_line() {
-    let examples = Path::new(env!("CARGO_MANIFEST_DIR")).join("examples/projects/requirements-unpinned");
+    let examples = repo_root().join("examples/projects/requirements-unpinned");
     let cases = [
         ("01-loose-ranges", 3, "Django>=4.2,<5"),
         ("02-bare-names", 1, "flask"),
@@ -9100,7 +9110,7 @@ fn every_unpinned_requirements_example_is_refused_by_line() {
 /// reader that cannot read a file its own tool wrote fails here rather than on a user's scan.
 #[test]
 fn the_whole_examples_tree_scans_clean() {
-    let examples = Path::new(env!("CARGO_MANIFEST_DIR")).join("examples/projects");
+    let examples = repo_root().join("examples/projects");
     let work = tempfile::tempdir().unwrap();
     let output = pixi_sbom()
         .current_dir(work.path())
@@ -9135,7 +9145,7 @@ fn the_whole_examples_tree_scans_clean() {
 /// written while the release is still fresh.
 #[test]
 fn the_whats_new_page_covers_every_release_since_1_0() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let root = repo_root();
     let version_of = |line: &str, prefix: &str| -> Option<(u32, u32, u32)> {
         let rest = line.strip_prefix(prefix)?;
         let version = rest.split_whitespace().next()?;
@@ -9200,7 +9210,7 @@ fn the_whats_new_page_covers_every_release_since_1_0() {
 /// it names exists.
 #[test]
 fn the_examples_tour_runs_as_written() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let root = repo_root();
     let page = std::fs::read_to_string(root.join("docs/try-the-examples.md")).unwrap();
     let work = tempfile::tempdir().unwrap();
     let examples = root.join("examples/projects");
@@ -9280,9 +9290,9 @@ fn the_examples_tour_runs_as_written() {
 /// with a description: a clip recorded and never placed, or placed without alt text, fails here.
 #[test]
 fn every_recording_is_recorded_named_and_shown() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let root = repo_root();
     let assets = root.join("docs/assets");
-    let docs: String = ["README.md", "docs/cli.md", "docs/index.md"]
+    let docs: String = ["crates/pixi-sbom/README.md", "docs/cli.md", "docs/index.md"]
         .iter()
         .map(|f| std::fs::read_to_string(root.join(f)).unwrap())
         .collect();
@@ -9379,7 +9389,7 @@ fn shell_words_split_like_the_shell_the_manual_is_written_for() {
 fn the_field_manual_runs_as_written() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let work = tempfile::tempdir().unwrap();
-    let project = root.join("examples/projects/pixi/01-django");
+    let project = repo_root().join("examples/projects/pixi/01-django");
     for file in walkdir(&project) {
         let target = work.path().join(file.strip_prefix(&project).unwrap());
         std::fs::create_dir_all(target.parent().unwrap()).unwrap();
@@ -9394,10 +9404,15 @@ fn the_field_manual_runs_as_written() {
             "requirements.txt",
         ),
     ] {
-        std::fs::copy(root.join(from), work.path().join(to)).unwrap();
+        let base = if from.starts_with("tests/") {
+            root.to_path_buf()
+        } else {
+            repo_root()
+        };
+        std::fs::copy(base.join(from), work.path().join(to)).unwrap();
     }
 
-    let nav = std::fs::read_to_string(root.join("mkdocs.yml")).unwrap();
+    let nav = std::fs::read_to_string(repo_root().join("mkdocs.yml")).unwrap();
     let pages: Vec<&str> = nav
         .lines()
         .filter_map(|line| line.trim().split_once(": field-manual/").map(|(_, page)| page))
@@ -9405,7 +9420,7 @@ fn the_field_manual_runs_as_written() {
     assert!(pages.len() >= 8, "the field manual is in the navigation: {pages:?}");
     let (mut ran, mut online) = (0, 0);
     for page in pages {
-        let text = std::fs::read_to_string(root.join("docs/field-manual").join(page)).unwrap();
+        let text = std::fs::read_to_string(repo_root().join("docs/field-manual").join(page)).unwrap();
         let mut in_shell = false;
         for line in text.lines() {
             if line.starts_with("```") {
@@ -9463,7 +9478,7 @@ fn the_field_manual_runs_as_written() {
 /// a classroom.
 #[test]
 fn the_training_lab_runs_as_written_and_shows_what_it_says() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let root = repo_root();
     let page = std::fs::read_to_string(root.join("docs/lab.md")).unwrap();
     let work = tempfile::tempdir().unwrap();
     let examples = root.join("examples");
@@ -9541,7 +9556,7 @@ fn the_training_lab_runs_as_written_and_shows_what_it_says() {
 /// against the lab cache as written, and every output line on a demo slide is in what its command printed.
 #[test]
 fn the_talk_demo_runs_as_written_and_its_slides_show_what_it_prints() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let root = repo_root();
     let talk = root.join("docs/presentations/talk");
     let script = std::fs::read_to_string(talk.join("demo-script.md")).unwrap();
     let work = tempfile::tempdir().unwrap();
@@ -9786,7 +9801,7 @@ fn a_symlinked_python_directory_lists_each_package_once() {
 #[test]
 fn native_conda_packages_carry_a_cpe_in_every_format() {
     let work = tempfile::tempdir().unwrap();
-    let lockfile = Path::new(env!("CARGO_MANIFEST_DIR")).join("examples/projects/pixi/01-django/pixi.lock");
+    let lockfile = repo_root().join("examples/projects/pixi/01-django/pixi.lock");
     let run = |args: &[&str]| -> Value {
         let assert = pixi_sbom()
             .current_dir(work.path())
@@ -9909,7 +9924,7 @@ fn an_installed_environment_documents_the_same_wherever_it_is() {
 /// are what pixi-sbom writes for that lockfile, offline, for linux-64.
 #[test]
 fn the_syft_page_counts_are_what_pixi_sbom_writes() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let root = repo_root();
     let page = std::fs::read_to_string(root.join("docs/syft.md")).unwrap();
     let work = tempfile::tempdir().unwrap();
     let mut checked = 0;

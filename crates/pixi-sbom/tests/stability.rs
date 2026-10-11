@@ -12,6 +12,14 @@ use std::path::{Path, PathBuf};
 use assert_cmd::Command;
 
 fn repo() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .ancestors()
+        .nth(2)
+        .unwrap()
+        .to_path_buf()
+}
+
+fn crate_dir() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).to_path_buf()
 }
 
@@ -253,8 +261,10 @@ fn the_page_lists_every_configuration_key_and_spells_them_as_the_parser_wants() 
 fn the_page_lists_every_exit_code_the_code_defines() {
     // Every `const *_EXIT_CODE` in the sources, plus the ones clap and success own.
     let mut defined: BTreeSet<i32> = BTreeSet::from([0, 2]);
-    for file in ["src/main.rs", "src/policy.rs", "src/vulnpolicy.rs", "src/diff.rs"] {
-        let text = read(file);
+    for file in
+        ["src/main.rs", "src/policy.rs", "src/vulnpolicy.rs", "src/diff.rs"].map(|f| format!("crates/pixi-sbom/{f}"))
+    {
+        let text = read(&file);
         for line in text.lines() {
             if line.contains("EXIT_CODE: i32 = ")
                 && let Some(value) = line.split('=').nth(1)
@@ -288,7 +298,7 @@ fn the_page_lists_every_exit_code_the_code_defines() {
 #[test]
 fn the_page_lists_every_pixi_property_the_code_emits() {
     let mut emitted = BTreeSet::new();
-    for entry in walk(&repo().join("src")) {
+    for entry in walk(&crate_dir().join("src")) {
         let text = std::fs::read_to_string(&entry)
             .unwrap_or_default()
             .replace("\r\n", "\n");
@@ -338,7 +348,7 @@ fn walk(dir: &Path) -> Vec<PathBuf> {
 #[test]
 fn the_page_lists_every_environment_variable_the_code_reads() {
     let mut read = BTreeSet::new();
-    for entry in walk(&repo().join("src")) {
+    for entry in walk(&crate_dir().join("src")) {
         let text = std::fs::read_to_string(&entry)
             .unwrap_or_default()
             .replace("\r\n", "\n");

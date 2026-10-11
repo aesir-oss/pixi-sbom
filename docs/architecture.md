@@ -1,6 +1,6 @@
 # Architecture
 
-`pixi-sbom` is a single Rust binary (~41k lines under `src/` counting its unit tests, plus ~10k of integration tests) organized as a short pipeline. Each stage has one
+`pixi-sbom` is a single Rust binary (~41k lines under `crates/pixi-sbom/src/` counting its unit tests, plus ~10k of integration tests) organized as a short pipeline. Each stage has one
 job and one module, and the stages meet at a format-agnostic model so that lockfile interpretation happens exactly
 once no matter how many output formats exist.
 
@@ -215,9 +215,9 @@ a `pixi run` task so the toolchain is the pinned one from `pixi.lock`. See [deve
 ## Adding a format
 
 1. Add a variant to `cli::Format` and its extension in `Format::extension`.
-2. Create `src/format/<name>.rs` with serde structs and a `document(&Sbom, &WriteContext)` function; use
+2. Create `crates/pixi-sbom/src/format/<name>.rs` with serde structs and a `document(&Sbom, &WriteContext)` function; use
    `format::top_level_ids` for the root's edges and `license::normalize` for licenses.
 3. Add the match arm in `format::to_value`.
-4. Vendor the format's JSON schema under `tests/schemas/`, add a snapshot test plus a schema-validation test against
-   `format::testing::sample_sbom()`, and an end-to-end case in `tests/cli.rs`.
+4. Vendor the format's JSON schema under `crates/pixi-sbom/tests/schemas/`, add a snapshot test plus a schema-validation test against
+   `format::testing::sample_sbom()`, and an end-to-end case in `crates/pixi-sbom/tests/cli.rs`.
 5. Document the field mapping in [output-format.md](output-format.md).

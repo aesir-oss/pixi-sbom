@@ -6,7 +6,7 @@ This page is how the code is built, checked, tested, and released. For what the 
 ## Toolchain
 
 Everything runs through [pixi](https://pixi.sh). `pixi.toml` pins the Rust toolchain from conda-forge and defines
-every task; `Cargo.toml` describes the crate. You do not need rustup or a system Rust.
+every task; `crates/pixi-sbom/Cargo.toml` describes the crate. You do not need rustup or a system Rust.
 
 ```sh
 git clone https://github.com/millsks/pixi-sbom
@@ -23,7 +23,7 @@ prefer adding a task.
 | `fmt` | `cargo fmt` | Format (`rustfmt.toml`: edition 2024, 120 columns) |
 | `lint` | `cargo clippy --all-targets -- -D warnings` | Lint; warnings are errors |
 | `check` | `cargo check --all-targets` | Type-check without building |
-| `test` | `cargo test` | Unit tests (in `src/`), end-to-end tests (`tests/cli.rs`) and network tests (`tests/network.rs`) |
+| `test` | `cargo test` | Unit tests (in `crates/pixi-sbom/src/`), end-to-end tests (`crates/pixi-sbom/tests/cli.rs`) and network tests (`crates/pixi-sbom/tests/network.rs`) |
 | `test-integration` | `cargo test --test '*'` | End-to-end tests only |
 | `cov` | `cargo llvm-cov --all-targets --fail-under-lines 90` | Full suite with a 90% line-coverage gate |
 | `build` | `cargo build --release` | Optimized binary (`lto`, `codegen-units = 1`, stripped) at `target/release/pixi-sbom` |
@@ -93,7 +93,7 @@ check specific fields.
 
 ### The minimum supported Rust version
 
-`rust-version` in `Cargo.toml` is **1.88**, and the `msrv` environment pins exactly that toolchain so the claim is
+`rust-version` in `crates/pixi-sbom/Cargo.toml` is **1.88**, and the `msrv` environment pins exactly that toolchain so the claim is
 checked rather than asserted: `pixi run -e msrv msrv-check`, which CI runs on every pull request.
 
 It was 1.85 until someone looked. That number came from edition 2024 and was never true — this crate uses
@@ -102,7 +102,7 @@ built on the toolchain `pixi.toml` pins, which is far newer.
 
 Raising the MSRV is a breaking change for anyone pinned to an older toolchain, so after 1.0 it belongs in a minor
 release at the earliest, with the new number in the changelog. Lowering it is free. Either way the `msrv`
-environment and `Cargo.toml` change together, or the check is measuring the wrong thing.
+environment and `crates/pixi-sbom/Cargo.toml` change together, or the check is measuring the wrong thing.
 
 ### Benchmarks (`benches/`, criterion)
 
@@ -111,7 +111,7 @@ renderers and the offline enrichment path, against this repository's own lockfil
 one. The numbers and what they say are in [benchmarks.md](benchmarks.md); CI runs `pixi run bench-test`, which
 executes each benchmark once without timing it, since a shared runner's timings are noise.
 
-The benchmarks reach into the crate through the library target (`src/lib.rs`), which exists for them and for the
+The benchmarks reach into the crate through the library target (`crates/pixi-sbom/src/lib.rs`), which exists for them and for the
 tests.
 
 **That library is published to crates.io and is deliberately not an API.** The binary depends on it, so it cannot
@@ -130,7 +130,7 @@ guarantees, not to let them reach into this one.
 
 ### Snapshot tests (`insta`)
 
-Each writer has one `insta::assert_json_snapshot!` over the sample model, stored in `src/format/snapshots/`. They
+Each writer has one `insta::assert_json_snapshot!` over the sample model, stored in `crates/pixi-sbom/src/format/snapshots/`. They
 catch unintended output changes. A `WriteContext` with a fixed timestamp, UUID and tool version keeps them stable.
 When an output change is intended, review the diff and accept it:
 
@@ -142,14 +142,14 @@ pixi run cargo insta review                # or: INSTA_UPDATE=always pixi run ca
 ### End-to-end tests (`tests/cli.rs`)
 
 Run the built binary with `assert_cmd` against copies of the fixtures in temp directories, then read the file it
-wrote and validate it with the `jsonschema` crate against the schemas in `tests/schemas/`. They cover lockfile
+wrote and validate it with the `jsonschema` crate against the schemas in `crates/pixi-sbom/tests/schemas/`. They cover lockfile
 discovery, every option including `--all-environments`, both formats, and each error path's message and exit code.
 They run with `PIXI_SBOM_OFFLINE=1`, so they never make a request.
 
 ### Network tests (`tests/network.rs`)
 
 The third kind, for behaviour that only shows in how requests go over the wire: unit tests stub `Fetch` and never
-speak HTTP, and the end-to-end tests are offline. `tests/support/` is a small HTTP/1.1 server on `127.0.0.1` (the
+speak HTTP, and the end-to-end tests are offline. `crates/pixi-sbom/tests/support/` is a small HTTP/1.1 server on `127.0.0.1` (the
 standard library and threads, no dependency) that answers a script and records every request: which connection
 carried it, when it started and finished, and its body. The tests run the real binary with every upstream pointed at
 it through the `PIXI_SBOM_*_URL` overrides, so nothing leaves the machine. They cover connection reuse, batched
@@ -180,7 +180,7 @@ own tables), and scans both documents with the same Grype and the same database.
 `pixi exec` at versions pinned in the script, so neither is a dependency of the project.
 
 Every conda, Python or npm finding from syft's document must also come from pixi-sbom's. One that does not fails the
-run unless `tests/grype/exceptions.toml` lists it, for that environment, with a reason: an exception is for a
+run unless `crates/pixi-sbom/tests/grype/exceptions.toml` lists it, for that environment, with a reason: an exception is for a
 difference that is right, such as a Grype match on a CPE syft guessed from a name for code the package does not
 contain. Findings only pixi-sbom's document produces are printed, not failed. The run prints the Grype database's
 build date, because findings change as advisories are published.
@@ -192,7 +192,7 @@ the comparison itself.
 
 ### Schema validation
 
-`tests/schemas/` contains the official CycloneDX 1.6 and 1.7 schemas (with the `spdx.schema.json`,
+`crates/pixi-sbom/tests/schemas/` contains the official CycloneDX 1.6 and 1.7 schemas (with the `spdx.schema.json`,
 `jsf-0.82.schema.json` and `cryptography-defs.schema.json` they reference, registered under their canonical `$id`s so
 no network access happens), the SPDX 2.3 schema, the SPDX 3.0.1 JSON schema and the SARIF 2.1.0 schema. Both the sample model and every end-to-end document are validated,
 CycloneDX against the schema of the version written. When adding a spec version, vendor its schema and extend
@@ -208,7 +208,7 @@ CycloneDX against the schema of the version written. When adding a spec version,
 | `multi-env` | Hand-composed | Environment ordering for `--all-environments` |
 
 To refresh a real fixture, run `pixi lock` in a scratch copy of its `pixi.toml` and copy the resulting `pixi.lock`
-back; then update any version-specific assertions in `src/lock.rs` and `tests/cli.rs`. Hand-composed fixtures are
+back; then update any version-specific assertions in `crates/pixi-sbom/src/lock.rs` and `crates/pixi-sbom/tests/cli.rs`. Hand-composed fixtures are
 deliberately tiny and reuse the `libzlib` record from `conda-only` so their hashes are real.
 
 ## Trying it as a real extension
@@ -233,17 +233,17 @@ real document; the fixtures are small by design.
 - Rust: edition 2024, `rustfmt` defaults at 120 columns, clippy clean with `-D warnings`. Public items in every module
   carry a doc comment; error enums derive `thiserror::Error` and `miette::Diagnostic` with a `code(...)`.
 - Every behavior change comes with a test in the layer that owns the behavior (model changes → `lock.rs` tests;
-  output changes → writer tests and snapshots; CLI changes → `tests/cli.rs`; request behaviour → `tests/network.rs`).
+  output changes → writer tests and snapshots; CLI changes → `crates/pixi-sbom/tests/cli.rs`; request behaviour → `crates/pixi-sbom/tests/network.rs`).
 - Dependencies: prefer what `rattler_lock` already pulls in; avoid git dependencies. `serde_json` uses
   `preserve_order` so keys are emitted in struct order.
 - Never print to stdout; logs go through `tracing` to stderr.
 
 ## The CPE table
 
-`data/cpe.toml` maps a conda package name to NVD's `vendor:product`, and is compiled into the binary
-(`src/cpe.rs`). A package missing from it gets no CPE: one is never guessed from a name.
+`crates/pixi-sbom/data/cpe.toml` maps a conda package name to NVD's `vendor:product`, and is compiled into the binary
+(`crates/pixi-sbom/src/cpe.rs`). A package missing from it gets no CPE: one is never guessed from a name.
 
-**Adding an entry** is one line in `data/cpe.toml`, `<conda name> = "<vendor>:<product>"`, plus nothing else:
+**Adding an entry** is one line in `crates/pixi-sbom/data/cpe.toml`, `<conda name> = "<vendor>:<product>"`, plus nothing else:
 `cpe::tests::every_entry_is_a_valid_vendor_and_product` checks every line's format, and the Grype comparison
 (`pixi run grype-compare`) shows what the entry matches. Before adding one, check the pair is the one NVD and Grype's
 database use for that code:
@@ -264,10 +264,10 @@ issue, *CPE table upkeep*, up to date with what it finds:
 | Unknown to NVD | The pair is wrong or was withdrawn: correct or remove the entry |
 | Not a conda-forge package | The name is not one conda-forge uses, so the entry can never match: rename or remove it |
 | Version spelled unlike NVD's | conda-forge's latest version has a different shape from every version NVD records; check whether CPEs from it still match |
-| Candidates | Native packages in the examples with neither a CPE nor a PyPI identity. Add an entry, or list the package in `tests/cpe/reviewed.toml` with the reason it has none, so it is not proposed again |
+| Candidates | Native packages in the examples with neither a CPE nor a PyPI identity. Add an entry, or list the package in `crates/pixi-sbom/tests/cpe/reviewed.toml` with the reason it has none, so it is not proposed again |
 
 Nothing is added to the table automatically: which CPE a package should get is a person's call.
-**The CRAN table** (`data/cran.toml`, #436) is generated, not curated: `pixi run cran-table` rebuilds it from CRAN's
+**The CRAN table** (`crates/pixi-sbom/data/cran.toml`, #436) is generated, not curated: `pixi run cran-table` rebuilds it from CRAN's
 package list and archive and conda-forge's channel data, and `pixi run cran-table --check` says whether it is out of
 date. It lists only the exceptions: `r-*` packages CRAN spells differently and the ones never on CRAN.
 `pixi run cran-table-test` tests the generator.
@@ -299,7 +299,7 @@ release containing them exists; keep `action.yml` inputs and the CLI in step at 
 | Test | `ubuntu-latest`, `macos-latest`, `windows-latest` | `pixi run test` |
 | Coverage gate | ubuntu | `pixi run cov` |
 | Dependency advisories and licenses | ubuntu | `pixi run -e lint deny`: RUSTSEC advisories, license terms, banned crates and unexpected sources |
-| Builds on the MSRV | ubuntu | `pixi run -e msrv msrv-check`: the oldest toolchain `Cargo.toml` claims |
+| Builds on the MSRV | ubuntu | `pixi run -e msrv msrv-check`: the oldest toolchain `crates/pixi-sbom/Cargo.toml` claims |
 | Benchmarks compile and run | ubuntu | `pixi run bench-test`: every benchmark runs once, untimed |
 | Performance (separate workflow) | all five release platforms | `pixi run perf`: builds two refs on one runner and compares them; fails on binary size or peak memory, reports wall time. On demand, weekly and on pushes to `main` — not on pull requests. See [benchmarks.md](benchmarks.md) |
 | Build | same three | `pixi run build` and `--version` smoke test |
@@ -351,7 +351,7 @@ Everything in the recording is real output from a release build. What is staged 
 `scripts/demo-workspace.sh` builds a throwaway workspace from the `with-pypi` fixture with urllib3
 pinned back to a vulnerable 1.26.4, and drops the recorded OSV and CISA KEV responses the tests
 already use into the cache, so the run needs no network and takes the same time every time. It
-makes the same substitution as `workspace_with_vulnerable_urllib3` in `tests/cli.rs` and fails
+makes the same substitution as `workspace_with_vulnerable_urllib3` in `crates/pixi-sbom/tests/cli.rs` and fails
 loudly if the fixture has drifted out from under it. The 1.8 clips add three more inputs: the recorded FIRST EPSS
 answer written into the cache the way a lookup leaves it, the OpenVEX fixture trimmed to its one urllib3 statement
 (so the clip is not buried in warnings about statements this workspace has nothing for), and syft's document for a
@@ -403,7 +403,7 @@ someone using the tool, not what the commits were. Before cutting a final releas
 pass in its own pull request. The release workflow refuses to tag a final release whose `## Unreleased` is missing
 or empty (`pixi run whats-new check <version>` asks the same question locally), and renames it to `## <version>`
 in the `chore(release)` commit next to the changelog, so the tag carries its notes and `main` never has a release
-the page does not describe. `the_whats_new_page_covers_every_release_since_1_0` in `tests/cli.rs` fails the build
+the page does not describe. `the_whats_new_page_covers_every_release_since_1_0` in `crates/pixi-sbom/tests/cli.rs` fails the build
 for a release without a section, for a section naming a release that does not exist, and for an `## Unreleased`
 that is not the only one or not above every release. Release candidates do not get a section, and leave
 `## Unreleased` as it is; their final does. A release with nothing a user would notice still gets one line, such

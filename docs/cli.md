@@ -1604,7 +1604,7 @@ The reports that look packages up work from the purls. `--report outdated` asks 
 scores the repository the document names, or for a PyPI package the one PyPI's `project_urls` name (see
 [How well each dependency is looked after](#how-well-each-dependency-is-looked-after)); syft names none, so for its
 documents every score comes from there. A document syft wrote for a venv gives the same answers in CycloneDX and in
-SPDX, which `tests/matrix.rs` checks.
+SPDX, which `crates/pixi-sbom/tests/matrix.rs` checks.
 
 What is written carries `pixi:source-document` — the source's serial number or namespace — in place of
 `pixi:lockfile`, so the derivation is traceable. Enrichment that needs a lockfile or a local package cache

@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use pixi_sbom::lock::{self, LoadedLock, Selection};
 use pixi_sbom::model::{Root, Sbom};
 
-/// The repository root, which is where the reference lockfile lives.
+/// The crate's directory, where its test fixtures live.
 pub fn manifest_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
 }
@@ -19,7 +19,7 @@ pub fn manifest_dir() -> PathBuf {
 /// Read at run time rather than embedded, because the packaged crate leaves the lockfile out
 /// and a benchmark that would not compile without it is worse than one that says it is absent.
 pub fn reference_lock() -> LoadedLock {
-    let path = manifest_dir().join("pixi.lock");
+    let path = manifest_dir().ancestors().nth(2).unwrap().join("pixi.lock");
     lock::load(&path).unwrap_or_else(|err| panic!("cannot read the reference lockfile {}: {err}", path.display()))
 }
 

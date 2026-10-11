@@ -12,7 +12,7 @@ set -euo pipefail
 
 target="${1:?usage: demo-workspace.sh <target-dir>}"
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-fixtures="$here/tests/fixtures"
+fixtures="$here/crates/pixi-sbom/tests/fixtures"
 
 rm -rf "$target"
 mkdir -p "$target/workspace" "$target/cache" "$target/bin"

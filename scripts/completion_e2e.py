@@ -19,7 +19,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-PROBES = ROOT / "tests" / "completion"
+PROBES = ROOT / "crates" / "pixi-sbom" / "tests" / "completion"
 
 CASES: list[tuple[str, set[str], bool]] = [
     # line, expected candidates, whether they must be all that is offered

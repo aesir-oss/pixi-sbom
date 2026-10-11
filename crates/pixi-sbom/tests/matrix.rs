@@ -18,6 +18,16 @@ use assert_cmd::Command;
 use serde_json::{Value, json};
 use support::{Request, Response, Server};
 
+/// The repository root: the docs, examples and changelog these tests check live there, not in
+/// the crate.
+fn repo_root() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .ancestors()
+        .nth(2)
+        .unwrap()
+        .to_path_buf()
+}
+
 fn root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
 }
@@ -236,7 +246,7 @@ struct Input {
 }
 
 fn inputs(work: &Path) -> Vec<Input> {
-    let examples = root().join("examples/projects");
+    let examples = repo_root().join("examples/projects");
     let fixtures = root().join("tests/fixtures");
     let lockfile = |path: PathBuf| {
         vec![

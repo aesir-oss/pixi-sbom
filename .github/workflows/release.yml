@@ -83,7 +83,7 @@ jobs:
             next_tag="${major}.${minor}.${patch}"
           else
             # First release: use whatever Cargo.toml already says.
-            next_tag=$(grep -m1 '^version = ' Cargo.toml | sed -E 's/version = "([^"]+)"/\1/')
+            next_tag=$(grep -m1 '^version = ' crates/pixi-sbom/Cargo.toml | sed -E 's/version = "([^"]+)"/\1/')
           fi
           echo "next_tag=${next_tag}" >> "$GITHUB_OUTPUT"
 
@@ -186,10 +186,10 @@ jobs:
           environments: default
           cache: true
 
-      - name: Bump version in Cargo.toml, Cargo.lock and pixi.toml
+      - name: Bump version in crates/pixi-sbom/Cargo.toml, Cargo.lock and pixi.toml
         if: steps.should_skip.outputs.skip != 'true'
         run: |
-          sed -i -E "s/^version = \"[^\"]+\"/version = \"${{ env.NEW_TAG }}\"/" Cargo.toml pixi.toml
+          sed -i -E "s/^version = \"[^\"]+\"/version = \"${{ env.NEW_TAG }}\"/" crates/pixi-sbom/Cargo.toml pixi.toml
           pixi run cargo update --workspace
           git diff --stat
 
@@ -220,7 +220,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add CHANGELOG.md Cargo.toml Cargo.lock pixi.toml docs/whats-new.md
+          git add CHANGELOG.md crates/pixi-sbom/Cargo.toml Cargo.lock pixi.toml docs/whats-new.md
           git commit -m "chore(release): v${{ env.NEW_TAG }}"
           git tag -a "v${{ env.NEW_TAG }}" -m "Release v${{ env.NEW_TAG }}"
           git push origin HEAD:main --tags
