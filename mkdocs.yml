@@ -37,6 +37,8 @@ nav:
       - A restricted network: field-manual/restricted-network.md
       - A project without pixi: field-manual/without-pixi.md
       - Release with a signed SBOM: field-manual/signed-release.md
+  - pixi-policy:
+      - License policy: pixi-policy/licenses.md
   - Command-line reference: cli.md
   - GitHub Action: github-action.md
   - CI recipes: ci-recipes.md

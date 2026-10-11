@@ -2056,6 +2056,7 @@ dependencies = [
  "rattler_lock",
  "serde",
  "serde_json",
+ "spdx",
  "tempfile",
  "thiserror 2.0.20",
  "toml",
