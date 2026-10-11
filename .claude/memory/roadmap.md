@@ -328,3 +328,14 @@ and likewise `pixi-sbom 1.13.0`, `pixi-sbom 2.0.0` and `pixi-sbom launch`), a `p
 repository-level issues (#49 repository releases, #6 the shared docs site), and every issue got a `pixi-sbom` or
 `pixi-ext-contrib` label (`pixi-policy` exists for when that work starts). Issue and PR texts written earlier still say
 the bare version.
+
+2026-10-11, the rest of that day: the per-extension changelog (#51, `crates/<extension>/CHANGELOG.md` from
+`scripts/changelog.py`) and the repository release (#49, `pixi-ext-contrib-YYYY.MM.N`, the only release marked Latest;
+created with the release App's token after `GITHUB_TOKEN` got HTTP 403 on its first run, #95) landed before pixi-policy.
+pixi-sbom 1.13.0 shipped the same day: `--scan` finds installed environments in an unpacked container image (#25),
+two example images to scan (#31), and a JavaScript project's `node_modules` read when it has no lockfile (#36). The
+`--deny-license` deprecation was held out of 1.13.0 by the maintainer: it waits until pixi-policy exists (#85, no
+milestone). pixi-policy's plan is on GitHub: milestones `aesir-pixi-ext-contrib-common 0.1.0` and `0.2.0` for the
+shared crate (renamed from `pixi-ext-common`, published to crates.io as an internal crate, #54), and `pixi-policy
+0.1.0`, `0.2.0`, `0.3.0` and `1.0.0` (#56 to #85). CI work is #89 to #93 (build cache, path filters, release builds
+on main, a lighter release gate, one compile per platform).
