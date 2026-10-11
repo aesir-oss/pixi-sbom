@@ -13,6 +13,7 @@ A Cargo workspace of pixi extensions. Each is a `pixi-<name>` binary that pixi r
 | Path | What it is |
 |---|---|
 | `crates/pixi-ext-common/` | Code the extensions share (`common` in their `Cargo.toml`): license normalization, `pipe`, `style`. Compiled into each extension by path, never published, not an API (#56, #106) |
+| `crates/pixi-policy/` | The pixi-policy crate (`pixi policy`, #60 on): checks a workspace's `pixi.lock` against `pixi-policy.toml`; rule families land from #61. `publish = false`, like every crate here |
 | `crates/pixi-sbom/` | The pixi-sbom crate: `src/`, `tests/` (fixtures, schemas, snapshots), `benches/`, `data/` (CPE and CRAN tables compiled in), `pyproject.toml` (maturin `bindings = "bin"` wheels), `pre-commit-mirror/` (templates) |
 | `actions/pixi-sbom/` | The GitHub Action's source, copied to `aesir-oss/pixi-sbom-action` on each release |
 | `docs/`, `mkdocs.yml` | The docs site (MkDocs Material, versioned with mike) at aesir-oss.github.io/pixi-ext-contrib |
@@ -20,8 +21,7 @@ A Cargo workspace of pixi extensions. Each is a `pixi-<name>` binary that pixi r
 | `scripts/` | Python maintenance and release tooling, each with a `test_*.py` |
 | `Cargo.toml` | The workspace manifest; the release profile lives here |
 
-Planned: `crates/pixi-policy` (dependency policy, takes over pixi-sbom's license gate). Docs per extension are tracked
-in #6.
+Docs per extension are tracked in #6.
 
 ## Commands
 

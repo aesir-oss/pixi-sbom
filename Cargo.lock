@@ -2040,6 +2040,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "pixi-policy"
+version = "0.1.0"
+dependencies = [
+ "assert_cmd",
+ "clap",
+ "miette",
+ "pixi-ext-common",
+ "predicates",
+ "rattler_lock",
+ "serde",
+ "tempfile",
+ "thiserror 2.0.20",
+ "toml",
+]
+
+[[package]]
 name = "pixi-sbom"
 version = "1.13.0"
 dependencies = [
