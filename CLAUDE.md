@@ -41,6 +41,8 @@ Everything runs through pixi.
   `crates/pixi-sbom/CHANGELOG.md`, commits and tags `pixi-sbom-vX.Y.Z` with the release App. The tag triggers `release-artifacts.yml`.
 - Tags before the move are plain `vX.Y.Z` (made in millsks/pixi-sbom); keep them. Archives are named
   `pixi-sbom-vX.Y.Z-<platform>`, which is also the tag.
+- Extension releases are never marked Latest; after each final one `repository-release.yml` publishes
+  `pixi-ext-contrib-YYYY.MM.N`, the only release marked Latest.
 - Release candidates go to TestPyPI, finals to PyPI; crates.io and PyPI use trusted publishing.
 - Ask before cutting any release. After every release candidate, the maintainer runs a private field test; see the
   private (uncommitted) project memory.

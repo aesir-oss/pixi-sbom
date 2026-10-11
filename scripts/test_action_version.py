@@ -10,8 +10,11 @@ import json
 import os
 import subprocess
 import tempfile
+import threading
 import unittest
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse
 
 SCRIPT = Path(__file__).resolve().parent.parent / "actions" / "pixi-sbom" / "action-version.sh"
 
@@ -92,6 +95,41 @@ class ActionVersionTest(unittest.TestCase):
     def test_unreachable_api_is_an_error(self) -> None:
         result = self.resolve(ACTION_REF="main", RELEASES_API="file:///nonexistent/releases")
         self.assertNotEqual(result.returncode, 0)
+
+
+    def test_every_page_of_releases_is_read(self) -> None:
+        # The repository's own pixi-ext-contrib-YYYY.MM.N releases (#49) fill the first page sooner; a release on the
+        # second page is still found by following the Link header, and the repository tags are never taken for one.
+        pages = {
+            1: [{"tag_name": f"pixi-ext-contrib-2026.10.{n}"} for n in range(1, 100)] + [{"tag_name": "pixi-sbom-v1.1.0"}],
+            2: [{"tag_name": "pixi-sbom-v1.4.0"}, {"tag_name": "pixi-ext-contrib-2026.09.1"}],
+        }
+        seen: list[str] = []
+
+        class Releases(BaseHTTPRequestHandler):
+            def do_GET(self) -> None:  # noqa: N802 - the handler's required name
+                seen.append(self.path)
+                page = int(parse_qs(urlparse(self.path).query).get("page", ["1"])[0])
+                body = json.dumps(pages[page], indent=2).encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                if page < len(pages):
+                    port = self.server.server_address[1]
+                    self.send_header("Link", f'<http://127.0.0.1:{port}/releases?per_page=100&page={page + 1}>; rel="next"')
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *args: object) -> None:
+                pass
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), Releases)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        self.addCleanup(server.server_close)
+        self.addCleanup(server.shutdown)
+        api = f"http://127.0.0.1:{server.server_address[1]}/releases"
+        self.assertEqual(self.version(RELEASES_API=api), "1.4.0")
+        self.assertEqual(self.version(RELEASES_API=api, ACTION_REF="pixi-sbom-v1"), "1.4.0")
+        self.assertEqual(len(seen), 4, seen)
 
 
 if __name__ == "__main__":

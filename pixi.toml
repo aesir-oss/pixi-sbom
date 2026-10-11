@@ -40,6 +40,8 @@ cran-table = { cmd = "python scripts/cran_table.py", description = "regenerate d
 cran-table-test = { cmd = "python -m unittest discover -s scripts -p 'test_cran_table.py' -v", description = "the CRAN table generator's own tests" }
 whats-new = { cmd = "python scripts/whats_new.py", description = "check, or release, the What's new page's Unreleased section: whats-new check|release <version>" }
 whats-new-test = { cmd = "python -m unittest discover -s scripts -p 'test_whats_new.py' -v", description = "the What's new release step's own tests" }
+repo-release = { cmd = "python scripts/repo_release.py", description = "plan the repository release marked Latest: repo-release --releases <JSONL> --notes <FILE>" }
+repo-release-test = { cmd = "python -m unittest discover -s scripts -p 'test_repo_release.py' -v", description = "the repository release planner's own tests" }
 action-test = { cmd = "python -m unittest discover -s scripts -p 'test_action_version.py' -v", description = "which binary the GitHub Action installs for a given ref" }
 bench = "cargo bench --benches"
 bench-test = "cargo bench --benches -- --test"

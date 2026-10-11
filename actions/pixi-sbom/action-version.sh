@@ -16,10 +16,24 @@ apis="${RELEASES_API:-https://api.github.com/repos/aesir-oss/pixi-ext-contrib/re
 
 fetch() {
   if [ -n "${GH_TOKEN:-}" ]; then
-    curl -sSfL -H "Authorization: Bearer $GH_TOKEN" "$1"
+    curl -sSfL -H "Authorization: Bearer $GH_TOKEN" "$@"
   else
-    curl -sSfL "$1"
+    curl -sSfL "$@"
   fi
+}
+
+# Every page of a release list, following the Link header's rel="next": the repository's own releases (#49) fill the
+# first hundred sooner, and a release past them would never be found. A file:// fixture has no headers, so one page.
+fetch_all() {
+  local url="$1?per_page=100" headers pages=0
+  headers=$(mktemp)
+  while [ -n "$url" ] && [ "$pages" -lt 50 ]; do
+    fetch -D "$headers" "$url"
+    echo
+    url=$(tr -d '\r' < "$headers" | grep -i '^link:' | grep -oE '<[^>]+>; *rel="next"' | sed -E 's/^<([^>]+)>.*/\1/' || true)
+    pages=$((pages + 1))
+  done
+  rm -f "$headers"
 }
 
 version="${INPUT_VERSION:-}"
@@ -37,7 +51,7 @@ fi
 newest() {
   local api
   for api in $apis; do
-    fetch "${api}?per_page=100"
+    fetch_all "$api"
   done |
     grep -oE "\"tag_name\": *\"(pixi-sbom-)?v$1\.[0-9]+\.[0-9]+\"" |
     sed -E 's/.*"(pixi-sbom-)?v([^"]+)"/\2/' |

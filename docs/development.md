@@ -409,6 +409,16 @@ Two workflows. `release.yml` is run by hand from the Actions tab (*Release* → 
 the tag push; that tag then starts `release-artifacts.yml`, which builds, signs and publishes everything. One
 operator action, two runs.
 
+**Two kinds of release.** Each extension's releases (`pixi-sbom-vX.Y.Z`, release candidates included) are published
+with `make_latest: false`, so no extension holds GitHub's *Latest* badge. After every successful final release,
+`repository-release.yml` publishes the repository's own release, `pixi-ext-contrib-YYYY.MM.N` (N counts up within the
+month), marked *Latest*: no assets, just a table of every extension's newest final release. `scripts/repo_release.py`
+plans it from the release list and makes none when the newest repository release already lists the same versions, so
+a release candidate, a re-run or a dispatch from the Actions tab with nothing new changes nothing. Without it GitHub
+would show the newest full release as *Latest*, whichever extension that was. The repository tag matches no
+extension pattern (`v*`, `pixi-sbom-v*`, `cliff.toml`'s `tag_pattern`, the Action's lookup), which
+`pixi run repo-release-test` checks.
+
 `release.yml` inputs:
 
 | Input | Default | Meaning |

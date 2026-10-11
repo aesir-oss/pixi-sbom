@@ -53,9 +53,12 @@ jobs:
     # A release commits `chore(release): vX.Y.Z` to main, touching crates/pixi-sbom/CHANGELOG.md, and the release
     # event follows minutes later. Without this the same release deploys twice, `dev` first and
     # then the tag; path filters cannot express "any push but that one".
+    # The repository release (pixi-ext-contrib-YYYY.MM.N, #49) documents no version of the site either.
     if: >-
-      ${{ github.event_name != 'push'
-        || !startsWith(github.event.head_commit.message, 'chore(release):') }}
+      ${{ (github.event_name != 'push'
+        || !startsWith(github.event.head_commit.message, 'chore(release):'))
+        && (github.event_name != 'release'
+        || !startsWith(github.event.release.tag_name, 'pixi-ext-contrib-')) }}
     outputs:
       version: ${{ steps.mike.outputs.version }}
     steps:

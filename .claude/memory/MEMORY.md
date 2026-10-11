@@ -12,4 +12,4 @@ Issue and PR numbers from before 2026-10-11 refer to millsks/pixi-sbom.
 - [Concurrent CI runs SIGKILL](concurrent-ci-sigkill.md) — SIGKILL in cov = two ci runs overlapping (mine + stop hook), not a failing test
 - [Concurrent sessions and the Stop hook](concurrent-sessions-stop-hook.md) — two sessions in one tree: CI runs kill each other; mass failures may not be real
 - [Dev environment](dev-environment.md) — local quirks: the Stop hook, pre-commit through pixi, tests reading repo-root files
-- [Releases are never latest](releases-never-latest.md) — monorepo: every component release, final or rc, is published with latest=false; never resolve releases/latest
+- [Releases are never latest](releases-never-latest.md) — extension releases are latest=false; the repository release pixi-ext-contrib-YYYY.MM.N is the only one marked Latest; never resolve releases/latest
