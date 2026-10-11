@@ -439,9 +439,10 @@ What the two do, in order:
    only triggers on `vX.Y.Z` tags and the version lookups match `vX.Y.Z` only, so the floating tag starts nothing
    and is never taken for the latest release.
 8. **Crate.** `publish-crate.yml` (reusable, also dispatchable by hand with a `tag` input to republish) checks the
-   tag out clean and runs `cargo publish --locked` (skipped with a warning while the `CARGO_REGISTRY_TOKEN` secret
-   is missing). The `[package.metadata.binstall]` table in `Cargo.toml` points `cargo binstall` at the release
-   archives.
+   tag out clean and runs `cargo publish -p pixi-sbom --locked` with a short-lived token from crates.io trusted
+   publishing (`rust-lang/crates-io-auth-action`); no API token is stored. The crate's crates.io settings list
+   `release-artifacts.yml` and `publish-crate.yml` as trusted publishers. The `[package.metadata.binstall]` table in
+   `crates/pixi-sbom/Cargo.toml` points `cargo binstall` at the release archives.
 9. **Wheels.** The `wheels` job builds the same binary into PyPI platform wheels with
    [maturin](https://www.maturin.rs/) (`pyproject.toml`, `bindings = "bin"`: no Python code, version from
    `Cargo.toml`, so `1.7.0-rc.1` becomes `1.7.0rc1`), from the tag, with the Rust `pixi.toml` pins: manylinux and

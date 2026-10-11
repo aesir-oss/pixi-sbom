@@ -292,10 +292,12 @@ jobs:
   # which cargo would refuse as uncommitted changes).
   crate:
     needs: [tag, publish]
+    permissions:
+      contents: read
+      id-token: write # crates.io trusted publishing, granted to the called job
     uses: ./.github/workflows/publish-crate.yml
     with:
       tag: ${{ needs.tag.outputs.tag }}
-    secrets: inherit
 
   # ---------------------------------------------------------------------------
   # The same binary as platform wheels for PyPI (maturin, `bindings = "bin"`), so `uvx pixi-sbom`
