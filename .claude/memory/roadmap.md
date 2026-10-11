@@ -322,3 +322,9 @@ name still prefixed `pixi-sbom-` to the new tag), fixed in #33. The action is pu
 the hooks from `aesir-oss/pixi-sbom-pre-commit`, both synced on release. The 1.12.0 and 1.13.0 milestones keep their
 features (#23, #24, #29, #30; #25, #31) for after the move is validated. pixi-policy will take over the license gate:
 deprecate `--deny-license` in 1.13, remove it in 2.0.
+
+2026-10-11, after 1.12.0 shipped: milestones were renamed to name their component (`1.12.0` became `pixi-sbom 1.12.0`,
+and likewise `pixi-sbom 1.13.0`, `pixi-sbom 2.0.0` and `pixi-sbom launch`), a `pixi-ext-contrib` milestone took the
+repository-level issues (#49 repository releases, #6 the shared docs site), and every issue got a `pixi-sbom` or
+`pixi-ext-contrib` label (`pixi-policy` exists for when that work starts). Issue and PR texts written earlier still say
+the bare version.
