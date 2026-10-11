@@ -41,9 +41,9 @@ class GrypeCompareTest(unittest.TestCase):
         self.assertEqual(g.default_gap({openssl}, {openssl, django}), set())
 
     def test_a_lockfile_entry_is_described_from_its_lockfile_and_an_environment_from_its_prefix(self) -> None:
-        self.assertIn(("js-app", "crates/pixi-sbom/tests/grype/js-app", "lockfile"), g.CORPUS)
+        self.assertIn(("web-frontend", "examples/projects/npm/19-web-frontend", "lockfile"), g.CORPUS)
         self.assertEqual(
-            g.pixi_sbom_input(g.Path("/w/js-app"), "lockfile"), ["--lockfile", str(g.Path("/w/js-app/package-lock.json"))]
+            g.pixi_sbom_input(g.Path("/w/web-frontend"), "lockfile"), ["--lockfile", str(g.Path("/w/web-frontend/package-lock.json"))]
         )
         self.assertEqual(g.pixi_sbom_input(g.Path("/w/env"), "pixi"), ["--prefix", str(g.Path("/w/env")), "--embedded-sboms"])
 

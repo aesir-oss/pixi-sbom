@@ -11,6 +11,7 @@ The standard library only, like the other scripts here: this is one helper besid
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import shutil
 import subprocess
@@ -26,6 +27,12 @@ PROJECTS = EXAMPLES / "projects"
 LOCAL_LIB = EXAMPLES / "shared" / "internal-utils"
 
 READERS = ("pixi", "pylock", "uv", "poetry", "pdm", "conda-lock", "conda-explicit", "requirements")
+# JavaScript projects (#29): only the scenarios that list them get one, each locked by its own tool.
+JS_READERS = ("npm", "yarn", "yarn-berry", "pnpm")
+# The package managers corepack runs, pinned so a regenerated lockfile is written by the same release.
+YARN_CLASSIC = "yarn@1.22.22"
+YARN_BERRY = "yarn@4.9.2"
+PNPM = "pnpm@9.15.9"
 CONDA_PLATFORMS = ("linux-64", "osx-arm64")
 # The examples' Python floor. A scenario that shows old, vulnerable pins may declare an older one
 # (`python` / `conda_python`), because those releases only have wheels for the Pythons of their day.
@@ -241,6 +248,54 @@ def pixi_toml(scenario: dict) -> str:
     return "\n".join(out) + "\n"
 
 
+def package_json(scenario: dict) -> str:
+    """The `package.json` of a scenario's JavaScript project: `npm.dependencies` and `npm.dev` as `name@version`
+    pins (a scoped name keeps its leading `@`)."""
+    def pins(specs: list[str]) -> dict[str, str]:
+        out = {}
+        for spec in specs:
+            name, _, version = spec.rpartition("@")
+            out[name] = version
+        return out
+
+    npm = scenario.get("npm", {})
+    body: dict = {
+        # The pixi manifests' naming: a bare scenario name can be a real npm package (`web-frontend` is a
+        # malicious one, MAL-2022-7069), which a scanner would then match the project against.
+        "name": scenario["id"].split("-", 1)[1] + "-example",
+        "version": "0.1.0",
+        "private": True,
+        "description": scenario["title"],
+        "license": "MIT",
+        "dependencies": pins(npm.get("dependencies", [])),
+    }
+    if npm.get("dev"):
+        body["devDependencies"] = pins(npm["dev"])
+    return json.dumps(body, indent=2) + "\n"
+
+
+def lock_javascript(reader: str, target: Path) -> None:
+    """Lock the `package.json` in `target` with the reader's own tool, leaving only its lockfile beside it."""
+    if reader == "npm":
+        run(["npm", "install", "--package-lock-only", "--ignore-scripts", "--no-audit", "--no-fund"], target)
+    elif reader == "yarn":
+        run(["corepack", YARN_CLASSIC, "install", "--ignore-scripts", "--non-interactive"], target)
+    elif reader == "yarn-berry":
+        # An empty yarn.lock is how Berry is told the directory is a project of its own.
+        (target / "yarn.lock").touch()
+        run(["corepack", YARN_BERRY, "install", "--mode=update-lockfile"], target)
+    elif reader == "pnpm":
+        run(["corepack", PNPM, "install", "--lockfile-only", "--ignore-scripts"], target)
+    else:
+        raise ValueError(f"{reader} is not a JavaScript reader")
+    for leftover in ("node_modules", ".yarn", ".pnp.cjs", ".pnp.loader.mjs"):
+        path = target / leftover
+        if path.is_dir():
+            shutil.rmtree(path)
+        else:
+            path.unlink(missing_ok=True)
+
+
 def requirements_in(scenario: dict) -> tuple[str, str]:
     """`requirements.in` and `requirements-dev.in`, as a pip-tools project keeps them: the
     application's requirements and its extras in one, every dependency group in the other on top
@@ -264,6 +319,8 @@ def tool_env(venv: Path | None = None, base: dict[str, str] | None = None) -> di
         "PDM_CHECK_UPDATE": "false",
         # Poetry's virtualenv for a scenario lives in Poetry's cache, never in the example itself.
         "POETRY_VIRTUALENVS_IN_PROJECT": "false",
+        # corepack fetches the pinned yarn and pnpm releases without asking.
+        "COREPACK_ENABLE_DOWNLOAD_PROMPT": "0",
     }
     if venv:
         # Poetry treats pixi's own environment (CONDA_PREFIX) as active unless told otherwise, and
@@ -374,6 +431,13 @@ def generate(scenario: dict, reader: str) -> Path:
         run(["pixi", "lock", "--manifest-path", str(target / "pixi.toml")], target, isolated=True)
         # pixi installs into the workspace to build a local or git package's metadata; not part of it.
         shutil.rmtree(target / ".pixi", ignore_errors=True)
+        # A workspace with a JavaScript frontend keeps the frontend's lockfile beside pixi.toml (`--javascript`).
+        if scenario.get("npm"):
+            (target / "package.json").write_text(package_json(scenario))
+            lock_javascript("npm", target)
+    elif reader in JS_READERS:
+        (target / "package.json").write_text(package_json(scenario))
+        lock_javascript(reader, target)
     elif reader == "requirements":
         main, dev = requirements_in(scenario)
         (target / "requirements.in").write_text(main)
@@ -428,15 +492,16 @@ def load(path: Path = SCENARIOS) -> list[dict]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--reader", action="append", choices=READERS, help="only these readers (repeatable)")
+    parser.add_argument("--reader", action="append", choices=READERS + JS_READERS, help="only these readers (repeatable)")
     parser.add_argument("--scenario", action="append", help="only these scenario ids, e.g. 01-django (repeatable)")
     args = parser.parse_args()
 
     scenarios = [s for s in load() if not args.scenario or s["id"] in args.scenario]
-    readers = args.reader or list(READERS)
+    readers = args.reader or list(READERS + JS_READERS)
     failures = []
     for scenario in scenarios:
         for reader in readers:
+            # A scenario without its own list is a Python one: every reader but the JavaScript ones.
             if reader not in scenario.get("readers", READERS):
                 continue
             sys.stderr.write(f"{reader}/{scenario['id']}\n")

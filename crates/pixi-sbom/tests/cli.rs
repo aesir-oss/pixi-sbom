@@ -9305,7 +9305,11 @@ fn every_pixi_example_reads_in_every_environment() {
         .filter(|p| p.join("pixi.lock").is_file())
         .collect();
     projects.sort();
-    assert_eq!(projects.len(), 17, "one per scenario, the conda-only ones included");
+    assert_eq!(
+        projects.len(),
+        19,
+        "one per scenario, the conda-only ones and the frontend's workspace included"
+    );
     for project in &projects {
         let manifest: toml::Table = std::fs::read_to_string(project.join("pixi.toml"))
             .unwrap()
@@ -9401,7 +9405,7 @@ fn every_requirements_example_reads_for_what_it_was_compiled_for() {
         .filter(|p| p.join("requirements.txt").is_file())
         .collect();
     projects.sort();
-    assert_eq!(projects.len(), 14, "one per scenario");
+    assert_eq!(projects.len(), 15, "one per scenario that has a requirements example");
     for project in &projects {
         let first = std::fs::read_to_string(project.join("requirements.txt")).unwrap();
         let by_uv = first.contains("uv pip compile");
@@ -9469,6 +9473,56 @@ fn every_unpinned_requirements_example_is_refused_by_line() {
 /// has a fixed name (explicit specs and requirements files are only read through --lockfile). A
 /// reader that cannot read a file its own tool wrote fails here rather than on a user's scan.
 #[test]
+fn every_javascript_example_describes_the_same_frontend() {
+    let examples = repo_root().join("examples/projects");
+    let work = tempfile::tempdir().unwrap();
+    let purls = |args: &[&str], dir: &Path| -> std::collections::BTreeSet<String> {
+        let output = pixi_sbom()
+            .current_dir(dir)
+            .env("PIXI_CACHE_DIR", work.path().join("empty-pkgs-cache"))
+            .env("PIXI_SBOM_CACHE_DIR", work.path().join("cache"))
+            .env("PIXI_SBOM_OFFLINE", "1")
+            .args(["-p", "linux-64", "--output", "-"])
+            .args(args)
+            .assert()
+            .success()
+            .get_output()
+            .stdout
+            .clone();
+        let doc: Value = serde_json::from_slice(&output).unwrap();
+        doc["components"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|c| c["purl"].as_str().unwrap().to_string())
+            .filter(|p| p.starts_with("pkg:npm/"))
+            .collect()
+    };
+    let npm = purls(
+        &["--lockfile", "package-lock.json"],
+        &examples.join("npm/19-web-frontend"),
+    );
+    assert!(npm.contains("pkg:npm/lodash@4.17.15"), "{npm:?}");
+    assert!(npm.contains("pkg:npm/%40babel/traverse@7.22.5"), "{npm:?}");
+    for (reader, file) in [
+        ("yarn", "yarn.lock"),
+        ("yarn-berry", "yarn.lock"),
+        ("pnpm", "pnpm-lock.yaml"),
+    ] {
+        let dir = examples.join(reader).join("19-web-frontend");
+        assert_eq!(
+            purls(&["--lockfile", file], &dir),
+            npm,
+            "{reader} locked the same releases"
+        );
+    }
+    // The pixi workspace with the frontend beside it: the frontend joins only with --javascript.
+    let workspace = examples.join("pixi/19-web-frontend");
+    assert!(purls(&[], &workspace).is_empty());
+    assert_eq!(purls(&["--javascript"], &workspace), npm);
+}
+
+#[test]
 fn the_whole_examples_tree_scans_clean() {
     let examples = repo_root().join("examples/projects");
     let work = tempfile::tempdir().unwrap();
@@ -9495,8 +9549,8 @@ fn the_whole_examples_tree_scans_clean() {
     let text = String::from_utf8(output).unwrap();
     assert_eq!(
         text.matches("\"report\": \"packages\"").count(),
-        90,
-        "one report per lockfile"
+        98,
+        "one report per lockfile, a JavaScript lockfile beside a pixi workspace's included"
     );
 }
 

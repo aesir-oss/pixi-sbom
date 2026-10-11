@@ -38,9 +38,9 @@ CORPUS = [
     # npm and its dependencies, installed by nodejs and a tool built on it (#438).
     ("node-tools", "examples/projects/pixi/17-node-tools", "pixi"),
     # Native libraries a wheel bundles (`PIL/.dylibs`, `pillow.libs`), read out of the binaries (#23).
-    ("pillow-wheels", "crates/pixi-sbom/tests/grype/pillow-wheels/requirements.txt", "venv"),
-    # A JavaScript project read from its package-lock.json, not installed: both tools read the lockfile (#29).
-    ("js-app", "crates/pixi-sbom/tests/grype/js-app", "lockfile"),
+    ("pillow-wheels", "examples/projects/requirements/18-image-wheels/requirements.txt", "venv"),
+    # The JavaScript example read from its package-lock.json, not installed: both tools read the lockfile (#29).
+    ("web-frontend", "examples/projects/npm/19-web-frontend", "lockfile"),
 ]
 
 # syft reads installed package.json files only in an image unless told to; on the environment that

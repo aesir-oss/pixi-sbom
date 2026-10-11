@@ -120,6 +120,9 @@ jobs:
         run: pixi run signature-check-test
       - name: The CRAN table generator's own tests
         run: pixi run cran-table-test
+      # Only the standard library, so the default environment runs them without the examples' tools.
+      - name: The example generator's own tests
+        run: pixi run python -m unittest discover -s scripts -p 'test_examples.py' -v
 
   # Tab completion as people get it: pixi-sbom's registration and the documented `pixi sbom`
   # snippets loaded into real fish, bash, zsh and PowerShell, each asked what Tab offers. Windows

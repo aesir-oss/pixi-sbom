@@ -316,3 +316,39 @@ title = "nodejs and a JavaScript tool"
 readers = ["pixi", "conda-lock", "conda-explicit"]
 shows = ["npm packages installed in the environment (--prefix)", "scoped and nested npm packages"]
 conda = ["nodejs=22", "configurable-http-proxy"]
+
+[[scenario]]
+id = "18-image-wheels"
+title = "Image processing with wheels that bundle native libraries"
+python = ">=3.12,<3.13"
+conda_python = "3.12"
+readers = ["pixi", "uv", "requirements"]
+shows = [
+  "native libraries bundled in wheels (--prefix --embedded-sboms, after installing)",
+  "CVE-2023-4863 in the libwebp inside Pillow's wheels",
+]
+dependencies = ["Pillow==10.0.0"]
+conda = []
+# Installed from PyPI by pixi too, so the environment holds the wheel with its pillow.libs / .dylibs.
+conda_pip = ["Pillow==10.0.0"]
+
+[[scenario]]
+id = "19-web-frontend"
+title = "A web frontend locked by npm, yarn and pnpm, and a pixi workspace with it beside"
+readers = ["npm", "yarn", "yarn-berry", "pnpm", "pixi"]
+shows = [
+  "JavaScript lockfiles (package-lock.json, yarn.lock v1 and Berry, pnpm-lock.yaml)",
+  "a pixi workspace with its frontend beside it (--javascript)",
+  "vulnerabilities in npm packages, a development dependency",
+]
+dependencies = []
+conda = ["nodejs=22"]
+conda_pip = ["fastapi==0.109.0"]
+npm = { dependencies = [
+  "@babel/traverse@7.22.5",
+  "axios@0.21.1",
+  "lodash@4.17.15",
+  "minimist@1.2.5",
+], dev = [
+  "semver@7.5.1",
+] }

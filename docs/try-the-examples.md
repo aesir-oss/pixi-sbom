@@ -35,6 +35,7 @@ examples/projects/requirements-unpinned/<NN-name>/
 | `conda-lock` | `environment.yml`, `conda-lock.yml` |
 | `conda-explicit` | `environment.yml`, `explicit-linux-64.txt`, `explicit-osx-arm64.txt` |
 | `requirements` | `requirements.in` / `.txt` and `requirements-dev.in` / `.txt`, compiled and hashed |
+| `npm`, `yarn`, `yarn-berry`, `pnpm` | `package.json` and the lockfile its tool wrote: `package-lock.json`, `yarn.lock` (v1, Berry), `pnpm-lock.yaml` |
 
 The scenarios worth knowing first:
 
@@ -48,15 +49,17 @@ The scenarios worth knowing first:
 | `15-r-analysis` | R packages with CRAN purls, and a CRAN advisory through `--vulnerabilities osv` |
 | `16-go-tools` | the Go modules inside `go-yq` and `gh`, with `--prefix --embedded-sboms` |
 | `17-node-tools` | the npm packages `nodejs` installs, with `--prefix` |
+| `18-image-wheels` | Pillow 10.0.0, whose wheels bundle libwebp, libpng, zlib and more, with `--prefix --embedded-sboms` |
+| `19-web-frontend` | a JavaScript frontend locked by npm, yarn and pnpm, and a pixi workspace with it beside (`--javascript`) |
 
-The last three describe what an installed environment holds, so install one first and point `--prefix` at it:
+15 to 18 describe what an installed environment holds, so install one first and point `--prefix` at it:
 
 ```sh
 pixi install --manifest-path examples/projects/pixi/16-go-tools/pixi.toml
 pixi sbom --prefix examples/projects/pixi/16-go-tools/.pixi/envs/default --embedded-sboms --report packages   # after pixi install
 ```
 
-`examples/README.md` in the repository lists all seventeen, with what each one shows.
+`examples/README.md` in the repository lists all nineteen, with what each one shows.
 
 The conda and pixi examples are locked for linux-64 and osx-arm64, so the commands below pass
 `-p linux-64` to give the same answer on any machine.
@@ -85,6 +88,48 @@ pixi sbom --lockfile examples/projects/uv/01-django/uv.lock -p linux-64 --format
 ```
 
 See [Using pixi-sbom without pixi](without-pixi.md) for what each reader takes from its lockfile.
+
+## A JavaScript frontend
+
+The same frontend, locked by npm, yarn 1, yarn 4 (Berry) and pnpm: four lockfiles, the same 29 `pkg:npm` releases.
+`semver` is a development dependency, so it and what it needs are `scope: optional`.
+
+```sh
+pixi sbom --lockfile examples/projects/npm/19-web-frontend/package-lock.json --report packages
+pixi sbom --lockfile examples/projects/yarn/19-web-frontend/yarn.lock --report packages
+pixi sbom --lockfile examples/projects/yarn-berry/19-web-frontend/yarn.lock --report packages
+pixi sbom --lockfile examples/projects/pnpm/19-web-frontend/pnpm-lock.yaml --report packages
+```
+
+The pixi workspace in `pixi/19-web-frontend` has the same frontend beside its `pixi.toml`. Its document is the
+workspace's alone until `--javascript` adds the frontend:
+
+```sh
+pixi sbom --lockfile examples/projects/pixi/19-web-frontend/pixi.lock -p linux-64 --javascript --report packages
+```
+
+See [Reading JavaScript lockfiles](cli.md#reading-javascript-lockfiles).
+
+## Libraries inside wheels, and where everything was found
+
+Pillow 10.0.0's wheels carry their own libwebp, libpng, zlib, libjpeg-turbo and more in `pillow.libs/` (Linux) or
+`PIL/.dylibs/` (macOS). Installed, `--embedded-sboms` reads each one's version out of the binary and lists it under
+Pillow, with the CPE a scanner matches: the libwebp is 1.3.1, the release CVE-2023-4863 was fixed after.
+
+```sh
+pixi install --manifest-path examples/projects/pixi/18-image-wheels/pixi.toml
+pixi sbom --prefix examples/projects/pixi/18-image-wheels/.pixi/envs/default --embedded-sboms --vulnerabilities osv --report vulnerabilities   # after pixi install
+```
+
+Any installed example also says where each component was found, as CycloneDX `evidence.occurrences`: the conda-meta
+record, the dist-info, and for 16-go-tools and 18-image-wheels the binary each module or library was read from.
+
+```sh
+pixi sbom --prefix examples/projects/pixi/18-image-wheels/.pixi/envs/default --embedded-sboms --output -   # after pixi install
+```
+
+See [Bundled native libraries](output-format.md#bundled-native-libraries) and
+[Installed environments](output-format.md#installed-environments).
 
 ## A requirements file that is not a lock
 
@@ -201,7 +246,8 @@ See [How complete the document is](cli.md#how-complete-the-document-is) and
 ## The whole tree at once
 
 `--scan` finds every project with a lockfile of a fixed name under a directory: the pixi, uv,
-Poetry, PDM, pylock and conda-lock examples, 84 in all. Explicit specs and requirements files have
+Poetry, PDM, pylock and conda-lock examples, and the JavaScript ones (the frontend beside the pixi workspace is a
+project of its own, written to `sbom-javascript.cdx.json`), 98 in all. Explicit specs and requirements files have
 no fixed name, so a scan doesn't pick them up.
 
 ```sh

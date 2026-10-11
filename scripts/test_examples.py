@@ -7,9 +7,12 @@ that looks real and describes the wrong project, which is the one failure nobody
 
 from __future__ import annotations
 
+import json
+import tempfile
 import tomllib
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import examples
 
@@ -206,14 +209,61 @@ class RequirementsTest(unittest.TestCase):
         self.assertNotIn("internal-utils", main + dev)
 
 
+FRONTEND = {
+    "id": "19-web-frontend",
+    "title": "A web frontend",
+    "npm": {"dependencies": ["@babel/traverse@7.22.5", "lodash@4.17.15"], "dev": ["semver@7.5.1"]},
+}
+
+
+class JavaScriptTest(unittest.TestCase):
+    def test_package_json_pins_scoped_and_plain_names_and_keeps_dev_apart(self) -> None:
+        body = json.loads(examples.package_json(FRONTEND))
+        self.assertEqual(body["name"], "web-frontend-example")
+        self.assertTrue(body["private"])
+        self.assertEqual(body["dependencies"], {"@babel/traverse": "7.22.5", "lodash": "4.17.15"})
+        self.assertEqual(body["devDependencies"], {"semver": "7.5.1"})
+        self.assertNotIn("devDependencies", json.loads(examples.package_json({**FRONTEND, "npm": {"dependencies": []}})))
+
+    def test_each_reader_locks_with_its_own_tool_and_leaves_only_the_lockfile(self) -> None:
+        for reader, tool in [
+            ("npm", ["npm", "install", "--package-lock-only"]),
+            ("yarn", ["corepack", examples.YARN_CLASSIC, "install"]),
+            ("yarn-berry", ["corepack", examples.YARN_BERRY, "install", "--mode=update-lockfile"]),
+            ("pnpm", ["corepack", examples.PNPM, "install", "--lockfile-only"]),
+        ]:
+            with tempfile.TemporaryDirectory() as tmp, mock.patch.object(examples, "run") as run:
+                target = Path(tmp)
+                (target / "node_modules").mkdir()
+                (target / ".pnp.cjs").write_text("")
+                examples.lock_javascript(reader, target)
+                command = run.call_args.args[0]
+                self.assertEqual(command[: len(tool)], tool, reader)
+                self.assertFalse((target / "node_modules").exists(), reader)
+                self.assertFalse((target / ".pnp.cjs").exists(), reader)
+                self.assertEqual((target / "yarn.lock").exists(), reader == "yarn-berry", reader)
+        with self.assertRaises(ValueError):
+            examples.lock_javascript("pip", Path("."))
+
+    def test_only_the_scenarios_that_list_them_get_javascript_examples(self) -> None:
+        for scenario in examples.load():
+            readers = scenario.get("readers", examples.READERS)
+            wants = set(readers) & set(examples.JS_READERS)
+            self.assertEqual(bool(wants), "npm" in scenario, scenario["id"])
+
+
 class ScenarioFileTest(unittest.TestCase):
     def test_every_scenario_is_complete_and_uniquely_named(self) -> None:
         scenarios = examples.load()
         ids = [s["id"] for s in scenarios]
         self.assertEqual(len(ids), len(set(ids)))
         for scenario in scenarios:
-            for key in ("id", "title", "shows", "dependencies", "conda"):
+            for key in ("id", "title", "shows", "conda"):
                 self.assertIn(key, scenario, scenario["id"])
+            # The conda-only and JavaScript scenarios have no Python readers, so nothing to list for them.
+            python_readers = {"pylock", "uv", "poetry", "pdm", "requirements"}
+            if python_readers & set(scenario.get("readers", examples.READERS)):
+                self.assertTrue(scenario.get("dependencies"), scenario["id"])
             # pip lock locks for the interpreter it runs on, which is the examples' 3.14.
             if scenario.get("pylock_tool") == "pip":
                 self.assertNotIn("python", scenario, scenario["id"])

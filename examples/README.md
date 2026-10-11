@@ -11,7 +11,7 @@ hand on purpose: those files are not locks, and each one shows a way pixi-sbom r
 
 ```
 examples/
-  scenarios.toml          the 17 scenarios every example is generated from
+  scenarios.toml          the 19 scenarios every example is generated from
   shared/internal-utils/  a stand-in private package, depended on by local path
   projects/<reader>/<NN-scenario>/
   projects/requirements-unpinned/   hand-written requirements files that must be refused
@@ -30,6 +30,10 @@ so lockfile discovery, `--scan` and the manifest beside a lockfile (#328) all wo
 | `conda-lock` | `environment.yml`, `conda-lock.yml` | `conda-lock lock` (linux-64, osx-arm64) |
 | `conda-explicit` | `environment.yml`, `explicit-linux-64.txt`, `explicit-osx-arm64.txt` | `conda-lock render --kind explicit` |
 | `requirements` | `requirements.in`, `requirements-dev.in`, `requirements.txt`, `requirements-dev.txt` | `uv pip compile --generate-hashes` for Python's floor on manylinux x86_64; `pip-compile --generate-hashes` for 02 and 09 |
+| `npm` | `package.json`, `package-lock.json` | `npm install --package-lock-only` |
+| `yarn` | `package.json`, `yarn.lock` (v1) | `yarn install` (yarn 1.22, through corepack) |
+| `yarn-berry` | `package.json`, `yarn.lock` (Berry) | `yarn install --mode=update-lockfile` (yarn 4.9, through corepack) |
+| `pnpm` | `package.json`, `pnpm-lock.yaml` | `pnpm install --lockfile-only` (pnpm 9.15, through corepack) |
 
 The `pixi` examples are the conda environment the conda readers describe, with the packages conda-forge does not
 carry (`conda_pip`) as PyPI dependencies, the local package as an editable path, and each dependency group and
@@ -42,8 +46,10 @@ A requirements file is never discovered, so it is always passed with `--lockfile
 
 ## Scenarios
 
-Scenarios 01 to 14 exist for every reader; 15 to 17 are conda-only (R, Go and JavaScript packages exist only in a
-conda environment), so they are in `pixi`, `conda-lock` and `conda-explicit`. Advisory counts are OSV records for the PyPI versions each
+Scenarios 01 to 14 exist for every Python and conda reader; 15 to 17 are conda-only (R, Go and JavaScript packages
+installed in a conda environment), so they are in `pixi`, `conda-lock` and `conda-explicit`. 18 is Pillow's wheels
+(`pixi`, `uv`, `requirements`), and 19 is a JavaScript frontend, in the four JavaScript readers and in `pixi` as a
+workspace with the frontend beside it. Advisory counts are OSV records for the PyPI versions each
 `uv.lock` resolved, queried on 2026-10-07; OSV lists GHSA and PYSEC copies of one advisory separately, and
 pixi-sbom merges them, so its own count is lower. New advisories are published all the time, so these only grow.
 
@@ -64,7 +70,7 @@ pixi-sbom merges them, so its own count is lower. New advisories are published a
 | 13-genai-llm | ≥3.14 | vulnerabilities in an LLM stack | 56 | 6 | 71 | transformers 4.46.0, langchain-core, langchain 0.3.0 |
 | 14-django-upgraded | ≥3.14 | 01-django after the upgrade: the other side of a diff | 32 | 1 | 10 | Django 4.2 LTS; compare with 01-django |
 
-The conda-only scenarios show what an installed environment carries beyond Python, so try them with `--prefix` after
+The conda-only scenarios, and 18, show what an installed environment carries beyond its lockfile, so try them with `--prefix` after
 `pixi install`:
 
 | Scenario | What it shows | Look for |
@@ -72,6 +78,18 @@ The conda-only scenarios show what an installed environment carries beyond Pytho
 | 15-r-analysis | CRAN purls for `r-*` packages, a CRAN advisory through OSV | `pkg:cran/Rcpp`, `pixi:cran-source`, RSEC-2023-8 against commonmark 1.8.0 with `--vulnerabilities osv`; `r-base` has no CRAN purl |
 | 16-go-tools | Go modules read out of `go-yq` and `gh` | `pkg:golang` components and `pkg:golang/stdlib` with `--embedded-sboms` |
 | 17-node-tools | npm packages installed by `nodejs` and `configurable-http-proxy` | about 220 `pkg:npm` components, scoped (`%40npmcli/...`) and nested |
+| 18-image-wheels | native libraries inside Pillow 10.0.0's wheels, with `--embedded-sboms` | `pkg:generic/libwebp@1.3.1` and its CPE under Pillow, CVE-2023-4863 with `--vulnerabilities osv`, each library's file in `evidence.occurrences` |
+
+Any installed example also shows where each component was found (`evidence.occurrences`, #24): the conda-meta record
+of each conda package, the dist-info of each pip package, and the binary each Go module (16) or bundled library (18)
+was read from.
+
+19-web-frontend is a JavaScript project, read from its lockfile with nothing installed:
+
+| Example | Look for |
+|---|---|
+| `npm`, `yarn`, `yarn-berry`, `pnpm` `/19-web-frontend` | the same 29 `pkg:npm` releases from four lockfiles; `semver` and what it needs are development (`scope: optional`); advisories for lodash 4.17.15, minimist 1.2.5, axios 0.21.1 and @babel/traverse 7.22.5 with `--vulnerabilities osv` |
+| `pixi/19-web-frontend` | a pixi workspace (Python with FastAPI, and nodejs) with the frontend's `package.json` and `package-lock.json` beside `pixi.toml`; `--javascript` adds the frontend to the workspace's document, and `--scan` writes it as `sbom-javascript.cdx.json` |
 
 ## Trying them
 

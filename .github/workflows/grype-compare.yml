@@ -27,6 +27,8 @@ on:
       - "crates/pixi-sbom/tests/grype/**"
       - "examples/projects/pixi/16-go-tools/**"
       - "examples/projects/pixi/17-node-tools/**"
+      - "examples/projects/requirements/18-image-wheels/**"
+      - "examples/projects/npm/19-web-frontend/**"
       - ".github/workflows/grype-compare.yml"
   schedule:
     - cron: "17 6 * * 1"

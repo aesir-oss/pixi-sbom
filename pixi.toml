@@ -129,6 +129,8 @@ conda-lock = "*"
 micromamba = "<2"
 pipenv = ">=2026.8.0,<2027"
 pip-tools = ">=7.6.1,<8"
+# npm, and corepack for the pinned yarn and pnpm releases, for the JavaScript examples (#29).
+nodejs = "22.*"
 
 # `pip lock` locks for the interpreter running it, so the pylock examples it writes use 3.14.
 [feature.examples-pip.dependencies]
