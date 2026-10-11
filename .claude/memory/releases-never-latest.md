@@ -26,6 +26,9 @@ the maintainer on 2026-10-11; the repository release on the same day (#49).
   `gh release create … --latest=false` or `gh release edit <tag> --latest=false`.
 - A new extension's release workflow does the same from its first release; the repository release picks it up from
   its `<extension>-vX.Y.Z` tags with no change.
+- The repository release is created with the release App's token. The default `GITHUB_TOKEN` got HTTP 403
+  ("Resource not accessible by integration") creating it on 1.13.0, despite `contents: write`; it can still upload
+  assets to an existing release. An App-made release starts workflows, so `docs.yml` skips `pixi-ext-contrib-` tags.
 - The repository tag must never match an extension pattern (`v*`, `<extension>-v*`, `cliff.toml`, the Action's
   lookup); `pixi run repo-release-test` checks it.
 - Never link to or resolve `releases/latest` in docs, install scripts or the Action: it is the repository release,
