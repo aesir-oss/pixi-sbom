@@ -45,6 +45,7 @@ repo-release = { cmd = "python scripts/repo_release.py", description = "plan the
 repo-release-test = { cmd = "python -m unittest discover -s scripts -p 'test_repo_release.py' -v", description = "the repository release planner's own tests" }
 pages = { cmd = "python scripts/pages.py", description = "lay out the gh-pages branch: pages plan|migrate|default|landing (see the script)" }
 pages-test = { cmd = "python -m unittest discover -s scripts -p 'test_pages.py' -v", description = "the Pages layout's own tests" }
+policy-docs = { cmd = "cargo test -p pixi-policy --test docs", env = { PIXI_POLICY_WRITE_DOCS = "1" }, description = "regenerate pixi-policy's policy reference and rule catalog from the code" }
 action-test = { cmd = "python -m unittest discover -s scripts -p 'test_action_version.py' -v", description = "which binary the GitHub Action installs for a given ref" }
 bench = "cargo bench --benches"
 bench-test = "cargo test --bench '*'"
