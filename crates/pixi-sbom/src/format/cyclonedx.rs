@@ -5,7 +5,7 @@ use serde::Serialize;
 use super::{WriteContext, top_level_ids};
 use crate::cli::SpecVersion;
 use crate::model::{Author, LicenseFile, Package, PackageKind, Sbom, Supplier, Vulnerability};
-use common::license::{self, License};
+use crate::license::{self, License};
 
 const ROOT_REF: &str = "root";
 /// The document is derived from a lockfile, i.e. from resolved inputs before any build runs.

@@ -39,8 +39,6 @@ name = "pixi-sbom"
 path = "src/main.rs"
 
 [dependencies]
-# The code the extensions share (#56), under a short name: `use common::license`.
-common = { package = "pixi-ext-common", path = "../pixi-ext-common" }
 anstream = "1.0.0"
 anstyle = "1.0.14"
 bzip2 = "0.6.1"

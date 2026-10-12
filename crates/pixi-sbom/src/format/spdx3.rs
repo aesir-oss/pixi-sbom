@@ -17,7 +17,7 @@ use serde::Serialize;
 use super::spdx::{assign_ids, id_fragment, kind_name};
 use super::{WriteContext, top_level_ids};
 use crate::model::Sbom;
-use common::license::{self, License};
+use crate::license::{self, License};
 
 const CONTEXT: &str = "https://spdx.org/rdf/3.0.1/spdx-context.jsonld";
 const SPEC_VERSION: &str = "3.0.1";

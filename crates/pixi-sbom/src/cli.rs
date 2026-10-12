@@ -822,8 +822,8 @@ pub struct Args {
 
     /// When to colour the terminal report: `auto` follows the terminal, `NO_COLOR` and
     /// `CLICOLOR_FORCE`. Only the `table` format is ever coloured.
-    #[arg(help_heading = "Reports", long, value_enum, value_name = "WHEN", default_value_t = common::style::ColorChoice::Auto)]
-    pub color: common::style::ColorChoice,
+    #[arg(help_heading = "Reports", long, value_enum, value_name = "WHEN", default_value_t = crate::style::ColorChoice::Auto)]
+    pub color: crate::style::ColorChoice,
 
     /// With --report packages: draw the dependency graph from the root downward instead of a
     /// flat list. A package is expanded once, at its first occurrence; later ones are marked

@@ -13,8 +13,8 @@ use comfy_table::{Cell, ColumnConstraint, ContentArrangement, LineStyle, Table, 
 use serde::Serialize;
 
 use crate::model::{Package, Sbom, Severity, Vulnerability};
-use common::license::{self, License};
-use common::style::{Palette, Role};
+use crate::license::{self, License};
+use crate::style::{Palette, Role};
 
 /// Which report to print.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]

@@ -2026,43 +2026,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a89322df9ebe1c1578d689c92318e070967d1042b512afbe49518723f4e6d5cd"
 
 [[package]]
-name = "pixi-ext-common"
-version = "0.1.0"
-dependencies = [
- "anstyle",
- "clap",
- "comfy-table",
- "packageurl",
- "rattler_conda_types",
- "rattler_lock",
- "spdx",
- "tracing",
-]
-
-[[package]]
-name = "pixi-policy"
-version = "0.1.0"
-dependencies = [
- "anstyle",
- "assert_cmd",
- "clap",
- "insta",
- "jsonschema",
- "miette",
- "pep440_rs",
- "pixi-ext-common",
- "predicates",
- "rattler_conda_types",
- "rattler_lock",
- "serde",
- "serde_json",
- "spdx",
- "tempfile",
- "thiserror 2.0.20",
- "toml",
-]
-
-[[package]]
 name = "pixi-sbom"
 version = "1.13.1"
 dependencies = [
@@ -2085,7 +2048,6 @@ dependencies = [
  "object 0.40.0",
  "packageurl",
  "pep508_rs",
- "pixi-ext-common",
  "predicates",
  "rattler_conda_types",
  "rattler_lock",

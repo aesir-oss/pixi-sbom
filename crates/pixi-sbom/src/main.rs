@@ -4,7 +4,7 @@
 // See the note in lib.rs: the shipped binary contains no `unsafe`, held by the compiler.
 #![cfg_attr(not(test), forbid(unsafe_code))]
 
-use common::{license, pipe, style};
+use pixi_sbom::{license, pipe, style};
 use pixi_sbom::{
     auditable, batch, bundled, cache, cli, concurrency, condaarchive, condalock, config, cran, diff, discover, doctor,
     embedded, epss, explain, explicit, filter, format, fromsbom, gobuild, http, imports, jslock, kev, lock, manifest,
