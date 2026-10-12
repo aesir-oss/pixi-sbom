@@ -21,7 +21,11 @@ targets = [
 version = 2
 # Every RUSTSEC advisory fails the build. Where one has no fix yet, add it here with the issue
 # that tracks getting off it — never a bare id, or nobody will know why it is still here.
-ignore = []
+ignore = [
+  # unsafe-libyaml is unmaintained (archived 2024-03-25), not vulnerable. It comes through serde_yaml, which
+  # pixi-sbom reads environment.yml with and rattler_conda_types depends on; #127 tracks getting off both.
+  { id = "RUSTSEC-2024-0449", reason = "unmaintained, via serde_yaml (pixi-sbom and rattler); tracked in #127" },
+]
 
 [licenses]
 version = 2
