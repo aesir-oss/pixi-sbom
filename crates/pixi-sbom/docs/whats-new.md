@@ -30,6 +30,16 @@ Since 1.0, pixi-sbom has:
 before: `pixi global install pixi-sbom` (conda-forge), `uv tool install pixi-sbom` or `pip install pixi-sbom` (PyPI),
 and the release archives.
 
+**The docs have moved.** pixi-sbom's documentation is now at
+[aesir-oss.github.io/pixi-ext-contrib/pixi-sbom/](https://aesir-oss.github.io/pixi-ext-contrib/pixi-sbom/), one site
+per extension beside [pixi-policy](https://aesir-oss.github.io/pixi-ext-contrib/pixi-policy/)'s, with a switcher
+between them. Old links (`/pixi-ext-contrib/latest/cli/`) still land on the same page. `--help` and the SARIF report's
+`informationUri` point at the new address.
+
+**Nothing else changes for you.** The license verdict, the lockfile reader and the terminal styling now live in code
+pixi-sbom shares with pixi-policy, so the two tools give the same license verdict on the same package. The output of
+every command is the same as 1.13.0's.
+
 ## 1.13.0
 
 **Every environment in a container image, in one command.** `--scan` now finds installed environments as well as
