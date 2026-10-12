@@ -12,7 +12,7 @@ autoload -Uz compinit
 compinit -u -d '"${init}"'.dump
 eval "$(pixi completion --shell zsh)"
 source <(PIXI_SBOM_COMPLETE=zsh pixi-sbom)
-source docs/completion/pixi-sbom.zsh
+source crates/pixi-sbom/docs/completion/pixi-sbom.zsh
 bindkey ''^I'' complete-word
 null-line () { print -r -- $''\0'' }
 compprefuncs=( null-line )

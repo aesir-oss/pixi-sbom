@@ -10,7 +10,7 @@ extend-exclude = [
   "*.cdx.json",
   "*.spdx.json",
   # Measured data: third-party repository and package names, not prose.
-  "docs/papers/data/**",
+  "crates/pixi-sbom/docs/papers/data/**",
   # Recorded answers of OSV, PyPI and the CISA catalog for the training lab: third-party text, kept as published.
   "examples/lab-cache/**",
   # Lockfiles written by uv, pip, Poetry, PDM and conda-lock: package names and hashes, not prose.

@@ -16,12 +16,12 @@ A Cargo workspace of pixi extensions. Each is a `pixi-<name>` binary that pixi r
 | `crates/pixi-policy/` | The pixi-policy crate (`pixi policy`, #60 on): checks a workspace's `pixi.lock` against `pixi-policy.toml`; rule families land from #61. `publish = false`, like every crate here |
 | `crates/pixi-sbom/` | The pixi-sbom crate: `src/`, `tests/` (fixtures, schemas, snapshots), `benches/`, `data/` (CPE and CRAN tables compiled in), `pyproject.toml` (maturin `bindings = "bin"` wheels), `pre-commit-mirror/` (templates) |
 | `actions/pixi-sbom/` | The GitHub Action's source, copied to `aesir-oss/pixi-sbom-action` on each release |
-| `docs/`, `mkdocs.yml` | The docs site (MkDocs Material, versioned with mike) at aesir-oss.github.io/pixi-ext-contrib |
+| `docs/`, `mkdocs.yml` | The workspace docs site at aesir-oss.github.io/pixi-ext-contrib/ (extensions page, development, security); `mkdocs.base.yml` and `docs/overrides/` are shared by every site |
+| `crates/<extension>/docs/`, `crates/<extension>/mkdocs.yml` | Each extension's docs site, versioned with mike under `/<extension>/` (#6); `extensions.json` lists them; `scripts/pages.py` lays out `gh-pages` |
 | `examples/` | Example projects and lockfiles the tests and docs run against |
 | `scripts/` | Python maintenance and release tooling, each with a `test_*.py` |
 | `Cargo.toml` | The workspace manifest; the release profile lives here |
 
-Docs per extension are tracked in #6.
 
 ## Commands
 
@@ -32,7 +32,7 @@ Everything runs through pixi.
 | Format, lint, check | `pixi run fmt`, `pixi run lint` (clippy `-D warnings`), `pixi run check` |
 | Tests | `pixi run test` (all crates); one test: `pixi run cargo test --test cli <name>` |
 | Full gate | `pixi run ci` (pre-commit, build, check, clippy, coverage ≥ 90%); the Stop hook runs it |
-| Docs | `pixi run -e docs docs-build` (strict) |
+| Docs | `pixi run -e docs docs-build` (every site, strict); `pixi run -e docs docs-preview` serves them as Pages lays them out |
 | Workflows | `pixi run actionlint` |
 | Script tests | `pixi run action-test`, `cpe-upkeep-test`, `cran-table-test`, `whats-new-test`, … (see `pixi.toml`) |
 

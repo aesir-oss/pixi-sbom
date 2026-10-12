@@ -252,10 +252,10 @@ jobs:
         run: |
           set -euo pipefail
           # An optional hand-written preamble, for a release where the list of commits is not the
-          # story: `docs/release-notes/v1.2.3.md` for `pixi-sbom-v1.2.3` (pixi-sbom's, from before the workspace), and
-          # `docs/release-notes/<tag>.md` for any other extension. git-cliff rewrites the changelog wholesale from
+          # story: `crates/pixi-sbom/docs/release-notes/v1.2.3.md` for `pixi-sbom-v1.2.3` (pixi-sbom's, from before the workspace), and
+          # `crates/pixi-sbom/docs/release-notes/<tag>.md` for any other extension. git-cliff rewrites the changelog wholesale from
           # the commit log every release, so this is the one place a narrative survives.
-          if [ "$CRATE" = pixi-sbom ]; then preamble="docs/release-notes/${TAG#pixi-sbom-}.md"; else preamble="docs/release-notes/${TAG}.md"; fi
+          if [ "$CRATE" = pixi-sbom ]; then preamble="crates/pixi-sbom/docs/release-notes/${TAG#pixi-sbom-}.md"; else preamble="crates/pixi-sbom/docs/release-notes/${TAG}.md"; fi
           if [ -f "$preamble" ]; then
             cat "$preamble" > RELEASE_NOTES.md
             printf '\n---\n\n' >> RELEASE_NOTES.md

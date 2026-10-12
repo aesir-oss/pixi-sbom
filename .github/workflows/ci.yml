@@ -49,14 +49,19 @@ jobs:
               - "examples/**"
               - "README.md"
               - "mkdocs.yml"
+              - "crates/*/mkdocs.yml"
+              - "extensions.json"
               - "actions/pixi-sbom/action.yml"
               - ".github/workflows/release.yml"
               - ".github/workflows/release-artifacts.yml"
               - "scripts/whats_new.py"
             docs:
               - "docs/**"
+              - "crates/*/docs/**"
               - "mkdocs.yml"
+              - "crates/*/mkdocs.yml"
               - "mkdocs_hooks.py"
+              - "extensions.json"
               - "CHANGELOG.md"
               - "crates/*/CHANGELOG.md"
               - "SECURITY.md"
@@ -70,7 +75,7 @@ jobs:
               - "crates/pixi-sbom/src/cli.rs"
               - "crates/pixi-sbom/src/main.rs"
               - "Cargo.lock"
-              - "docs/completion/**"
+              - "crates/pixi-sbom/docs/completion/**"
               - "scripts/completion_e2e.py"
               - ".github/workflows/ci.yml"
             action:
@@ -258,6 +263,9 @@ jobs:
       # Which repository release is made, and that its tag stays invisible to everything reading extension tags.
       - name: The repository release planner's own tests
         run: pixi run repo-release-test
+      # Where each site lands on gh-pages; a mistake here deletes published versions or the old layout's links.
+      - name: The Pages layout's own tests
+        run: pixi run pages-test
       # Which commits each extension's changelog and release notes list; a mistake puts one extension's
       # work in another's notes, or drops a shared crate's change from the extensions built on it.
       - name: The per-extension changelog's own tests

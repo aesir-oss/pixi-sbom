@@ -1,11 +1,12 @@
 {% extends "base.html" %}
 
-{#
-  Material caches the repository card (latest release, stars, forks) in sessionStorage for the
-  life of the tab, so a tab kept open across releases keeps showing the old version. Expire the
-  cache after ten minutes; that stays well inside GitHub's unauthenticated API rate limit.
-#}
 {% block extrahead %}
+  <style>{% include "aesir.css" %}</style>
+  {#
+    Material caches the repository card (latest release, stars, forks) in sessionStorage for the
+    life of the tab, so a tab kept open across releases keeps showing the old version. Expire the
+    cache after ten minutes; that stays well inside GitHub's unauthenticated API rate limit.
+  #}
   <script>
     (function () {
       try {
@@ -16,6 +17,89 @@
           sessionStorage.setItem(key, String(Date.now()));
         }
       } catch (e) {}
+    })();
+  </script>
+{% endblock %}
+
+{% block scripts %}
+  {{ super() }}
+  {% if config.extra.version %}
+  {#
+    The repository card shows the repository's Latest release, which is pixi-ext-contrib-YYYY.MM.N, the
+    repository's own release (#49). On an extension's site it shows that extension's newest final release instead:
+    the version its docs call `latest`, read from mike's versions.json beside this version, so the card always agrees
+    with the version selector and costs no GitHub API call. Before an extension's first final there is no such
+    release, and the card shows none.
+  #}
+  <script>
+    (function () {
+      var name = {{ config.site_name | tojson }};
+      var versions = new URL("../versions.json", new URL({{ base_url | tojson }} + "/", location.href));
+      var release = fetch(versions).then(function (response) {
+        return response.ok ? response.json() : [];
+      }).then(function (list) {
+        var entry = list.filter(function (v) { return (v.aliases || []).indexOf("latest") !== -1; })[0];
+        return entry ? name + "-" + entry.version : null;
+      }).catch(function () { return null; });
+
+      function apply(fact) {
+        release.then(function (tag) {
+          if (tag) fact.textContent = tag; else fact.hidden = true;
+        });
+      }
+
+      var source = document.querySelector(".md-source");
+      if (!source) return;
+      var existing = source.querySelector(".md-source__fact--version");
+      if (existing) return apply(existing);
+      new MutationObserver(function (changes, observer) {
+        var fact = source.querySelector(".md-source__fact--version");
+        if (fact) {
+          observer.disconnect();
+          apply(fact);
+        }
+      }).observe(source, { childList: true, subtree: true });
+    })();
+  </script>
+  {% endif %}
+  {#
+    The extension switcher (#6): every site reads the workspace's extensions.json when the page loads, so an old
+    version of any extension's docs lists extensions added after it was built. It sits beside mike's version selector
+    and opens each extension at its prefix, which redirects to that extension's default version.
+  #}
+  <script>
+    (function () {
+      var workspace = {{ config.extra.workspace | tojson }};
+      var current = {{ config.site_name | tojson }};
+      var topic = document.querySelector(".md-header__topic");
+      if (!topic || !window.fetch) return;
+      fetch(workspace + "extensions.json").then(function (response) {
+        return response.ok ? response.json() : [];
+      }).then(function (list) {
+        if (!list.length) return;
+        var root = document.createElement("div");
+        root.className = "md-version aesir-switcher";
+        var button = document.createElement("button");
+        button.className = "md-version__current";
+        button.setAttribute("aria-label", "Switch extension");
+        button.textContent = list.some(function (e) { return e.name === current; }) ? current : "All extensions";
+        var menu = document.createElement("ul");
+        menu.className = "md-version__list";
+        list.concat([{ name: "All extensions", path: "" }]).forEach(function (entry) {
+          var item = document.createElement("li");
+          item.className = "md-version__item";
+          var link = document.createElement("a");
+          link.className = "md-version__link";
+          link.href = workspace + (entry.path ? entry.path + "/" : "");
+          link.textContent = entry.name;
+          item.appendChild(link);
+          menu.appendChild(item);
+        });
+        root.appendChild(button);
+        root.appendChild(menu);
+        var title = topic.querySelector(".md-ellipsis");
+        if (title && title.nextSibling) topic.insertBefore(root, title.nextSibling); else topic.appendChild(root);
+      }).catch(function () {});
     })();
   </script>
 {% endblock %}

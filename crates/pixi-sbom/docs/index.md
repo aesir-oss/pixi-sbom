@@ -1,0 +1,75 @@
+# pixi-sbom
+
+A [pixi](https://pixi.sh) extension that writes a Software Bill of Materials from a lockfile: every conda and PyPI
+package of one environment on one platform, with purls, licenses and the dependency graph, as
+[CycloneDX](https://cyclonedx.org) 1.6 / 1.7 or [SPDX](https://spdx.dev) 2.3 / 3.0.1 JSON that validates against the
+official schemas. It reads `pixi.lock`, `uv.lock`, `pylock.toml`, `poetry.lock`, `pdm.lock`, `conda-lock.yml`,
+explicit conda specs and fully pinned `requirements.txt` files, a JavaScript project's `package-lock.json`, `pnpm-lock.yaml` or `yarn.lock`, an installed conda environment or venv, or other
+tools' SBOMs (one, or several merged into one), and needs neither an installed environment nor pixi
+itself: a uv or Poetry project runs it as `uvx pixi-sbom` ([Using pixi-sbom without pixi](without-pixi.md)).
+
+```sh
+pixi global install pixi-sbom
+
+pixi sbom                                   # sbom.cdx.json next to pixi.lock
+pixi sbom --primary-purl pypi --output - | grype   # straight into a scanner
+pixi sbom --fetch-licenses --deny-license GPL-3.0-only --require-license   # a license gate, exit 3 on violation
+```
+
+## Where to go
+
+<div class="grid cards" markdown>
+
+-   **[Installation](installation.md)**
+
+    pixi global, a release binary, or a build from source; how pixi finds the extension.
+
+-   **[Training lab](lab.md)**
+
+    Seven hands-on modules on the examples, offline, with expected output and self-checks. 60 to 90 minutes.
+
+-   **[Field manual](field-manual/index.md)**
+
+    Playbooks by job: gate CI, take in a vendor's SBOM, one SBOM for a product, "are we exposed?", restricted
+    networks, signed releases.
+
+-   **[pixi-sbom and syft](syft.md)**
+
+    What each reads, what Grype finds from each, and what syft does that pixi-sbom does not try to.
+
+-   **[Try it on the examples](try-the-examples.md)**
+
+    More than a hundred real projects for every lockfile kind, and a tour of what to run on them.
+
+-   **[Command-line reference](cli.md)**
+
+    Every option, the license policy, terminal reports, batch mode, environment variables, exit codes and error
+    codes.
+
+-   **[GitHub Action](github-action.md)**
+
+    `uses: aesir-oss/pixi-sbom-action@v1`: inputs, outputs, the policy gate, a worked example.
+
+-   **[CI recipes](ci-recipes.md)**
+
+    Scanning with grype, license tables in PR comments, diffing SBOMs between commits, air-gapped runners.
+
+-   **[Which format to pick](formats.md)**
+
+    CycloneDX 1.6 / 1.7 against SPDX 2.3 / 3.0.1, by consumer.
+
+-   **[Output format reference](output-format.md)**
+
+    Field by field: purls, licenses, the dependency graph, reproducibility.
+
+</div>
+
+## Why a lockfile-based SBOM
+
+Pixi environments mix conda and PyPI packages, and scanners have no conda vulnerability data: a conda-only Python
+environment scans as clean no matter what it contains. `pixi sbom` gives conda-forge Python packages their PyPI
+identity from the same mapping pixi uses, fetches licenses for every package kind from the package cache, the channel
+archive or the wheel, and produces byte-identical documents under `SOURCE_DATE_EPOCH` so CI can diff them.
+
+Contributors: the [architecture](architecture.md) and [development](https://aesir-oss.github.io/pixi-ext-contrib/development/) pages describe the pipeline, the
+modules and the change harness. Releases are listed in the [changelog](changelog.md).

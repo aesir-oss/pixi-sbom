@@ -108,5 +108,5 @@ Releases up to 1.11.x were built in `millsks/pixi-sbom` and tagged `v<version>`:
 `--repo millsks/pixi-sbom`, and in the strict form `--signer-workflow millsks/pixi-sbom/.github/workflows/release-artifacts.yml`
 and `--source-ref refs/tags/v<version>`.
 
-See [installation](https://aesir-oss.github.io/pixi-ext-contrib/latest/installation/#checking-where-a-binary-came-from) for
+See [installation](https://aesir-oss.github.io/pixi-ext-contrib/pixi-sbom/latest/installation/#checking-where-a-binary-came-from) for
 the offline form and why 0.11.0 only passes the plain `--repo` check.

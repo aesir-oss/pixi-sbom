@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds the throwaway workspace docs/assets/demo.tape records against.
+# Builds the throwaway workspace crates/pixi-sbom/docs/assets/demo.tape records against.
 #
 # Everything the demo shows is real output from the real binary. What is staged here is only the
 # *input*: a lockfile with a known-vulnerable urllib3, and the recorded OSV and CISA KEV responses

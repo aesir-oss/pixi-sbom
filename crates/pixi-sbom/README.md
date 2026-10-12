@@ -8,28 +8,28 @@ extension (`pixi sbom`) that needs no pixi: the same binary runs as `pixi-sbom`,
 [![CI](https://github.com/aesir-oss/pixi-ext-contrib/actions/workflows/ci.yml/badge.svg)](https://github.com/aesir-oss/pixi-ext-contrib/actions/workflows/ci.yml)
 [![conda-forge](https://img.shields.io/conda/vn/conda-forge/pixi-sbom?logo=conda-forge&color=brightgreen)](https://anaconda.org/conda-forge/pixi-sbom)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![Docs](https://img.shields.io/badge/docs-aesir--oss.github.io%2Fpixi--ext--contrib-teal.svg)](https://aesir-oss.github.io/pixi-ext-contrib/)
+[![Docs](https://img.shields.io/badge/docs-aesir--oss.github.io%2Fpixi--ext--contrib-teal.svg)](https://aesir-oss.github.io/pixi-ext-contrib/pixi-sbom/)
 
-Full documentation: **https://aesir-oss.github.io/pixi-ext-contrib/**
-What 1.0 freezes, and what it does not: **[stability.md](../../docs/stability.md)**
+Full documentation: **https://aesir-oss.github.io/pixi-ext-contrib/pixi-sbom/**
+What 1.0 freezes, and what it does not: **[stability.md](docs/stability.md)**
 Found a vulnerability? [SECURITY.md](../../SECURITY.md) says where to send it privately and what is in scope.
 
 <p align="center">
-  <img src="../../docs/assets/demo.gif" alt="A terminal: pixi sbom turns a pixi.lock into a CycloneDX document, then an SPDX 3.0.1 one, prints a license table, and fails a vulnerability gate with exit code 4 on a known-exploited urllib3 advisory." width="100%">
+  <img src="docs/assets/demo.gif" alt="A terminal: pixi sbom turns a pixi.lock into a CycloneDX document, then an SPDX 3.0.1 one, prints a license table, and fails a vulnerability gate with exit code 4 on a known-exploited urllib3 advisory." width="100%">
 </p>
 
-Each report has a recording of its own in the [command-line reference](https://aesir-oss.github.io/pixi-ext-contrib/latest/cli/):
-[vulnerabilities](https://aesir-oss.github.io/pixi-ext-contrib/latest/cli/#looking-up-vulnerabilities),
-[licenses](https://aesir-oss.github.io/pixi-ext-contrib/latest/cli/#enforcing-a-license-policy),
-[packages](https://aesir-oss.github.io/pixi-ext-contrib/latest/cli/#looking-instead-of-writing),
-[diff](https://aesir-oss.github.io/pixi-ext-contrib/latest/cli/#looking-instead-of-writing),
-[python](https://aesir-oss.github.io/pixi-ext-contrib/latest/cli/#what-python-the-environment-allows),
-[phantom](https://aesir-oss.github.io/pixi-ext-contrib/latest/cli/#what-is-imported-but-never-declared),
-[outdated](https://aesir-oss.github.io/pixi-ext-contrib/latest/cli/#how-far-behind-the-environment-is),
-[scorecard](https://aesir-oss.github.io/pixi-ext-contrib/latest/cli/#how-well-each-dependency-is-looked-after),
-[quality](https://aesir-oss.github.io/pixi-ext-contrib/latest/cli/#how-complete-the-document-is),
-[EPSS](https://aesir-oss.github.io/pixi-ext-contrib/latest/cli/#exploit-likelihood-first-epss) and
-[a vendor's VEX](https://aesir-oss.github.io/pixi-ext-contrib/latest/cli/#applying-a-vendors-vex).
+Each report has a recording of its own in the [command-line reference](https://aesir-oss.github.io/pixi-ext-contrib/pixi-sbom/latest/cli/):
+[vulnerabilities](https://aesir-oss.github.io/pixi-ext-contrib/pixi-sbom/latest/cli/#looking-up-vulnerabilities),
+[licenses](https://aesir-oss.github.io/pixi-ext-contrib/pixi-sbom/latest/cli/#enforcing-a-license-policy),
+[packages](https://aesir-oss.github.io/pixi-ext-contrib/pixi-sbom/latest/cli/#looking-instead-of-writing),
+[diff](https://aesir-oss.github.io/pixi-ext-contrib/pixi-sbom/latest/cli/#looking-instead-of-writing),
+[python](https://aesir-oss.github.io/pixi-ext-contrib/pixi-sbom/latest/cli/#what-python-the-environment-allows),
+[phantom](https://aesir-oss.github.io/pixi-ext-contrib/pixi-sbom/latest/cli/#what-is-imported-but-never-declared),
+[outdated](https://aesir-oss.github.io/pixi-ext-contrib/pixi-sbom/latest/cli/#how-far-behind-the-environment-is),
+[scorecard](https://aesir-oss.github.io/pixi-ext-contrib/pixi-sbom/latest/cli/#how-well-each-dependency-is-looked-after),
+[quality](https://aesir-oss.github.io/pixi-ext-contrib/pixi-sbom/latest/cli/#how-complete-the-document-is),
+[EPSS](https://aesir-oss.github.io/pixi-ext-contrib/pixi-sbom/latest/cli/#exploit-likelihood-first-epss) and
+[a vendor's VEX](https://aesir-oss.github.io/pixi-ext-contrib/pixi-sbom/latest/cli/#applying-a-vendors-vex).
 
 ## What it does
 
@@ -43,7 +43,7 @@ Each report has a recording of its own in the [command-line reference](https://a
 | **Fits CI** | a GitHub Action, SARIF for code scanning, VEX output, JSON / CSV / Markdown reports, signed build provenance |
 
 What it is **not**: a scanner (it feeds one), a package manager, or a stable Rust library — the
-command line is the interface, and [what 1.0 freezes](../../docs/stability.md) says exactly which parts.
+command line is the interface, and [what 1.0 freezes](docs/stability.md) says exactly which parts.
 
 ## Installation
 
@@ -72,7 +72,7 @@ gh attestation verify pixi-sbom-<version>-linux-64.tar.gz --repo aesir-oss/pixi-
 
 A `.sigstore.json` bundle ships beside each archive for machines that cannot reach `api.github.com`: add
 `--bundle pixi-sbom-<version>-linux-64.tar.gz.sigstore.json` and the check runs offline. The
-[strict form](https://aesir-oss.github.io/pixi-ext-contrib/latest/installation/#the-strict-form) also pins the release
+[strict form](https://aesir-oss.github.io/pixi-ext-contrib/pixi-sbom/latest/installation/#the-strict-form) also pins the release
 workflow and the tag.
 
 ## What it supports
@@ -104,7 +104,7 @@ pixi-sbom --lockfile poetry.lock --format spdx
 pixi-sbom --prefix .venv --against uv.lock --report diff    # does the venv still match its lock?
 ```
 
-See [Using pixi-sbom without pixi](https://aesir-oss.github.io/pixi-ext-contrib/latest/without-pixi/) for each lockfile kind,
+See [Using pixi-sbom without pixi](https://aesir-oss.github.io/pixi-ext-contrib/pixi-sbom/latest/without-pixi/) for each lockfile kind,
 what works with which, and why a `requirements.txt` with ranges is not an input.
 
 ## Quick start
@@ -312,27 +312,27 @@ It downloads the release binary, generates the documents and uploads them as an 
 
 Add `attest: "true"` (with `id-token: write` and `attestations: write`) to sign the documents; verify one with
 `gh attestation verify sbom.cdx.json --repo <owner>/<repo>`. See the
-[GitHub Action page](https://aesir-oss.github.io/pixi-ext-contrib/latest/github-action/) for every input, or the
+[GitHub Action page](https://aesir-oss.github.io/pixi-ext-contrib/pixi-sbom/latest/github-action/) for every input, or the
 [Marketplace listing](https://github.com/marketplace/actions/pixi-sbom).
 
 ## Documentation
 
 | | |
 |---|---|
-| [Installation](https://aesir-oss.github.io/pixi-ext-contrib/latest/installation/) | pixi global, release binaries, building from source |
-| [Command-line reference](https://aesir-oss.github.io/pixi-ext-contrib/latest/cli/) | Every option, the license policy, terminal reports, batch mode, environment variables, exit codes and error messages |
-| [GitHub Action](https://aesir-oss.github.io/pixi-ext-contrib/latest/github-action/) | The action's inputs and outputs, with a worked example |
-| [CI recipes](https://aesir-oss.github.io/pixi-ext-contrib/latest/ci-recipes/) | Scanning with grype, license tables in PR comments, diffing SBOMs, air-gapped runners |
-| [Which format to pick](https://aesir-oss.github.io/pixi-ext-contrib/latest/formats/) | CycloneDX 1.6 / 1.7 against SPDX 2.3 / 3.0.1 |
-| [pixi-sbom and syft](https://aesir-oss.github.io/pixi-ext-contrib/latest/syft/) | What each reads, what Grype finds from each, and what syft does that pixi-sbom does not |
-| [Output format reference](https://aesir-oss.github.io/pixi-ext-contrib/latest/output-format/) | Field-by-field reference for the CycloneDX and SPDX documents, purls, licenses, dependency graph |
-| [What 1.0 freezes](https://aesir-oss.github.io/pixi-ext-contrib/latest/stability/) | The semver contract: flags, config keys, exit codes, `pixi:*` names, the action's inputs — and what is deliberately not covered |
-| [Security policy](https://aesir-oss.github.io/pixi-ext-contrib/latest/security/) | Reporting a vulnerability privately, what is in scope, verifying a release |
-| [Architecture](https://aesir-oss.github.io/pixi-ext-contrib/latest/architecture/) | Pipeline, modules, and the design decisions behind them |
-| [Development](https://aesir-oss.github.io/pixi-ext-contrib/latest/development/) | Toolchain, tasks, the change harness, tests and fixtures, conventions, releasing |
-| [Changelog](https://aesir-oss.github.io/pixi-ext-contrib/latest/changelog/) | Every release's notes |
+| [Installation](https://aesir-oss.github.io/pixi-ext-contrib/pixi-sbom/latest/installation/) | pixi global, release binaries, building from source |
+| [Command-line reference](https://aesir-oss.github.io/pixi-ext-contrib/pixi-sbom/latest/cli/) | Every option, the license policy, terminal reports, batch mode, environment variables, exit codes and error messages |
+| [GitHub Action](https://aesir-oss.github.io/pixi-ext-contrib/pixi-sbom/latest/github-action/) | The action's inputs and outputs, with a worked example |
+| [CI recipes](https://aesir-oss.github.io/pixi-ext-contrib/pixi-sbom/latest/ci-recipes/) | Scanning with grype, license tables in PR comments, diffing SBOMs, air-gapped runners |
+| [Which format to pick](https://aesir-oss.github.io/pixi-ext-contrib/pixi-sbom/latest/formats/) | CycloneDX 1.6 / 1.7 against SPDX 2.3 / 3.0.1 |
+| [pixi-sbom and syft](https://aesir-oss.github.io/pixi-ext-contrib/pixi-sbom/latest/syft/) | What each reads, what Grype finds from each, and what syft does that pixi-sbom does not |
+| [Output format reference](https://aesir-oss.github.io/pixi-ext-contrib/pixi-sbom/latest/output-format/) | Field-by-field reference for the CycloneDX and SPDX documents, purls, licenses, dependency graph |
+| [What 1.0 freezes](https://aesir-oss.github.io/pixi-ext-contrib/pixi-sbom/latest/stability/) | The semver contract: flags, config keys, exit codes, `pixi:*` names, the action's inputs — and what is deliberately not covered |
+| [Security policy](https://aesir-oss.github.io/pixi-ext-contrib/pixi-sbom/latest/security/) | Reporting a vulnerability privately, what is in scope, verifying a release |
+| [Architecture](https://aesir-oss.github.io/pixi-ext-contrib/pixi-sbom/latest/architecture/) | Pipeline, modules, and the design decisions behind them |
+| [Development](https://aesir-oss.github.io/pixi-ext-contrib/pixi-sbom/latest/development/) | Toolchain, tasks, the change harness, tests and fixtures, conventions, releasing |
+| [Changelog](https://aesir-oss.github.io/pixi-ext-contrib/pixi-sbom/latest/changelog/) | Every release's notes |
 
-The pages are the Markdown files in [`docs/`](../../docs/), so they can be read in the repository too.
+The pages are the Markdown files in [`docs/`](docs/), so they can be read in the repository too.
 
 ## Development
 
@@ -347,7 +347,7 @@ pixi run ci             # full gate: pre-commit, build, check, lint, cov
 
 Cargo is never invoked directly; every command is a pixi task so the pinned toolchain is always used. End-to-end
 tests validate generated documents against the official JSON schemas vendored in `tests/schemas/`. See
-the [development page](https://aesir-oss.github.io/pixi-ext-contrib/latest/development/) for the full workflow, test layers, fixtures,
+the [development page](https://aesir-oss.github.io/pixi-ext-contrib/pixi-sbom/latest/development/) for the full workflow, test layers, fixtures,
 and the release process.
 
 ## License

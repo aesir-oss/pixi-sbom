@@ -21,7 +21,7 @@ verifies its checksum, runs it and uploads the documents as a workflow artifact.
 changes underneath you.
 
 Every input and output, and more examples, are in the
-[GitHub Action guide](https://aesir-oss.github.io/pixi-ext-contrib/latest/github-action/).
+[GitHub Action guide](https://aesir-oss.github.io/pixi-ext-contrib/pixi-sbom/latest/github-action/).
 
 This repository is published from
 [`actions/pixi-sbom`](https://github.com/aesir-oss/pixi-ext-contrib/tree/main/actions/pixi-sbom) in

@@ -1,14 +1,14 @@
 # The README recording: a lockfile in, documents out, and the gate that fails a build.
 #
 #   pixi global install vhs      # once
-#   pixi run demo                # regenerates docs/assets/demo.gif
+#   pixi run demo                # regenerates crates/pixi-sbom/docs/assets/demo.gif
 #
 # Every line of output is the real binary's. Only the input is staged — see
 # scripts/demo-workspace.sh. Keep it near 20s: it autoplays at the top of the README and a reader
 # gives it one loop. `-e web -p linux-64` is on each command because that environment is the one
 # carrying a vulnerable urllib3, and the gate is the whole point of the last step.
 
-Output "docs/assets/demo.gif"
+Output "crates/pixi-sbom/docs/assets/demo.gif"
 
 Require pixi-sbom
 

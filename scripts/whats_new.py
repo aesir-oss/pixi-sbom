@@ -15,7 +15,7 @@ import re
 import sys
 from pathlib import Path
 
-PAGE = Path(__file__).resolve().parent.parent / "docs" / "whats-new.md"
+PAGE = Path(__file__).resolve().parent.parent / "crates" / "pixi-sbom" / "docs" / "whats-new.md"
 UNRELEASED = "## Unreleased"
 RELEASE = re.compile(r"^## \d+\.\d+\.\d+\s*$")
 
@@ -33,22 +33,22 @@ def check(text: str, version: str) -> None:
     """Raise WhatsNewError unless the page has one non-empty Unreleased section above every release."""
     lines = text.splitlines()
     if any(line.strip() == f"## {version}" for line in lines):
-        raise WhatsNewError(f"docs/whats-new.md already has a section for {version}")
+        raise WhatsNewError(f"crates/pixi-sbom/docs/whats-new.md already has a section for {version}")
     headings = [i for i, line in enumerate(lines) if line.rstrip() == UNRELEASED]
     if not headings:
         raise WhatsNewError(
-            f"docs/whats-new.md has no '{UNRELEASED}' section: write what {version} means for someone "
+            f"crates/pixi-sbom/docs/whats-new.md has no '{UNRELEASED}' section: write what {version} means for someone "
             "using the tool there before releasing it"
         )
     if len(headings) > 1:
-        raise WhatsNewError(f"docs/whats-new.md has {len(headings)} '{UNRELEASED}' sections")
+        raise WhatsNewError(f"crates/pixi-sbom/docs/whats-new.md has {len(headings)} '{UNRELEASED}' sections")
     start = headings[0]
     first_release = next((i for i, line in enumerate(lines) if RELEASE.match(line)), len(lines))
     if start > first_release:
-        raise WhatsNewError(f"'{UNRELEASED}' in docs/whats-new.md is below a release's section")
+        raise WhatsNewError(f"'{UNRELEASED}' in crates/pixi-sbom/docs/whats-new.md is below a release's section")
     end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith("## ")), len(lines))
     if not any(line.strip() for line in lines[start + 1 : end]):
-        raise WhatsNewError(f"'{UNRELEASED}' in docs/whats-new.md is empty")
+        raise WhatsNewError(f"'{UNRELEASED}' in crates/pixi-sbom/docs/whats-new.md is empty")
 
 
 def release(text: str, version: str) -> str:
@@ -65,7 +65,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--page", type=Path, default=PAGE)
     args = parser.parse_args(argv)
     if is_candidate(args.version):
-        sys.stderr.write(f"{args.version} is a pre-release: docs/whats-new.md is left as it is\n")
+        sys.stderr.write(f"{args.version} is a pre-release: crates/pixi-sbom/docs/whats-new.md is left as it is\n")
         return 0
     text = args.page.read_text(encoding="utf-8")
     try:
@@ -77,7 +77,7 @@ def main(argv: list[str] | None = None) -> int:
         sys.stderr.write(f"error: {error}\n")
         return 1
     done = "is ready to become" if args.command == "check" else "is now"
-    sys.stderr.write(f"docs/whats-new.md: '{UNRELEASED}' {done} '## {args.version}'\n")
+    sys.stderr.write(f"crates/pixi-sbom/docs/whats-new.md: '{UNRELEASED}' {done} '## {args.version}'\n")
     return 0
 
 

@@ -1,11 +1,19 @@
 name: Docs site
 
-# Publishes the MkDocs site to GitHub Pages whenever a release is published, so the site
-# always describes the released binary. Dispatch it by hand for a docs-only republish.
+# Publishes the docs to GitHub Pages whenever a release is published, so each extension's site
+# always describes its released binary. Dispatch it by hand for a docs-only republish.
 #
-# Versions, the way pixi's own docs do it: mike keeps one copy of the site per release
-# (`v0.5.5`) on the gh-pages branch, `latest` is an alias of the newest release (pre-releases
-# deploy under their version only), `dev` follows main, and the site root redirects to `latest`.
+# One Pages site, three kinds of content (#6), laid out by scripts/pages.py:
+#   - /                the workspace site (mkdocs.yml, docs/): the extensions page, development, security,
+#                      extensions.json and the sitemap index. Not versioned; rebuilt on every run.
+#   - /<extension>/    each extension's site (crates/<extension>/mkdocs.yml), versioned with mike under
+#                      its own prefix: one copy per release (`v1.13.0`), `latest` aliasing the newest final
+#                      (release candidates deploy under their version only), `dev` following main.
+# A release deploys only its own extension; a push to main deploys `dev` for every extension.
+# Until #6 the branch root was pixi-sbom's; the first run after it moves those versions under
+# /pixi-sbom/ (pages.py migrate, which does nothing once they are there), and the 404 page sends old
+# links (/latest/cli/) on to their new address.
+#
 # The branch is then published as the Pages artifact, so the Pages source stays "GitHub Actions"
 # and every deployment is recorded in the github-pages environment.
 #
@@ -15,7 +23,6 @@ name: Docs site
 # Pages could republish the previous commit while every step still reported success (#163).
 # The two guards below — versions.json in the artifact, versions.json on the live site — are
 # there so that any future variant of that failure stops the run instead of passing quietly.
-
 on:
   release:
     types: [published]
@@ -23,8 +30,13 @@ on:
     branches: [main]
     paths:
       - docs/**
+      - crates/*/docs/**
       - mkdocs.yml
+      - mkdocs.base.yml
+      - crates/*/mkdocs.yml
       - mkdocs_hooks.py
+      - extensions.json
+      - scripts/pages.py
       - CHANGELOG.md
       - crates/*/CHANGELOG.md
       - SECURITY.md
@@ -32,7 +44,7 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: "Git ref to build from: a vX.Y.Z tag deploys that version, anything else deploys `dev` (default: main)"
+        description: "Git ref to build from: a <extension>-vX.Y.Z (or plain vX.Y.Z, pixi-sbom's) tag deploys that version, anything else deploys `dev` for every extension (default: main)"
         required: false
         type: string
         default: ""
@@ -46,21 +58,24 @@ concurrency:
   group: pages
   cancel-in-progress: false
 
+env:
+  PAGES_URL: https://aesir-oss.github.io/pixi-ext-contrib/
+
 jobs:
   build:
     name: Build the site
     runs-on: ubuntu-latest
-    # A release commits `chore(release): vX.Y.Z` to main, touching crates/pixi-sbom/CHANGELOG.md, and the release
+    # A release commits `chore(release): <extension>-vX.Y.Z` to main, touching its CHANGELOG.md, and the release
     # event follows minutes later. Without this the same release deploys twice, `dev` first and
     # then the tag; path filters cannot express "any push but that one".
-    # The repository release (pixi-ext-contrib-YYYY.MM.N, #49) documents no version of the site either.
+    # The repository release (pixi-ext-contrib-YYYY.MM.N, #49) documents no version of any site.
     if: >-
       ${{ (github.event_name != 'push'
         || !startsWith(github.event.head_commit.message, 'chore(release):'))
         && (github.event_name != 'release'
         || !startsWith(github.event.release.tag_name, 'pixi-ext-contrib-')) }}
     outputs:
-      version: ${{ steps.mike.outputs.version }}
+      deploys: ${{ steps.plan.outputs.deploys }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -71,13 +86,20 @@ jobs:
         with:
           environments: docs
           cache: true
-      - name: Build strictly
+      - name: Build every site strictly
         run: pixi run -e docs docs-build
-      - name: Commit this version to the local gh-pages branch
-        id: mike
+      - name: Plan what mike deploys
+        id: plan
         env:
+          EVENT: ${{ github.event_name }}
           TAG: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.ref }}
           PRERELEASE: ${{ github.event_name == 'release' && github.event.release.prerelease || 'false' }}
+        run: |
+          set -euo pipefail
+          python3 scripts/pages.py plan --event "$EVENT" --tag "$TAG" --prerelease "$PRERELEASE" > deploys.txt
+          cat deploys.txt
+          { echo "deploys<<EOF"; cat deploys.txt; echo "EOF"; } >> "$GITHUB_OUTPUT"
+      - name: Point the local gh-pages branch at the published one
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
@@ -87,44 +109,70 @@ jobs:
           if git show-ref --verify --quiet refs/remotes/origin/gh-pages; then
             git branch --force gh-pages origin/gh-pages
           fi
-          # mike versions keep their vX.Y.Z names whichever tag format the release used.
-          VERSION="${TAG#pixi-sbom-}"
-          if [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+ ]]; then
-            if [ "$PRERELEASE" = "true" ]; then
-              pixi run -e docs mike deploy "$VERSION"
-              echo "alias=" >> "$GITHUB_OUTPUT"
-            else
-              pixi run -e docs mike deploy --update-aliases "$VERSION" latest
-              pixi run -e docs mike set-default latest
-              echo "alias=latest" >> "$GITHUB_OUTPUT"
-            fi
-            echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          else
-            pixi run -e docs mike deploy dev
-            echo "version=dev" >> "$GITHUB_OUTPUT"
-            echo "alias=" >> "$GITHUB_OUTPUT"
-          fi
-          pixi run -e docs mike list
-      - name: Materialise the commit mike just made
-        run: git worktree add gh-pages gh-pages
-      - name: Check the artifact carries this version
-        env:
-          VERSION: ${{ steps.mike.outputs.version }}
-          ALIAS: ${{ steps.mike.outputs.alias }}
+      - name: Move the old root layout under /pixi-sbom/ (once)
         run: |
           set -euo pipefail
-          if ! jq -e --arg v "$VERSION" 'any(.[]; .version == $v)' gh-pages/versions.json > /dev/null; then
-            echo "::error::gh-pages/versions.json lists no $VERSION, so the artifact would publish stale docs."
-            cat gh-pages/versions.json
+          git show-ref --verify --quiet refs/heads/gh-pages || exit 0
+          git worktree add pages gh-pages
+          python3 scripts/pages.py migrate pages
+          if [ -n "$(git -C pages status --porcelain)" ]; then
+            git -C pages add -A
+            git -C pages commit -m "docs: move pixi-sbom's versions under /pixi-sbom/ (#6)"
+          fi
+          # mike moves the branch itself; a worktree left on it would go stale.
+          git worktree remove pages
+      - name: Deploy each planned version with mike
+        run: |
+          set -euo pipefail
+          while read -r prefix version alias; do
+            config="crates/${prefix}/mkdocs.yml"
+            if [ -n "${alias:-}" ]; then
+              pixi run -e docs mike deploy -F "$config" --deploy-prefix "$prefix" --update-aliases "$version" "$alias"
+            else
+              pixi run -e docs mike deploy -F "$config" --deploy-prefix "$prefix" "$version"
+            fi
+            # /<prefix>/ opens `latest` once there is one, `dev` before an extension's first final.
+            mkdir -p "defaults/${prefix}"
+            git show "gh-pages:${prefix}/versions.json" > "defaults/${prefix}/versions.json"
+            default="$(python3 scripts/pages.py default defaults "$prefix")"
+            pixi run -e docs mike set-default -F "$config" --deploy-prefix "$prefix" --allow-empty "$default"
+            pixi run -e docs mike list -F "$config" --deploy-prefix "$prefix"
+          done < deploys.txt
+      - name: Materialise the commit mike just made
+        run: git worktree add gh-pages gh-pages
+      - name: Put the workspace site at the root
+        run: |
+          set -euo pipefail
+          python3 scripts/pages.py landing gh-pages site --base "$PAGES_URL"
+          if [ -n "$(git -C gh-pages status --porcelain)" ]; then
+            git -C gh-pages add -A
+            git -C gh-pages commit -m "docs: the workspace site at ${GITHUB_SHA::7}"
+          fi
+      - name: Check the artifact carries every planned version
+        run: |
+          set -euo pipefail
+          if [ -e gh-pages/versions.json ]; then
+            echo "::error::gh-pages still has the pre-#6 root layout (versions.json at the root)."
             exit 1
           fi
-          if [ -n "$ALIAS" ] && ! jq -e --arg v "$VERSION" --arg a "$ALIAS" \
-              'any(.[]; .version == $v and (.aliases | index($a)))' gh-pages/versions.json > /dev/null; then
-            echo "::error::gh-pages/versions.json does not alias $ALIAS to $VERSION."
-            cat gh-pages/versions.json
-            exit 1
-          fi
-          echo "The artifact lists $VERSION${ALIAS:+ aliased as $ALIAS}."
+          for file in index.html 404.html extensions.json sitemap.xml; do
+            [ -e "gh-pages/$file" ] || { echo "::error::the workspace site has no $file"; exit 1; }
+          done
+          while read -r prefix version alias; do
+            listing="gh-pages/${prefix}/versions.json"
+            if ! jq -e --arg v "$version" 'any(.[]; .version == $v)' "$listing" > /dev/null; then
+              echo "::error::$listing lists no $version, so the artifact would publish stale docs."
+              cat "$listing"
+              exit 1
+            fi
+            if [ -n "${alias:-}" ] && ! jq -e --arg v "$version" --arg a "$alias" \
+                'any(.[]; .version == $v and (.aliases | index($a)))' "$listing" > /dev/null; then
+              echo "::error::$listing does not alias $alias to $version."
+              cat "$listing"
+              exit 1
+            fi
+            echo "The artifact lists ${prefix} ${version}${alias:+ aliased as $alias}."
+          done < deploys.txt
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
@@ -142,26 +190,29 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
-      - name: Wait for the live site to serve this version
+      - name: Wait for the live site to serve every planned version
         env:
-          VERSION: ${{ needs.build.outputs.version }}
+          DEPLOYS: ${{ needs.build.outputs.deploys }}
           PAGE_URL: ${{ steps.deployment.outputs.page_url }}
         run: |
           set -euo pipefail
-          base="${PAGE_URL:-https://aesir-oss.github.io/pixi-ext-contrib/}"
-          url="${base%/}/versions.json"
-          attempts=10
-          for attempt in $(seq 1 "$attempts"); do
-            # The query string keeps a CDN copy of the previous deployment out of the answer.
-            if curl -fsSL -H 'Cache-Control: no-cache' "$url?t=${GITHUB_RUN_ID}-${attempt}" \
-                | jq -e --arg v "$VERSION" 'any(.[]; .version == $v)' > /dev/null; then
-              echo "$url lists $VERSION."
-              exit 0
-            fi
-            if [ "$attempt" -lt "$attempts" ]; then
-              echo "Attempt $attempt of $attempts: $VERSION is not live yet, retrying in 15s."
-              sleep 15
-            fi
-          done
-          echo "::error::$url still does not list $VERSION. Pages reported success on a stale site (see #163)."
-          exit 1
+          base="${PAGE_URL:-$PAGES_URL}"
+          while read -r prefix version _; do
+            [ -n "$prefix" ] || continue
+            url="${base%/}/${prefix}/versions.json"
+            attempts=10
+            for attempt in $(seq 1 "$attempts"); do
+              # The query string keeps a CDN copy of the previous deployment out of the answer.
+              if curl -fsSL -H 'Cache-Control: no-cache' "$url?t=${GITHUB_RUN_ID}-${attempt}" \
+                  | jq -e --arg v "$version" 'any(.[]; .version == $v)' > /dev/null; then
+                echo "$url lists $version."
+                continue 2
+              fi
+              if [ "$attempt" -lt "$attempts" ]; then
+                echo "Attempt $attempt of $attempts: $prefix $version is not live yet, retrying in 15s."
+                sleep 15
+              fi
+            done
+            echo "::error::$url still does not list $version. Pages reported success on a stale site (see #163)."
+            exit 1
+          done <<< "$DEPLOYS"

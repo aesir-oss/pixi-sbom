@@ -1,0 +1,71 @@
+INHERIT: ../../mkdocs.base.yml
+site_name: pixi-sbom
+site_description: CycloneDX and SPDX Software Bills of Materials from pixi.lock
+site_url: https://aesir-oss.github.io/pixi-ext-contrib/pixi-sbom/
+edit_uri: edit/main/crates/pixi-sbom/docs/
+
+docs_dir: docs
+# These live under docs/ for the strict build's sake; none of them is a page.
+exclude_docs: |
+  papers/
+  posts/
+  presentations/
+  release-notes/
+
+nav:
+  - Overview: index.md
+  - Installation: installation.md
+  - What's new: whats-new.md
+  - Without pixi: without-pixi.md
+  - Try it on the examples: try-the-examples.md
+  - Training lab: lab.md
+  - Field manual:
+      - Overview: field-manual/index.md
+      - Gate a repository in CI: field-manual/ci-gate.md
+      - Take in a vendor's SBOM: field-manual/vendor-sbom.md
+      - One SBOM for a product: field-manual/product-sbom.md
+      - Are we exposed?: field-manual/are-we-exposed.md
+      - A restricted network: field-manual/restricted-network.md
+      - A project without pixi: field-manual/without-pixi.md
+      - Release with a signed SBOM: field-manual/signed-release.md
+  - Command-line reference: cli.md
+  - GitHub Action: github-action.md
+  - CI recipes: ci-recipes.md
+  - Which format to pick: formats.md
+  - pixi-sbom and syft: syft.md
+  - Output format reference: output-format.md
+  - What 1.0 freezes: stability.md
+  - Troubleshooting: troubleshooting.md
+  - Contributing:
+      - Architecture: architecture.md
+      - Benchmarks: benchmarks.md
+      - Development: https://aesir-oss.github.io/pixi-ext-contrib/development/
+  - Security policy: https://aesir-oss.github.io/pixi-ext-contrib/security/
+  - Changelog: changelog.md
+
+hooks:
+  - ../../mkdocs_hooks.py
+
+theme:
+  custom_dir: ../../docs/overrides
+  favicon: https://aesir-oss.github.io/pixi-ext-contrib/assets/favicon.svg
+
+plugins:
+  - search
+  # Aliases (`latest`) are real copies so GitHub Pages serves them without symlinks or redirects,
+  # and every version's pages declare the `latest` URL as canonical for search engines.
+  - mike:
+      alias_type: copy
+      canonical_version: latest
+
+extra:
+  # Repository files published as pages of this site (mkdocs_hooks.py), from the repository root.
+  repo_pages:
+    crates/pixi-sbom/CHANGELOG.md: changelog.md
+  # Version selector fed by mike's versions.json under /pixi-sbom/; the prefix root redirects to `latest`.
+  version:
+    provider: mike
+    default: latest
+
+extra_javascript:
+  - javascripts/lab-progress.js

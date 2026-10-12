@@ -10,7 +10,7 @@ description = "Generate a CycloneDX or SPDX SBOM from a pixi.lock file"
 license = "Apache-2.0"
 repository = "https://github.com/aesir-oss/pixi-ext-contrib"
 homepage = "https://aesir-oss.github.io/pixi-ext-contrib/"
-documentation = "https://aesir-oss.github.io/pixi-ext-contrib/"
+documentation = "https://aesir-oss.github.io/pixi-ext-contrib/pixi-sbom/latest/"
 readme = "README.md"
 keywords = ["pixi", "sbom", "cyclonedx", "spdx", "conda"]
 categories = ["command-line-utilities", "development-tools"]
@@ -19,9 +19,10 @@ categories = ["command-line-utilities", "development-tools"]
 publish = false
 
 # What counts toward this crate's CHANGELOG.md beyond its own directory and the workspace crates it
-# depends on (scripts/changelog.py). docs/ and examples/ are pixi-sbom's until the site gets a
-# section per extension (#6). Releases up to v1.11.0 were made before the move into crates/, so that
-# history is kept whole rather than filtered by path.
+# depends on (scripts/changelog.py). Its docs now live in crates/pixi-sbom/docs/ and count through its own directory
+# (#6); `docs/**` stays claimed because released sections list commits made when pixi-sbom's pages were there, and the
+# changelog is regenerated whole, so dropping it would rewrite released notes. Releases up to v1.11.0 were made before
+# the move into crates/, so that history is kept whole rather than filtered by path.
 [package.metadata.changelog]
 include = ["actions/pixi-sbom/**", "docs/**", "examples/**"]
 history-before = "v1.11.0"

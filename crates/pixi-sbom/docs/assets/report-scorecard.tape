@@ -9,8 +9,8 @@
 # The hidden block runs the command once before filming, so the network wait happens off camera
 # and what is filmed is a warm run — which is also what the second run of anything looks like.
 
-Output "docs/assets/report-scorecard.gif"
-Source "docs/assets/_common.tape"
+Output "crates/pixi-sbom/docs/assets/report-scorecard.gif"
+Source "crates/pixi-sbom/docs/assets/_common.tape"
 Set Height 950
 
 Hide

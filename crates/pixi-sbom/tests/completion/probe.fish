@@ -2,5 +2,5 @@
 # for the line in $argv[1], one candidate per line.
 pixi completion --shell fish | source
 PIXI_SBOM_COMPLETE=fish pixi-sbom | source
-source docs/completion/pixi-sbom.fish
+source crates/pixi-sbom/docs/completion/pixi-sbom.fish
 complete -C "$argv[1]" | string replace -r '\t.*' ''

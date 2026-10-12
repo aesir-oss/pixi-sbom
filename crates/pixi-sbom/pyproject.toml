@@ -28,7 +28,7 @@ classifiers = [
 
 [project.urls]
 Homepage = "https://github.com/aesir-oss/pixi-ext-contrib"
-Documentation = "https://aesir-oss.github.io/pixi-ext-contrib/latest/"
+Documentation = "https://aesir-oss.github.io/pixi-ext-contrib/pixi-sbom/latest/"
 Changelog = "https://github.com/aesir-oss/pixi-ext-contrib/blob/main/crates/pixi-sbom/CHANGELOG.md"
 Issues = "https://github.com/aesir-oss/pixi-ext-contrib/issues"
 

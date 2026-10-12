@@ -1,0 +1,77 @@
+# What every site in this repository shares (#6): the workspace site (mkdocs.yml) and one site per extension
+# (crates/<extension>/mkdocs.yml) each start with `INHERIT: <path to this file>`. Dictionaries merge with the
+# site's own; lists (nav, plugins, markdown_extensions) are replaced, so a site that sets one sets all of it.
+# Paths a site resolves itself (custom_dir, hooks, favicon) live in each site's file, since MkDocs reads them
+# relative to that file.
+repo_url: https://github.com/aesir-oss/pixi-ext-contrib
+repo_name: aesir-oss/pixi-ext-contrib
+copyright: Apache-2.0 licensed · Aesir Open Source Solutions
+
+strict: true
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn
+  anchors: warn
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - search.highlight
+    - search.suggest
+    - content.code.copy
+    - content.action.edit
+  # The Aesir brand (docs/overrides/aesir.css): Inter for text, JetBrains Mono for code.
+  font:
+    text: Inter
+    code: JetBrains Mono
+  icon:
+    logo: aesir/mark
+  # Light by default regardless of the OS preference; the toggle switches to dark. The colours themselves are the
+  # brand's light and dark theme mapping, set in docs/overrides/aesir.css.
+  palette:
+    - scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
+  # Shell snippets live as real files so CI runs exactly what the page shows. Paths are from the repository root,
+  # where every docs task runs.
+  - pymdownx.snippets:
+      base_path: [crates/pixi-sbom/docs/completion]
+      check_paths: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+      clickable_checkbox: true
+  - pymdownx.tabbed:
+      alternate_style: true
+
+extra:
+  # Where the workspace site is served, for the extension switcher (docs/overrides/main.html).
+  workspace: /pixi-ext-contrib/
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/aesir-oss/pixi-ext-contrib

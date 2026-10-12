@@ -1,7 +1,7 @@
 # Development guide
 
 This page is how the code is built, checked, tested, and released. For what the code does, see
-[architecture.md](architecture.md).
+[pixi-sbom's architecture page](https://aesir-oss.github.io/pixi-ext-contrib/pixi-sbom/latest/architecture/).
 
 ## Toolchain
 
@@ -31,14 +31,28 @@ prefer adding a task.
 | `ci` | `pre-commit-run` → `build` → `check` → `lint` → `cov` | The gate; must exit 0 before work is considered done |
 | `changelog-of` | `python scripts/changelog.py write <extension>` | Regenerate one extension's changelog from the commits that touched it |
 | `bootstrap` | `pre-commit install ...` | One-time hook installation |
-| `docs-serve` | `mkdocs serve` (`docs` environment) | Live preview of the documentation site at http://127.0.0.1:8000 |
-| `docs-build` | `mkdocs build --strict` (`docs` environment) | Build the site into `site/`; a broken link or a page missing from the nav fails |
+| `docs-preview` | `python scripts/pages.py preview` (`docs` environment) | Build every site laid out as on GitHub Pages and serve it at http://127.0.0.1:8000/pixi-ext-contrib/ |
+| `docs-serve`, `docs-serve-sbom`, `docs-serve-policy` | `mkdocs serve -f <config>` (`docs` environment) | Live preview of one site, reloading as you edit |
+| `docs-build` | `mkdocs build --strict`, once per site (`docs` environment) | Build every site into `site/`; a broken link or a page missing from the nav fails |
 
-The documentation site is [MkDocs](https://www.mkdocs.org) with the Material theme, configured in `mkdocs.yml`; the
-pages are the Markdown files in `docs/` with `index.md` as the landing page, plus pixi-sbom's `crates/pixi-sbom/CHANGELOG.md`,
-which `mkdocs_hooks.py` publishes as the changelog page at build time. The `docs` pixi environment is separate
-from the Rust one, so `pixi run -e docs docs-serve` (or plain `pixi run docs-serve`, which resolves to it) does not
-pull the Rust toolchain into a docs-only checkout.
+The documentation is [MkDocs](https://www.mkdocs.org) with the Material theme, as one site per extension plus the
+workspace's own (#6):
+
+| Site | Config | Pages | Served at |
+|---|---|---|---|
+| The workspace | `mkdocs.yml` | `docs/`: the extensions page, this page, the security policy, the changelog index | `/` |
+| pixi-sbom | `crates/pixi-sbom/mkdocs.yml` | `crates/pixi-sbom/docs/` | `/pixi-sbom/<version>/` |
+| pixi-policy | `crates/pixi-policy/mkdocs.yml` | `crates/pixi-policy/docs/` | `/pixi-policy/<version>/` |
+
+What they share is in `mkdocs.base.yml`, which each config names with `INHERIT`, and `docs/overrides/`: the Aesir
+brand (`aesir.css`, the A mark in `.icons/`), the extension switcher beside the version selector, and the 404 page
+that forwards the old pre-#6 addresses (`/latest/cli/`) to `/pixi-sbom/`. Repository files that are also pages, such
+as `SECURITY.md` and each extension's `CHANGELOG.md`, are added at build time by `mkdocs_hooks.py` from each site's
+`extra.repo_pages`. `extensions.json` lists the extensions for the extensions page and the switcher; a new
+extension's site is a `crates/<extension>/mkdocs.yml` and a row there, and `pixi run pages-test` fails until both
+exist. Links from one site to another are absolute URLs, since each site builds on its own. The `docs` pixi
+environment is separate from the Rust one, so `pixi run -e docs docs-preview` does not pull the Rust toolchain into a
+docs-only checkout.
 
 ## The change harness
 
@@ -108,7 +122,7 @@ environment and `crates/pixi-sbom/Cargo.toml` change together, or the check is m
 
 `pixi run bench` times the lockfile reader, the model builder, each writer, license normalization, the report
 renderers and the offline enrichment path, against this repository's own lockfile and a generated 2000-package
-one. The numbers and what they say are in [benchmarks.md](benchmarks.md); CI runs `pixi run bench-test`, which
+one. The numbers and what they say are in [pixi-sbom's benchmarks page](https://aesir-oss.github.io/pixi-ext-contrib/pixi-sbom/latest/benchmarks/); CI runs `pixi run bench-test`, which
 executes each benchmark once without timing it, since a shared runner's timings are noise.
 
 The benchmarks reach into the crate through the library target (`crates/pixi-sbom/src/lib.rs`), which exists for them and for the
@@ -282,7 +296,7 @@ thirty seconds without an API key); `pixi run cpe-upkeep-test` tests them.
 
 ## The bundled-library signatures
 
-`crates/pixi-sbom/data/signatures.toml` says how each [bundled native library](output-format.md#bundled-native-libraries)
+`crates/pixi-sbom/data/signatures.toml` says how each [bundled native library](https://aesir-oss.github.io/pixi-ext-contrib/pixi-sbom/latest/output-format/#bundled-native-libraries)
 is recognized: the files it is installed as, the conda packages that are the library itself, the CPE table key, and
 where its version is (`text` after a prefix, an exported `symbol` holding the string, a `symbol-pointer` to it, or a
 `packed-function` returning `major << 16 | minor << 8 | patch`). `crates/pixi-sbom/src/bundled.rs` reads it.
@@ -323,10 +337,10 @@ must pass:
 | Pull request changes | Runs |
 |---|---|
 | Rust code, any `Cargo.toml`, `Cargo.lock`, `pixi.toml`, `pixi.lock`, `rustfmt.toml`, `ci.yml` | Tests on Linux, macOS and Windows; coverage, MSRV, benchmarks |
-| Files the tests read: `docs/`, `examples/`, `README.md`, `mkdocs.yml`, `actions/pixi-sbom/action.yml`, the release workflows, `scripts/whats_new.py` | Tests on Linux only |
-| `docs/`, `mkdocs.yml`, the hook, the changelogs, `SECURITY.md` | The docs build |
+| Files the tests read: `docs/`, `examples/`, `README.md`, the MkDocs configs, `extensions.json`, `actions/pixi-sbom/action.yml`, the release workflows, `scripts/whats_new.py` | Tests on Linux only |
+| `docs/`, `crates/*/docs/`, the MkDocs configs, the hook, `extensions.json`, the changelogs, `SECURITY.md` | The docs build |
 | `Cargo.lock`, any `Cargo.toml`, `deny.toml` | Dependency advisories and licenses |
-| `cli.rs`, `main.rs`, `Cargo.lock`, `docs/completion/`, `scripts/completion_e2e.py` | Shell completion on all three |
+| `cli.rs`, `main.rs`, `Cargo.lock`, `crates/pixi-sbom/docs/completion/`, `scripts/completion_e2e.py` | Shell completion on all three |
 | `actions/`, `cli.rs`, `main.rs` | SBOM via action on all five, and the action on a uv project |
 | Anything | Lint and the script tests |
 
@@ -341,7 +355,7 @@ A newer push to a pull request cancels its running CI; on `main` every commit's 
 | Builds on the MSRV | ubuntu | `pixi run -e msrv msrv-check`: the oldest toolchain `crates/pixi-sbom/Cargo.toml` claims |
 | Benchmarks compile and run | ubuntu | `pixi run bench-test`: every benchmark runs once, untimed, in a debug build |
 | Script tests | ubuntu | The Python scripts' own tests: `action-test`, `perf-test`, `whats-new-test`, `repo-release-test`, `changelog-test` and the rest |
-| Performance (separate workflow) | all five release platforms | `pixi run perf`: builds two refs on one runner and compares them; fails on binary size or peak memory, reports wall time. On demand, weekly and for each release candidate (its tag, against the last final release); not on pull requests or pushes to `main` (#91). See [benchmarks.md](benchmarks.md) |
+| Performance (separate workflow) | all five release platforms | `pixi run perf`: builds two refs on one runner and compares them; fails on binary size or peak memory, reports wall time. On demand, weekly and for each release candidate (its tag, against the last final release); not on pull requests or pushes to `main` (#91). See [pixi-sbom's benchmarks page](https://aesir-oss.github.io/pixi-ext-contrib/pixi-sbom/latest/benchmarks/) |
 | Build | same three | `pixi run build` and `--version` smoke test, with the release profile; on `main` only, not on pull requests (#91) |
 | Docs | ubuntu | `pixi run docs-build`: the site must build with `--strict` |
 | SBOM via action | all five release platforms | The repository's own action against its own lockfile; SARIF and the attestation from the linux-64 leg only. See [The GitHub Action](#the-github-action) |
@@ -351,16 +365,20 @@ A newer push to a pull request cancels its running CI; on `main` every commit's 
 The per-pull-request run cannot see an advisory published after a merge, and the weekly one is what catches it:
 nothing about the repository changes and one day the answer is different.
 
-`.github/workflows/docs.yml` publishes the site to GitHub Pages (https://aesir-oss.github.io/pixi-ext-contrib/) every time
-a release is published, building from the release tag so the site matches the released binary. The site is
-versioned with [mike](https://github.com/jimporter/mike) the way pixi's own docs are: each release deploys under
-its tag (`/v0.5.5/`), `latest` is an alias of the newest non-pre-release version and the root redirects to it, so
-links should use `/latest/...`, and `dev` follows `main` (redeployed on every push that touches `docs/`,
-`mkdocs.yml`, the hook or the changelog). The versions live on the `gh-pages` branch, which the workflow then
-publishes as the Pages artifact; the repository's Pages source stays "GitHub Actions" and the `github-pages`
-environment records every deployment. `gh workflow run docs.yml -f ref=<tag>` redeploys a release's docs;
-any other ref (or none) redeploys `dev`. `pixi run -e docs mike serve` previews every deployed version locally
-from `gh-pages`; `mike delete --push <version>` removes one.
+`.github/workflows/docs.yml` publishes the sites to GitHub Pages (https://aesir-oss.github.io/pixi-ext-contrib/) every
+time a release is published, building from the release tag so each extension's site matches its released binary.
+Each extension's site is versioned with [mike](https://github.com/jimporter/mike) under its own prefix, the way
+pixi's own docs are versioned: a release deploys under its version (`/pixi-sbom/v1.13.0/`), `latest` is an alias of
+the extension's newest final release and `/<extension>/` opens it, so links should use `/<extension>/latest/...`,
+and `dev` follows `main`. Before an extension's first final, `/<extension>/` opens `dev`. A release deploys only its
+own extension; a push to `main` that touches the docs redeploys `dev` for every extension. The workspace site is not
+versioned and is rebuilt at the root on every run. `scripts/pages.py` decides what each run deploys and lays out the
+branch, and its first run after #6 moved pixi-sbom's earlier versions from the root to `/pixi-sbom/`. Everything
+lives on the `gh-pages` branch, which the workflow then publishes as the Pages artifact; the repository's Pages
+source stays "GitHub Actions" and the `github-pages` environment records every deployment.
+`gh workflow run docs.yml -f ref=<extension>-vX.Y.Z` redeploys a release's docs; any other ref (or none) redeploys
+`dev`. `pixi run -e docs mike serve -F crates/<extension>/mkdocs.yml --deploy-prefix <extension>` previews one
+extension's deployed versions locally from `gh-pages`.
 
 The `github-pages` environment's deployment branch policy must allow the `v*` tag pattern as well as `main`
 (Settings → Environments → github-pages), because a release event runs on the tag; without it the deploy job fails
@@ -381,8 +399,8 @@ binary once, as a wheel (step 5), cross-compiling osx-64 on the arm runner.
 
 ## The README recording
 
-`docs/assets/demo.gif` is generated, not captured by hand: `pixi run demo` replays
-`docs/assets/demo.tape` through [vhs](https://github.com/charmbracelet/vhs) and overwrites the GIF.
+`crates/pixi-sbom/docs/assets/demo.gif` is generated, not captured by hand: `pixi run demo` replays
+`crates/pixi-sbom/docs/assets/demo.tape` through [vhs](https://github.com/charmbracelet/vhs) and overwrites the GIF.
 Re-record it when the output it shows changes.
 
 **vhs is not a project dependency.** It pulls ttyd and ffmpeg — 95 packages, and it more than
@@ -467,8 +485,9 @@ only links to them. `scripts/changelog.py` writes one with git-cliff from the co
 - the extension's own crate;
 - every workspace crate it depends on, read from `cargo metadata`, so adding a dependency on a shared crate needs no
   other change;
-- the extra paths its `Cargo.toml` claims under `[package.metadata.changelog] include`. pixi-sbom claims `docs/**`,
-  `examples/**` and `actions/pixi-sbom/**` until the site gets a section per extension (#6).
+- the extra paths its `Cargo.toml` claims under `[package.metadata.changelog] include`. pixi-sbom claims
+  `examples/**` and `actions/pixi-sbom/**`, and `docs/**` because its released sections list commits made when its
+  pages lived there; its pages are now in its crate (#6).
 
 A commit that touches only another extension, or only repository-wide files (`.github/`, `.claude/`, the root
 configuration), appears in no extension's changelog. A commit to a shared crate appears in the changelog of every

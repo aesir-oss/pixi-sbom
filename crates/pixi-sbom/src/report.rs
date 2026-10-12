@@ -2654,7 +2654,7 @@ fn sarif(reports: &[Report]) -> serde_json::Value {
                     "driver": {
                         "name": "pixi-sbom",
                         "version": env!("CARGO_PKG_VERSION"),
-                        "informationUri": "https://aesir-oss.github.io/pixi-ext-contrib/",
+                        "informationUri": "https://aesir-oss.github.io/pixi-ext-contrib/pixi-sbom/",
                         "rules": rules,
                     }
                 },

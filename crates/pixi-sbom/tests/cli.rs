@@ -117,7 +117,7 @@ fn help_lists_all_options() {
         .stdout(predicate::str::contains("--all-environments"))
         .stdout(predicate::str::contains("--all-platforms"))
         .stdout(predicate::str::contains(
-            "https://aesir-oss.github.io/pixi-ext-contrib/",
+            "https://aesir-oss.github.io/pixi-ext-contrib/pixi-sbom/",
         ));
 }
 
@@ -9241,7 +9241,7 @@ fn the_without_pixi_page_runs_and_shows_the_tested_matrix() {
     // #345: every `pixi-sbom` line in the page's shell blocks runs as written, in a project that
     // has each file it names, and its table is the one tests/matrix.rs produces.
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let page = std::fs::read_to_string(repo_root().join("docs/without-pixi.md")).unwrap();
+    let page = std::fs::read_to_string(repo_root().join("crates/pixi-sbom/docs/without-pixi.md")).unwrap();
     let project = tempfile::tempdir().unwrap();
     let examples = repo_root().join("examples/projects");
     for (from, files) in [
@@ -9294,14 +9294,14 @@ fn the_without_pixi_page_runs_and_shows_the_tested_matrix() {
     for row in grid {
         assert!(
             page.lines().any(|line| line == row),
-            "docs/without-pixi.md is behind tests/matrix.rs; copy the grid from the snapshot. Missing: {row}"
+            "crates/pixi-sbom/docs/without-pixi.md is behind tests/matrix.rs; copy the grid from the snapshot. Missing: {row}"
         );
     }
 }
 
 #[test]
 fn what_each_common_setup_writes_is_read() {
-    // #389: the "Getting a lockfile" table in docs/without-pixi.md, one real tool output per row
+    // #389: the "Getting a lockfile" table in crates/pixi-sbom/docs/without-pixi.md, one real tool output per row
     // (tests/fixtures/lockfile-routes/README.md says how each was made).
     let routes = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/lockfile-routes");
     for (file, platform, expect) in [
@@ -9895,15 +9895,18 @@ fn the_whats_new_page_covers_every_release_since_1_0() {
         .filter_map(|l| version_of(l, "## "))
         .filter(|v| *v > (1, 0, 0))
         .collect();
-    let page = std::fs::read_to_string(root.join("docs/whats-new.md")).unwrap();
+    let page = std::fs::read_to_string(root.join("crates/pixi-sbom/docs/whats-new.md")).unwrap();
     let covered: std::collections::BTreeSet<(u32, u32, u32)> =
         page.lines().filter_map(|l| version_of(l, "## ")).collect();
     let missing: Vec<_> = released.difference(&covered).collect();
     let invented: Vec<_> = covered.difference(&released).collect();
-    assert!(missing.is_empty(), "docs/whats-new.md has no section for {missing:?}");
+    assert!(
+        missing.is_empty(),
+        "crates/pixi-sbom/docs/whats-new.md has no section for {missing:?}"
+    );
     assert!(
         invented.is_empty(),
-        "docs/whats-new.md describes releases that do not exist: {invented:?}"
+        "crates/pixi-sbom/docs/whats-new.md describes releases that do not exist: {invented:?}"
     );
     assert!(released.contains(&(1, 8, 1)), "the changelog was read");
 
@@ -9917,21 +9920,21 @@ fn the_whats_new_page_covers_every_release_since_1_0() {
         .collect();
     assert!(
         unreleased.len() <= 1,
-        "docs/whats-new.md has {} '## Unreleased' sections",
+        "crates/pixi-sbom/docs/whats-new.md has {} '## Unreleased' sections",
         unreleased.len()
     );
     if let Some(&at) = unreleased.first() {
         let first_release = page.lines().position(|l| version_of(l, "## ").is_some()).unwrap();
         assert!(
             at < first_release,
-            "'## Unreleased' in docs/whats-new.md is below a release's section"
+            "'## Unreleased' in crates/pixi-sbom/docs/whats-new.md is below a release's section"
         );
     }
     let release = std::fs::read_to_string(root.join(".github/workflows/release.yml")).unwrap();
     for step in [
         "scripts/whats_new.py check",
         "pixi run whats-new release",
-        "pixi.toml docs/whats-new.md",
+        "pixi.toml crates/pixi-sbom/docs/whats-new.md",
     ] {
         assert!(release.contains(step), "release.yml no longer runs `{step}`");
     }
@@ -9945,7 +9948,7 @@ fn the_whats_new_page_covers_every_release_since_1_0() {
 #[test]
 fn the_examples_tour_runs_as_written() {
     let root = repo_root();
-    let page = std::fs::read_to_string(root.join("docs/try-the-examples.md")).unwrap();
+    let page = std::fs::read_to_string(root.join("crates/pixi-sbom/docs/try-the-examples.md")).unwrap();
     let work = tempfile::tempdir().unwrap();
     let examples = root.join("examples/projects");
     for file in walkdir(&examples) {
@@ -10025,11 +10028,15 @@ fn the_examples_tour_runs_as_written() {
 #[test]
 fn every_recording_is_recorded_named_and_shown() {
     let root = repo_root();
-    let assets = root.join("docs/assets");
-    let docs: String = ["crates/pixi-sbom/README.md", "docs/cli.md", "docs/index.md"]
-        .iter()
-        .map(|f| std::fs::read_to_string(root.join(f)).unwrap())
-        .collect();
+    let assets = root.join("crates/pixi-sbom/docs/assets");
+    let docs: String = [
+        "crates/pixi-sbom/README.md",
+        "crates/pixi-sbom/docs/cli.md",
+        "crates/pixi-sbom/docs/index.md",
+    ]
+    .iter()
+    .map(|f| std::fs::read_to_string(root.join(f)).unwrap())
+    .collect();
     let mut tapes = 0;
     for entry in std::fs::read_dir(&assets).unwrap() {
         let path = entry.unwrap().path();
@@ -10045,8 +10052,8 @@ fn every_recording_is_recorded_named_and_shown() {
         );
         let tape = std::fs::read_to_string(&path).unwrap();
         assert!(
-            tape.contains(&format!("Output \"docs/assets/{gif}\"")),
-            "{name} writes somewhere other than docs/assets/{gif}"
+            tape.contains(&format!("Output \"crates/pixi-sbom/docs/assets/{gif}\"")),
+            "{name} writes somewhere other than crates/pixi-sbom/docs/assets/{gif}"
         );
         let shown = docs
             .lines()
@@ -10146,7 +10153,7 @@ fn the_field_manual_runs_as_written() {
         std::fs::copy(base.join(from), work.path().join(to)).unwrap();
     }
 
-    let nav = std::fs::read_to_string(repo_root().join("mkdocs.yml")).unwrap();
+    let nav = std::fs::read_to_string(repo_root().join("crates/pixi-sbom/mkdocs.yml")).unwrap();
     let pages: Vec<&str> = nav
         .lines()
         .filter_map(|line| line.trim().split_once(": field-manual/").map(|(_, page)| page))
@@ -10154,7 +10161,7 @@ fn the_field_manual_runs_as_written() {
     assert!(pages.len() >= 8, "the field manual is in the navigation: {pages:?}");
     let (mut ran, mut online) = (0, 0);
     for page in pages {
-        let text = std::fs::read_to_string(repo_root().join("docs/field-manual").join(page)).unwrap();
+        let text = std::fs::read_to_string(repo_root().join("crates/pixi-sbom/docs/field-manual").join(page)).unwrap();
         let mut in_shell = false;
         for line in text.lines() {
             if line.starts_with("```") {
@@ -10213,7 +10220,7 @@ fn the_field_manual_runs_as_written() {
 #[test]
 fn the_training_lab_runs_as_written_and_shows_what_it_says() {
     let root = repo_root();
-    let page = std::fs::read_to_string(root.join("docs/lab.md")).unwrap();
+    let page = std::fs::read_to_string(root.join("crates/pixi-sbom/docs/lab.md")).unwrap();
     let work = tempfile::tempdir().unwrap();
     let examples = root.join("examples");
     for file in walkdir(&examples) {
@@ -10232,7 +10239,7 @@ fn the_training_lab_runs_as_written_and_shows_what_it_says() {
     assert_eq!(
         recorded(&page, "recorded into `examples/lab-cache/` on "),
         recorded(&readme, "commands were run on "),
-        "docs/lab.md and examples/lab-cache disagree about when the cache was recorded: run `pixi run lab-cache`"
+        "crates/pixi-sbom/docs/lab.md and examples/lab-cache disagree about when the cache was recorded: run `pixi run lab-cache`"
     );
 
     let (mut ran, mut checked) = (0, 0);
@@ -10274,7 +10281,7 @@ fn the_training_lab_runs_as_written_and_shows_what_it_says() {
             Some("text") if !line.trim().is_empty() => {
                 assert!(
                     last.contains(line.trim()),
-                    "docs/lab.md expects `{}` from the command before it, which printed:\n{last}",
+                    "crates/pixi-sbom/docs/lab.md expects `{}` from the command before it, which printed:\n{last}",
                     line.trim()
                 );
                 checked += 1;
@@ -10291,7 +10298,7 @@ fn the_training_lab_runs_as_written_and_shows_what_it_says() {
 #[test]
 fn the_talk_demo_runs_as_written_and_its_slides_show_what_it_prints() {
     let root = repo_root();
-    let talk = root.join("docs/presentations/talk");
+    let talk = root.join("crates/pixi-sbom/docs/presentations/talk");
     let script = std::fs::read_to_string(talk.join("demo-script.md")).unwrap();
     let work = tempfile::tempdir().unwrap();
     let examples = root.join("examples");
@@ -10654,12 +10661,12 @@ fn an_installed_environment_documents_the_same_wherever_it_is() {
     );
 }
 
-/// The pixi-sbom column of the lockfile table on docs/syft.md: each row's package and hash counts
+/// The pixi-sbom column of the lockfile table on crates/pixi-sbom/docs/syft.md: each row's package and hash counts
 /// are what pixi-sbom writes for that lockfile, offline, for linux-64.
 #[test]
 fn the_syft_page_counts_are_what_pixi_sbom_writes() {
     let root = repo_root();
-    let page = std::fs::read_to_string(root.join("docs/syft.md")).unwrap();
+    let page = std::fs::read_to_string(root.join("crates/pixi-sbom/docs/syft.md")).unwrap();
     let work = tempfile::tempdir().unwrap();
     let mut checked = 0;
     for line in page.lines().filter(|l| l.starts_with("| `examples/")) {
@@ -10848,7 +10855,7 @@ fn help_sections_are_rules_set_apart_by_blank_lines() {
             );
         }
         assert!(!help.contains("\nOptions:") && !help.contains("\nInput:"), "{flag}");
-        assert!(help.contains("Documentation: https://aesir-oss.github.io/pixi-ext-contrib/"));
+        assert!(help.contains("Documentation: https://aesir-oss.github.io/pixi-ext-contrib/pixi-sbom/"));
     }
 }
 

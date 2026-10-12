@@ -30,7 +30,7 @@ perf = "python scripts/perf.py"
 perf-test = { cmd = "python -m unittest discover -s scripts -p 'test_perf.py' -v", description = "the perf comparison's own tests" }
 lab-cache = { cmd = "python scripts/lab_cache.py", description = "re-record the training lab's online answers into examples/lab-cache" }
 lab-cache-test = { cmd = "python -m unittest discover -s scripts -p 'test_lab_cache.py' -v", description = "the lab-cache recorder's own tests" }
-completion-e2e = { cmd = "cargo build && python scripts/completion_e2e.py", description = "tab completion in real shells (fish, bash, zsh and PowerShell; PowerShell 7 and 5.1 on Windows), for pixi-sbom and for `pixi sbom` through docs/completion" }
+completion-e2e = { cmd = "cargo build && python scripts/completion_e2e.py", description = "tab completion in real shells (fish, bash, zsh and PowerShell; PowerShell 7 and 5.1 on Windows), for pixi-sbom and for `pixi sbom` through crates/pixi-sbom/docs/completion" }
 grype-compare = { cmd = "cargo build && python scripts/grype_compare.py", description = "Grype's findings from pixi-sbom's SBOM against syft's, on installed corpus environments (#434); needs the network" }
 grype-compare-test = { cmd = "python -m unittest discover -s scripts -p 'test_grype_compare.py' -v", description = "the Grype comparison's own tests" }
 cpe-upkeep = { cmd = "cargo build && python scripts/cpe_upkeep.py", description = "check the CPE table against NVD and conda-forge, and list candidates (#435); needs the network: cpe-upkeep --report <FILE> [--apply]" }
@@ -43,6 +43,8 @@ whats-new = { cmd = "python scripts/whats_new.py", description = "check, or rele
 whats-new-test = { cmd = "python -m unittest discover -s scripts -p 'test_whats_new.py' -v", description = "the What's new release step's own tests" }
 repo-release = { cmd = "python scripts/repo_release.py", description = "plan the repository release marked Latest: repo-release --releases <JSONL> --notes <FILE>" }
 repo-release-test = { cmd = "python -m unittest discover -s scripts -p 'test_repo_release.py' -v", description = "the repository release planner's own tests" }
+pages = { cmd = "python scripts/pages.py", description = "lay out the gh-pages branch: pages plan|migrate|default|landing (see the script)" }
+pages-test = { cmd = "python -m unittest discover -s scripts -p 'test_pages.py' -v", description = "the Pages layout's own tests" }
 action-test = { cmd = "python -m unittest discover -s scripts -p 'test_action_version.py' -v", description = "which binary the GitHub Action installs for a given ref" }
 bench = "cargo bench --benches"
 bench-test = "cargo test --bench '*'"
@@ -109,8 +111,19 @@ pymdown-extensions = ">=10"
 mike = ">=2.1"
 
 [feature.docs.tasks]
-docs-serve = "mkdocs serve"
-docs-build = "mkdocs build --strict"
+# One site per extension plus the workspace site (#6); docs-build builds all three the way docs.yml lays them out.
+docs-serve = { cmd = "mkdocs serve -f mkdocs.yml", description = "the workspace site (landing page, development, security)" }
+docs-serve-sbom = { cmd = "mkdocs serve -f crates/pixi-sbom/mkdocs.yml", description = "pixi-sbom's site" }
+docs-serve-policy = { cmd = "mkdocs serve -f crates/pixi-policy/mkdocs.yml", description = "pixi-policy's site" }
+docs-build-workspace = "mkdocs build --strict -f mkdocs.yml -d $PIXI_PROJECT_ROOT/site"
+docs-build-sbom = "mkdocs build --strict -f crates/pixi-sbom/mkdocs.yml -d $PIXI_PROJECT_ROOT/site/pixi-sbom/dev"
+docs-build-policy = "mkdocs build --strict -f crates/pixi-policy/mkdocs.yml -d $PIXI_PROJECT_ROOT/site/pixi-policy/dev"
+docs-build = { depends-on = [
+  "docs-build-workspace",
+  "docs-build-sbom",
+  "docs-build-policy",
+], description = "every site, strictly" }
+docs-preview = { cmd = "python scripts/pages.py preview", description = "build every site as Pages lays them out and serve it at http://127.0.0.1:8000/pixi-ext-contrib/" }
 
 # The tools that write examples/projects (#362). Dev-only: pixi-sbom never resolves, these do, and
 # `pixi run examples` regenerates every example lockfile from its manifest. Each example declares its

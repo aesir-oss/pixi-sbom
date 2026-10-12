@@ -1,4 +1,4 @@
-//! `docs/stability.md` is a promise, so it is checked against the code rather than maintained by
+//! `crates/pixi-sbom/docs/stability.md` is a promise, so it is checked against the code rather than maintained by
 //! hand and hoped over.
 //!
 //! Each test extracts a list from the page and compares it to what the binary, `action.yml` or the
@@ -33,7 +33,7 @@ fn read(relative: &str) -> String {
 }
 
 fn page() -> String {
-    read("docs/stability.md")
+    read("crates/pixi-sbom/docs/stability.md")
 }
 
 /// The section of the page under `heading`, up to the next heading of the same level or higher.
@@ -75,11 +75,11 @@ fn assert_same(kind: &str, real: &BTreeSet<String>, listed: &BTreeSet<String>) {
     let extra: Vec<&String> = listed.difference(real).collect();
     assert!(
         missing.is_empty(),
-        "these {kind} exist but docs/stability.md does not list them: {missing:?}"
+        "these {kind} exist but crates/pixi-sbom/docs/stability.md does not list them: {missing:?}"
     );
     assert!(
         extra.is_empty(),
-        "docs/stability.md promises these {kind} but they no longer exist: {extra:?}"
+        "crates/pixi-sbom/docs/stability.md promises these {kind} but they no longer exist: {extra:?}"
     );
 }
 
@@ -277,7 +277,7 @@ fn the_page_lists_every_exit_code_the_code_defines() {
     assert_eq!(
         defined,
         BTreeSet::from([0, 1, 2, 3, 4, 6, 7, 8, 9]),
-        "the set of exit codes changed; docs/stability.md and this test both need a decision"
+        "the set of exit codes changed; crates/pixi-sbom/docs/stability.md and this test both need a decision"
     );
 
     let section = section(&page(), "## Exit codes");

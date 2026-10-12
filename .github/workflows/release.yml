@@ -181,7 +181,7 @@ jobs:
             echo "Version is new"
           fi
 
-      # A final release carries its notes: docs/whats-new.md needs a non-empty `## Unreleased`
+      # A final release carries its notes: crates/pixi-sbom/docs/whats-new.md needs a non-empty `## Unreleased`
       # section, checked here so a release without one stops before anything is pushed.
       # Release candidates are skipped by the script.
       - name: Check the What's new notes are written
@@ -278,7 +278,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add "${DIR}/CHANGELOG.md" crates/*/Cargo.toml Cargo.lock pixi.toml docs/whats-new.md
+          git add "${DIR}/CHANGELOG.md" crates/*/Cargo.toml Cargo.lock pixi.toml crates/pixi-sbom/docs/whats-new.md
           git commit -m "chore(release): ${PREFIX}${{ env.NEW_TAG }}"
           git tag -a "${PREFIX}${{ env.NEW_TAG }}" -m "Release ${PREFIX}${{ env.NEW_TAG }}"
           git push origin HEAD:main --tags
