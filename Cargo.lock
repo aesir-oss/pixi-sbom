@@ -2064,7 +2064,7 @@ dependencies = [
 
 [[package]]
 name = "pixi-sbom"
-version = "1.13.0"
+version = "1.13.1-rc.1"
 dependencies = [
  "anstream",
  "anstyle",
