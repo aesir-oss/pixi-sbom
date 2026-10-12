@@ -27,7 +27,7 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
 ROOT = Path(__file__).resolve().parent.parent
-SIGNATURES = ROOT / "crates" / "pixi-sbom" / "data" / "signatures.toml"
+SIGNATURES = ROOT / "data" / "signatures.toml"
 ANACONDA = "https://api.anaconda.org/package/conda-forge/"
 # One per object file format: ELF, Mach-O and PE.
 PLATFORMS = ("linux-64", "osx-arm64", "win-64")

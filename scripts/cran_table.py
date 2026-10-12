@@ -19,7 +19,7 @@ import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-TABLE = ROOT / "crates" / "pixi-sbom" / "data" / "cran.toml"
+TABLE = ROOT / "data" / "cran.toml"
 CRAN_PACKAGES = "https://cran.r-project.org/src/contrib/PACKAGES"
 CRAN_ARCHIVE = "https://cran.r-project.org/src/contrib/Archive/"
 CHANNELDATA = "https://conda.anaconda.org/conda-forge/channeldata.json"
@@ -85,7 +85,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.check:
         current = TABLE.read_text(encoding="utf-8") if TABLE.exists() else ""
         if current != text:
-            sys.stderr.write("crates/pixi-sbom/data/cran.toml is out of date: run `pixi run cran-table`\n")
+            sys.stderr.write("data/cran.toml is out of date: run `pixi run cran-table`\n")
             return 1
         return 0
     TABLE.write_text(text, encoding="utf-8")

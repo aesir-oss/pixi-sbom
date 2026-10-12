@@ -25,8 +25,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-TABLE = ROOT / "crates" / "pixi-sbom" / "data" / "cpe.toml"
-REVIEWED = ROOT / "crates" / "pixi-sbom" / "tests" / "cpe" / "reviewed.toml"
+TABLE = ROOT / "data" / "cpe.toml"
+REVIEWED = ROOT / "tests" / "cpe" / "reviewed.toml"
 NVD = "https://services.nvd.nist.gov/rest/json/cpes/2.0"
 ANACONDA = "https://api.anaconda.org/package/conda-forge/"
 # Without an API key NVD allows 5 requests in a rolling 30 seconds.

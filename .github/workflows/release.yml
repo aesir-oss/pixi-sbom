@@ -6,9 +6,9 @@ name: Release
 # note at the top of it for why the split exists (#218: provenance has to be able to name the
 # commit the binaries were built from, and only a tag-triggered run can).
 #
-# One workflow for every extension: the `crate` input picks which (pixi-sbom now, pixi-policy later, #69), and every
-# crate-specific value comes from the `Resolve the crate` step. Nothing is published to crates.io (#106): the shared
-# crate, pixi-ext-common, is compiled into each extension from this repository and never released.
+# Releases are tagged vX.Y.Z. Nothing is published to crates.io: the binary ships as release archives and wheels.
+# Releases 1.12.0 to 1.13.1 were made in aesir-oss/pixi-ext-contrib (tags pixi-sbom-vX.Y.Z there); their tags are
+# carried here as vX.Y.Z, beside the vX.Y.Z tags of the releases up to 1.11.x, made in millsks/pixi-sbom.
 #
 # Operator prerequisite: a release commits the version bump + the crate's CHANGELOG.md and pushes a
 # tag to `main` under the branch ruleset, so the default GITHUB_TOKEN is not enough.
@@ -21,12 +21,6 @@ name: Release
 on:
   workflow_dispatch:
     inputs:
-      crate:
-        description: "What to release"
-        required: true
-        type: choice
-        options: [pixi-sbom, pixi-policy]
-        default: pixi-sbom
       version:
         description: "Version to release (e.g. 1.0.0); leave blank to auto-increment the patch"
         required: false
@@ -68,16 +62,10 @@ jobs:
           fetch-depth: 0
           token: ${{ steps.app-token.outputs.token }}
 
-      # Everything that differs between crates, decided once.
-      - name: Resolve the crate
-        env:
-          CRATE: ${{ inputs.crate || 'pixi-sbom' }}
+      - name: Resolve the names
         run: |
-          set -euo pipefail
           {
-            echo "CRATE=${CRATE}"
-            echo "PREFIX=${CRATE}-v"
-            echo "DIR=crates/${CRATE}"
+            echo "PREFIX=v"
             echo "NEXT_WORKFLOW=release-artifacts.yml"
           } >> "$GITHUB_ENV"
 
@@ -88,10 +76,7 @@ jobs:
         id: get_tag
         run: |
           git fetch --tags
-          # <crate>-vX.Y.Z; pixi-sbom's releases before the move to the workspace are plain vX.Y.Z.
-          legacy=()
-          if [ "$CRATE" = pixi-sbom ]; then legacy=(--match 'v[0-9]*.[0-9]*.[0-9]*'); fi
-          latest_tag=$(git describe --tags --abbrev=0 --match "${PREFIX}[0-9]*.[0-9]*.[0-9]*" "${legacy[@]}" 2>/dev/null || echo no_tag_found)
+          latest_tag=$(git describe --tags --abbrev=0 --match "${PREFIX}[0-9]*.[0-9]*.[0-9]*" 2>/dev/null || echo no_tag_found)
           echo "tag=${latest_tag}" >> "$GITHUB_OUTPUT"
           if [ "$latest_tag" != "no_tag_found" ]; then
             echo "has_tags=true" >> "$GITHUB_OUTPUT"
@@ -111,7 +96,7 @@ jobs:
             next_tag="${major}.${minor}.${patch}"
           else
             # First release: use whatever Cargo.toml already says.
-            next_tag=$(grep -m1 '^version = ' "${DIR}/Cargo.toml" | sed -E 's/version = "([^"]+)"/\1/')
+            next_tag=$(grep -m1 '^version = ' Cargo.toml | sed -E 's/version = "([^"]+)"/\1/')
           fi
           echo "next_tag=${next_tag}" >> "$GITHUB_OUTPUT"
 
@@ -181,11 +166,11 @@ jobs:
             echo "Version is new"
           fi
 
-      # A final release carries its notes: crates/pixi-sbom/docs/whats-new.md needs a non-empty `## Unreleased`
+      # A final release carries its notes: docs/whats-new.md needs a non-empty `## Unreleased`
       # section, checked here so a release without one stops before anything is pushed.
       # Release candidates are skipped by the script.
       - name: Check the What's new notes are written
-        if: steps.should_skip.outputs.skip != 'true' && env.CRATE == 'pixi-sbom'
+        if: steps.should_skip.outputs.skip != 'true'
         run: python3 scripts/whats_new.py check "${{ env.NEW_TAG }}"
 
       - name: Remove existing tag and release (force_recreate)
@@ -238,14 +223,12 @@ jobs:
           shared-key: debug
           save-if: false
 
-      # pixi.toml's version follows pixi-sbom.
-      - name: Bump the version in the crate's Cargo.toml, Cargo.lock (and pixi.toml for pixi-sbom)
+      # pixi.toml's version follows the crate's.
+      - name: Bump the version in Cargo.toml, Cargo.lock and pixi.toml
         if: steps.should_skip.outputs.skip != 'true'
         run: |
           set -euo pipefail
-          files=("${DIR}/Cargo.toml")
-          if [ "$CRATE" = pixi-sbom ]; then files+=(pixi.toml); fi
-          sed -i -E "0,/^version = /s/^version = \"[^\"]+\"/version = \"${{ env.NEW_TAG }}\"/" "${files[@]}"
+          sed -i -E "0,/^version = /s/^version = \"[^\"]+\"/version = \"${{ env.NEW_TAG }}\"/" Cargo.toml pixi.toml
           pixi run cargo update --workspace
           git diff --stat
 
@@ -256,21 +239,22 @@ jobs:
       - name: Check the bumped workspace
         if: steps.should_skip.outputs.skip != 'true'
         run: |
-          pixi run cargo check --workspace --all-targets --locked
+          pixi run cargo check --all-targets --locked
           pixi run cargo test --test stability --locked
 
       # -----------------------------------------------------------------------
       # Changelog & tag (git-cliff via cliff.toml)
       # -----------------------------------------------------------------------
-      # Only the commits that touched the crate or a workspace crate it depends on (scripts/changelog.py).
-      - name: Generate the crate's CHANGELOG.md with git-cliff
+      # The release's section goes on top; the sections below it are never rewritten (those from 1.12.0 to 1.13.1 link to
+      # aesir-oss/pixi-ext-contrib, and those before to millsks/pixi-sbom, where they were made).
+      - name: Add the release's section to CHANGELOG.md with git-cliff
         if: steps.should_skip.outputs.skip != 'true'
-        run: pixi run changelog-of write "$CRATE" --tag "${PREFIX}${{ env.NEW_TAG }}"
+        run: pixi run changelog "${PREFIX}${{ env.NEW_TAG }}"
 
       # The notes become the release's section in the same commit as the changelog, so main
       # never has a release the What's new page does not describe.
       - name: Turn the What's new notes into the release's section
-        if: steps.should_skip.outputs.skip != 'true' && env.CRATE == 'pixi-sbom'
+        if: steps.should_skip.outputs.skip != 'true'
         run: pixi run whats-new release "${{ env.NEW_TAG }}"
 
       - name: Commit the release and tag it
@@ -278,7 +262,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add "${DIR}/CHANGELOG.md" crates/*/Cargo.toml Cargo.lock pixi.toml crates/pixi-sbom/docs/whats-new.md
+          git add CHANGELOG.md Cargo.toml Cargo.lock pixi.toml docs/whats-new.md
           git commit -m "chore(release): ${PREFIX}${{ env.NEW_TAG }}"
           git tag -a "${PREFIX}${{ env.NEW_TAG }}" -m "Release ${PREFIX}${{ env.NEW_TAG }}"
           git push origin HEAD:main --tags

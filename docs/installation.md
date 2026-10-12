@@ -1,0 +1,172 @@
+# Installation
+
+`pixi-sbom` is a [pixi extension](https://pixi.sh/latest/integration/extensions/introduction/): a standalone
+executable named `pixi-sbom`. Pixi finds any `pixi-<name>` binary on `PATH` (or in its own global bin directory) and
+runs it when you type `pixi <name>`. There is no plugin registration; installing the binary is the whole setup.
+
+## Methods
+
+| Method | Command |
+|---|---|
+| pixi global (recommended) | `pixi global install pixi-sbom` |
+| Prebuilt binary | Download `pixi-sbom-<version>-<platform>.tar.gz` (or `.zip` on Windows) from the [releases page](https://github.com/aesir-oss/pixi-sbom/releases) (1.12.0 to 1.13.1: [aesir-oss/pixi-ext-contrib](https://github.com/aesir-oss/pixi-ext-contrib/releases); up to 1.11.x: [millsks/pixi-sbom](https://github.com/millsks/pixi-sbom/releases)), check its provenance (below), and put `pixi-sbom` on your `PATH` |
+| PyPI | `uvx pixi-sbom` runs it without installing; `uv tool install pixi-sbom` or `pip install pixi-sbom` installs it. The wheels hold the same binary as the release archives (no Python code), for Linux (glibc and musl) x86_64/aarch64, macOS x86_64/arm64 and Windows x86_64, from 1.7.0 on |
+| From source | `pixi run build` in a clone, then copy `target/release/pixi-sbom` to `~/.pixi/bin/` |
+
+Check it is picked up:
+
+```sh
+pixi --list          # ...  sbom  (via pixi-sbom)
+pixi sbom --version
+```
+
+`pixi-sbom --help` and `pixi sbom --help` are equivalent; the binary can be run directly without pixi.
+
+## Checking where a binary came from
+
+Each release archive has a `.sha256` and a signed `.sigstore.json` beside it. They answer different questions. The
+checksum says the file did not change between the release page and your disk. It says nothing about who made the
+file — anyone can publish a binary and a correct checksum of it.
+
+The provenance attestation is the one worth running. It is a Sigstore-signed statement that this exact archive was
+built by this repository's release workflow, from a named commit, in a named workflow run. Releases carry one from
+**0.11.0 onward**; earlier archives have a checksum and nothing else.
+
+```sh
+gh attestation verify pixi-sbom-<version>-linux-64.tar.gz --repo aesir-oss/pixi-sbom
+```
+
+The PyPI wheels are attested the same way, from 1.7.0 on: `gh attestation verify pixi_sbom-<version>-py3-none-<platform>.whl
+--repo aesir-oss/pixi-sbom` checks a downloaded wheel (`pip download pixi-sbom --no-deps` fetches one), and PyPI shows
+its own publish attestation beside each file.
+
+```console
+Loaded digest sha256:... for file://pixi-sbom-<version>-linux-64.tar.gz
+Loaded 1 attestation from GitHub API
+
+The following policy criteria will be enforced:
+- Predicate type must match:................ https://slsa.dev/provenance/v1
+- Source Repository Owner URI must match:... https://github.com/aesir-oss
+- Source Repository URI must match:......... https://github.com/aesir-oss/pixi-sbom
+
+✓ Verification succeeded!
+```
+
+That needs the [GitHub CLI](https://cli.github.com) and reaches `api.github.com` to fetch the statement. On a
+machine that cannot, pass the bundle that ships with the archive and the check runs entirely offline:
+
+```sh
+gh attestation verify pixi-sbom-<version>-linux-64.tar.gz \
+  --bundle pixi-sbom-<version>-linux-64.tar.gz.sigstore.json \
+  --repo aesir-oss/pixi-sbom
+```
+
+### The strict form
+
+`--repo` alone accepts an archive signed by *any* workflow in this repository, from any branch. To also require that
+it came from the release workflow, run on the tag of the version you downloaded, on a GitHub-hosted runner:
+
+```sh
+gh attestation verify pixi-sbom-<version>-linux-64.tar.gz --repo aesir-oss/pixi-sbom \
+  --signer-workflow aesir-oss/pixi-sbom/.github/workflows/release-artifacts.yml \
+  --source-ref refs/tags/v<version> \
+  --deny-self-hosted-runners
+```
+
+Releases from 1.12.0 to 1.13.1 were built in `aesir-oss/pixi-ext-contrib` and tagged `pixi-sbom-v<version>`: verify
+those with `--repo aesir-oss/pixi-sbom`, and in the strict form
+`--signer-workflow aesir-oss/pixi-ext-contrib/.github/workflows/release-artifacts.yml` and
+`--source-ref refs/tags/pixi-sbom-v<version>`. Releases up to 1.11.x were built in `millsks/pixi-sbom` and tagged
+`v<version>`: verify those with `--repo millsks/pixi-sbom`, and in the strict form
+`--signer-workflow millsks/pixi-sbom/.github/workflows/release-artifacts.yml` and `--source-ref refs/tags/v<version>`.
+
+| Flag | Refuses |
+|---|---|
+| `--signer-workflow` | An archive signed by any other workflow, such as a CI job that also builds binaries |
+| `--source-ref` | One built from a branch, or from a different release's tag |
+| `--deny-self-hosted-runners` | One built on a machine outside GitHub's hosted runners |
+
+It combines with `--bundle` for the offline check. The strict form holds from **0.12.0 onward**. The 0.11.0 archives
+were signed by `release.yml` on `refs/heads/main`, before the build moved to the tag-triggered workflow (#218), so for
+0.11.0 the plain `--repo` check is as far as verification goes.
+
+The conda-forge package is deliberately not attested: the feedstock builds on conda-forge's infrastructure rather
+than ours, so the provenance there would be theirs to make. The binaries this project builds and hands out are the
+ones covered.
+
+**Not on crates.io any more.** pixi-sbom is not published to crates.io after 1.13.0 (#106): `cargo install pixi-sbom`
+and `cargo binstall pixi-sbom` stay at 1.13.0. Use `pixi global install pixi-sbom`, `uv tool install pixi-sbom` (or
+`pip`), or a release archive.
+
+## Shell completion
+
+`pixi-sbom` completes its flags, the values they take (`--report <TAB>` lists the report kinds,
+`--format <TAB>` the formats) and file paths. Flags and values are listed alphabetically in every shell, so the
+`--fail-on-…` gates sit together. Add the line for your shell to its startup file:
+
+| Shell | Startup file | Line |
+|---|---|---|
+| bash | `~/.bashrc` (`~/.bash_profile` on macOS) | `eval "$(PIXI_SBOM_COMPLETE=bash pixi-sbom)"` |
+| zsh | `~/.zshrc` | `source <(PIXI_SBOM_COMPLETE=zsh pixi-sbom)` |
+| fish | `~/.config/fish/config.fish` | `PIXI_SBOM_COMPLETE=fish pixi-sbom \| source` |
+| PowerShell | `$PROFILE` | `$env:PIXI_SBOM_COMPLETE = "powershell"; pixi-sbom \| Out-String \| Invoke-Expression; Remove-Item Env:\PIXI_SBOM_COMPLETE` |
+| elvish | `~/.config/elvish/rc.elv` | `eval (E:PIXI_SBOM_COMPLETE=elvish pixi-sbom \| slurp)` |
+
+For bash, `eval` rather than `source <(…)`: macOS's own bash is 3.2, where `source` reading a
+process substitution gets nothing and completion silently stays off. The line asks the binary for
+its registration each time a shell starts, so it always matches the
+installed version; don't save its output to a file. Pressing Tab runs `pixi-sbom` briefly to ask
+for suggestions. That run reads no lockfile, writes nothing and makes no network request, and
+`PIXI_SBOM_COMPLETE` is set only for it, so every other run writes its SBOM as usual.
+
+### `pixi sbom`, with a space
+
+pixi's own completion knows only pixi's built-in commands: it does not hand an extension's
+arguments to the extension ([#424](https://github.com/millsks/pixi-sbom/issues/424) has the tests,
+and [prefix-dev/pixi#7225](https://github.com/prefix-dev/pixi/issues/7225) asks pixi to). The
+mechanism above is the one pixi would use to forward them, so if it does, `pixi sbom` completes
+with no change here.
+
+Until then, a short addition to your shell's startup file hands `pixi sbom …` to pixi-sbom's
+completion. Load it after pixi's completion (`pixi completion --shell <shell>`) and pixi-sbom's
+line above. Each one is run in that shell by CI on every change, next to pixi's own completion,
+which keeps working.
+
+=== "bash"
+
+    ```bash
+    --8<-- "pixi-sbom.bash"
+    ```
+
+=== "zsh"
+
+    ```zsh
+    --8<-- "pixi-sbom.zsh"
+    ```
+
+=== "fish"
+
+    ```fish
+    --8<-- "pixi-sbom.fish"
+    ```
+
+=== "PowerShell"
+
+    ```powershell
+    --8<-- "pixi-sbom.ps1"
+    ```
+
+    PowerShell allows one completer per command, so this replaces the usual pixi completion line
+    and calls pixi's completer for everything that is not `pixi sbom`. It edits the text of pixi's
+    script, and stops working if pixi changes that line.
+
+Two limits: `sbom` is not added to the list `pixi <TAB>` offers, and pixi options placed before
+`sbom` (`pixi -v sbom …`) are not handled.
+
+## Upgrading
+
+`pixi global update pixi-sbom` follows the conda-forge feedstock, which tracks releases within a day or two; a
+downloaded binary is replaced by the next one from the releases page. `pixi sbom --version` prints the running
+version, and every release is listed in the [changelog](changelog.md).
+
+Next: [run it](cli.md), [use it in CI](github-action.md), or see [which format to pick](formats.md).

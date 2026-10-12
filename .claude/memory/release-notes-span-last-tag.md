@@ -26,10 +26,11 @@ the releases made in millsks/pixi-sbom and `pixi-sbom-vX.Y.Z` the ones made here
 candidates stay invisible. The template links `(#N)` in `v`-tagged releases to millsks/pixi-sbom and later ones
 here; the same rule applies: change `cliff.toml`, never `CHANGELOG.md`.
 
-Since #51 each extension's changelog is `crates/<extension>/CHANGELOG.md`, written by `scripts/changelog.py`, which
-passes `--tag-pattern ^<extension>-vX.Y.Z$` (still anchored) and one `--include-path` per path the extension is built
-from. A path filter cannot follow the move into `crates/`, so pixi-sbom's history up to `v1.11.0` (its
-`history-before`) is generated unfiltered and appended; without that every section before 1.12.0 vanishes.
+Since the split (aesir-oss/pixi-ext-contrib#131) `CHANGELOG.md` is never regenerated: each release adds only its own
+section, below the header, with `scripts/changelog.sh` (git-cliff `--unreleased --tag vX.Y.Z`, `tag_pattern`
+anchored to `^v[0-9]+\.[0-9]+\.[0-9]+$`). The sections already there were written in millsks/pixi-sbom (up to 1.11.x)
+and aesir-oss/pixi-ext-contrib (1.12.0 to 1.13.1) and link to those repositories; the history was filtered and its
+commits got new hashes, so regenerating them would point their links at commits that do not exist.
 
 Note that GitHub release bodies published *before* the fix still under-report; editing those is an
 outward-facing change and is the maintainer's call.

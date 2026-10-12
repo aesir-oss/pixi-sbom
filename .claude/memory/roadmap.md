@@ -344,3 +344,10 @@ The same day the maintainer stopped publishing anything to crates.io (#106): eve
 repository, where the shared crate is a path dependency, and crates.io carried about 2% of pixi-sbom's downloads.
 That undid #54's reason for naming the shared crate `aesir-pixi-ext-contrib-common` (a published `pixi-`-prefixed
 crate could be taken for prefix.dev's), so it went back to `pixi-ext-common`, in `crates/pixi-ext-common`.
+
+2026-10-12: split back out (aesir-oss/pixi-ext-contrib#131). The maintainer moved each extension to a repository of
+its own so either can be handed to a new owner by transferring one repository: pixi-policy went first (0.1.1 from
+aesir-oss/pixi-policy), then pixi-sbom to aesir-oss/pixi-sbom, with its full history (millsks/pixi-sbom's included),
+the crate back at the root and the shared code folded back in. Releases are tagged `vX.Y.Z` again, the first from the
+new repository being 1.13.2; 1.12.0 to 1.13.1 stay in aesir-oss/pixi-ext-contrib, which is archived. Issue numbers in
+this file from 2026-10-11 to the split refer to aesir-oss/pixi-ext-contrib.

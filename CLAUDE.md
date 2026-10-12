@@ -1,27 +1,28 @@
 # CLAUDE.md
 
-Project guidance for aesir-oss/pixi-ext-contrib. The global CLAUDE.md (toolchain, harness, git workflow) applies; this
-file covers what is specific here. This project is **Rust**: the Python-specific parts of the global file (mypy,
-pytest, structlog) apply only to the scripts in `scripts/`.
+Project guidance for aesir-oss/pixi-sbom. The global CLAUDE.md (toolchain, harness, git workflow) applies; this file
+covers what is specific here. This project is **Rust**: the Python-specific parts of the global file (mypy, pytest,
+structlog) apply only to the scripts in `scripts/`.
 
 @.claude/memory/MEMORY.md
 
 ## Architecture
 
-A Cargo workspace of pixi extensions. Each is a `pixi-<name>` binary that pixi runs as `pixi <name>`.
+One crate, `pixi-sbom`, a binary pixi runs as `pixi sbom`: it writes CycloneDX and SPDX SBOMs from `pixi.lock` and
+other lockfiles, and reports on them. See [docs/architecture.md](docs/architecture.md) for the pipeline and modules.
 
 | Path | What it is |
 |---|---|
-| `crates/pixi-ext-common/` | Code the extensions share (`common` in their `Cargo.toml`): license normalization, `pipe`, `style`. Compiled into each extension by path, never published, not an API (#56, #106) |
-| `crates/pixi-policy/` | The pixi-policy crate (`pixi policy`, #60 on): checks a workspace's `pixi.lock` against `pixi-policy.toml`; rule families land from #61. `publish = false`, like every crate here |
-| `crates/pixi-sbom/` | The pixi-sbom crate: `src/`, `tests/` (fixtures, schemas, snapshots), `benches/`, `data/` (CPE and CRAN tables compiled in), `pyproject.toml` (maturin `bindings = "bin"` wheels), `pre-commit-mirror/` (templates) |
-| `actions/pixi-sbom/` | The GitHub Action's source, copied to `aesir-oss/pixi-sbom-action` on each release |
-| `docs/`, `mkdocs.yml` | The workspace docs site at aesir-oss.github.io/pixi-ext-contrib/ (extensions page, development, security); `mkdocs.base.yml` and `docs/overrides/` are shared by every site |
-| `crates/<extension>/docs/`, `crates/<extension>/mkdocs.yml` | Each extension's docs site, versioned with mike under `/<extension>/` (#6); `extensions.json` lists them; `scripts/pages.py` lays out `gh-pages` |
-| `examples/` | Example projects and lockfiles the tests and docs run against |
+| `src/` | the crate |
+| `tests/` | end-to-end, matrix, network and stability tests, with fixtures and schemas |
+| `benches/` | criterion benchmarks |
+| `data/` | the CPE, CRAN and bundled-library tables compiled in |
+| `actions/pixi-sbom/` | the GitHub Action's source, copied to `aesir-oss/pixi-sbom-action` on each final release |
+| `pre-commit-mirror/` | the templates `aesir-oss/pixi-sbom-pre-commit` is rendered from on each final release |
+| `pyproject.toml` | maturin `bindings = "bin"`: the binary as platform wheels for PyPI |
+| `docs/`, `mkdocs.yml` | the docs site (MkDocs Material, versioned with mike) at aesir-oss.github.io/pixi-sbom |
+| `examples/` | example projects and lockfiles the tests and docs run against |
 | `scripts/` | Python maintenance and release tooling, each with a `test_*.py` |
-| `Cargo.toml` | The workspace manifest; the release profile lives here |
-
 
 ## Commands
 
@@ -30,36 +31,30 @@ Everything runs through pixi.
 | Task | Command |
 |---|---|
 | Format, lint, check | `pixi run fmt`, `pixi run lint` (clippy `-D warnings`), `pixi run check` |
-| Tests | `pixi run test` (all crates); one test: `pixi run cargo test --test cli <name>` |
+| Tests | `pixi run test`; one test: `pixi run cargo test --test cli <name>` |
 | Full gate | `pixi run ci` (pre-commit, build, check, clippy, coverage ≥ 90%); the Stop hook runs it |
-| Docs | `pixi run -e docs docs-build` (every site, strict); `pixi run -e docs docs-preview` serves them as Pages lays them out |
+| Docs | `pixi run -e docs docs-build` (strict), `pixi run -e docs docs-serve` |
 | Workflows | `pixi run actionlint` |
 | Script tests | `pixi run action-test`, `cpe-upkeep-test`, `cran-table-test`, `whats-new-test`, … (see `pixi.toml`) |
 
 ## Releases
 
-- Started by the Release workflow (`workflow_dispatch`, `crate` and `version` inputs). It bumps the version,
-  regenerates the crate's `CHANGELOG.md`, commits and tags `<crate>-vX.Y.Z` with the release App. A `pixi-sbom-v*` or
-  `pixi-policy-v*` tag triggers `release-artifacts.yml`, one workflow for every extension (#69).
-- Nothing is published to crates.io (#106): every crate is `publish = false`, and the shared crate is compiled into
-  each extension from this repository, never released.
-- Tags before the move are plain `vX.Y.Z` (made in millsks/pixi-sbom); keep them. Archives are named
-  `pixi-sbom-vX.Y.Z-<platform>`, which is also the tag.
-- Extension releases are never marked Latest; after each final one `repository-release.yml` publishes
-  `pixi-ext-contrib-YYYY.MM.N`, the only release marked Latest.
+- Started by the Release workflow (`workflow_dispatch`, `version` input). It bumps the version, moves What's new's
+  `## Unreleased` into the release's section, adds the release's section to `CHANGELOG.md`, commits and tags
+  `vX.Y.Z` with the release App; the tag starts `release-artifacts.yml`.
 - Release candidates go to TestPyPI, finals to PyPI, with trusted publishing.
 - Ask before cutting any release. After every release candidate, the maintainer runs a private field test; see the
   private (uncommitted) project memory.
 
 ## Off-limits and traps
 
-- `crates/<extension>/CHANGELOG.md` is generated by `scripts/changelog.py` (git-cliff, `cliff.toml`, filtered by the
-  paths the extension is built from); fix the script or config, never the file. The root `CHANGELOG.md` is a
-  hand-kept index.
-- Never bump versions or push tags by hand. Pushing three or fewer `pixi-sbom-v*` or `pixi-policy-v*` tags starts a release.
+- `CHANGELOG.md`'s existing sections are never edited or regenerated; each release adds its own on top
+  (`scripts/changelog.sh`). Fix `cliff.toml` or the script, never the file.
+- Never bump versions or push tags by hand. Pushing three or fewer `v*` tags starts a release.
 - `gh-pages` holds the built docs site; never merge it anywhere.
 - `aesir-oss/pixi-sbom-action` and `aesir-oss/pixi-sbom-pre-commit` are generated: change `actions/pixi-sbom/` and
-  `crates/pixi-sbom/pre-commit-mirror/` instead.
+  `pre-commit-mirror/` instead.
 - `examples/projects/` lockfiles are regenerated with `pixi run -e examples examples`, not edited.
 - `.claude/memory/` is public. Nothing private, personal or about the maintainer's employer goes in it.
-- `millsks/pixi-sbom` still serves `uses: millsks/pixi-sbom@v1`; never delete it or reuse its name.
+- `millsks/pixi-sbom` still serves `uses: millsks/pixi-sbom@v1`; never delete it or reuse its name. Releases 1.12.0
+  to 1.13.1 live in `aesir-oss/pixi-ext-contrib`; the action reads both, and this repository's, release lists.

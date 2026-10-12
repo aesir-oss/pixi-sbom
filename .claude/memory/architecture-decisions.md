@@ -14,14 +14,14 @@ pixi-sbom is a Rust pixi extension (`pixi-sbom` binary -> `pixi sbom`). Decision
 - Default output: `<lockfile dir>/sbom.cdx.json` or `sbom.spdx.json`; `--output` overrides.
 - Intermediate format-agnostic model (`model.rs`) sits between `lock.rs` and the writers in `format/`.
 
-Since 2026-10-11 the crate is `crates/pixi-sbom` in the `aesir-oss/pixi-ext-contrib` Cargo workspace (one `Cargo.lock`,
-the release profile in the root `Cargo.toml`), and these decisions hold for it unchanged. Code shared with pixi-policy
-goes into the `pixi-ext-common` crate (`crates/pixi-ext-common`, used as `common`) rather than
-into either tool. Nothing is published to crates.io (#106, decided 2026-10-11): conda-forge, PyPI and the release
-archives all build from this repository, where the shared crate is a path dependency, and crates.io carried about 2%
-of pixi-sbom's downloads. Publishing would have forced the shared crate onto crates.io too (crates.io refuses
-unpublished dependencies), with a release-ordering rule and a manual first publish; #54 and #57 had set that up
-before the decision.
+From 2026-10-11 to the split (aesir-oss/pixi-ext-contrib#131, October 2026) the crate lived in the
+`aesir-oss/pixi-ext-contrib` Cargo workspace beside pixi-policy, sharing license normalization, the license verdict,
+the lockfile facts, purl builders, terminal styling and pipe handling through a `pixi-ext-common` crate. It is a
+single crate again, in `aesir-oss/pixi-sbom`: `license.rs`, `style.rs` and `pipe.rs` are back in `src/`, and the
+purl builders, the verdict and the lockfile facts are the `core`, `verdict` and `facts` modules of `purl.rs`,
+`policy.rs` and `lock.rs`. pixi-policy keeps its own copy; nothing keeps the two in step. Nothing is published to
+crates.io (#106, decided 2026-10-11): conda-forge, PyPI and the release archives all build from this repository, and
+crates.io carried about 2% of pixi-sbom's downloads.
 
 Release binaries (#93, decided 2026-10-11): every platform is compiled once, as its PyPI wheel (maturin,
 `bindings = "bin"`), and the release archive carries the binary from that wheel. Linux archives use the manylinux

@@ -1,44 +1,136 @@
-# The workspace site, served at the root of aesir-oss.github.io/pixi-ext-contrib/ and never versioned: the landing
-# page, the repository-wide pages, and the files every extension site reads (extensions.json, the favicon). Each
-# extension has its own versioned site beside its crate, crates/<extension>/mkdocs.yml, served under /<extension>/
-# (#6).
-INHERIT: mkdocs.base.yml
-site_name: pixi-ext-contrib
-site_description: Extensions for the pixi package manager, from Aesir Open Source Solutions
-site_url: https://aesir-oss.github.io/pixi-ext-contrib/
+site_name: pixi-sbom
+site_description: CycloneDX and SPDX Software Bills of Materials from pixi.lock
+site_url: https://aesir-oss.github.io/pixi-sbom/
+repo_url: https://github.com/aesir-oss/pixi-sbom
+repo_name: aesir-oss/pixi-sbom
 edit_uri: edit/main/docs/
+copyright: Apache-2.0 licensed · Aesir Open Source Solutions
 
 docs_dir: docs
+# These live under docs/ for the strict build's sake; none of them is a page.
 exclude_docs: |
   overrides/
-# The landing page links to the extension sites by relative path (pixi-sbom/, pixi-policy/), which are served beside
-# this site but are not part of its build; MkDocs cannot see them, so it notes those links instead of failing.
+  papers/
+  posts/
+  presentations/
+  release-notes/
+strict: true
 validation:
-  unrecognized_links: info
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn
+  anchors: warn
 
 nav:
-  - Extensions: index.md
-  - pixi-sbom: https://aesir-oss.github.io/pixi-ext-contrib/pixi-sbom/latest/
-  - pixi-policy: https://aesir-oss.github.io/pixi-ext-contrib/pixi-policy/latest/
-  - Development: development.md
+  - Overview: index.md
+  - Installation: installation.md
+  - What's new: whats-new.md
+  - Without pixi: without-pixi.md
+  - Try it on the examples: try-the-examples.md
+  - Training lab: lab.md
+  - Field manual:
+      - Overview: field-manual/index.md
+      - Gate a repository in CI: field-manual/ci-gate.md
+      - Take in a vendor's SBOM: field-manual/vendor-sbom.md
+      - One SBOM for a product: field-manual/product-sbom.md
+      - Are we exposed?: field-manual/are-we-exposed.md
+      - A restricted network: field-manual/restricted-network.md
+      - A project without pixi: field-manual/without-pixi.md
+      - Release with a signed SBOM: field-manual/signed-release.md
+  - Command-line reference: cli.md
+  - GitHub Action: github-action.md
+  - CI recipes: ci-recipes.md
+  - Which format to pick: formats.md
+  - pixi-sbom and syft: syft.md
+  - Output format reference: output-format.md
+  - What 1.0 freezes: stability.md
+  - Troubleshooting: troubleshooting.md
+  - Contributing:
+      - Architecture: architecture.md
+      - Development: development.md
+      - Benchmarks: benchmarks.md
   - Security policy: security.md
-  - Changelogs: changelog.md
+  - Changelog: changelog.md
 
 hooks:
   - mkdocs_hooks.py
 
 theme:
+  name: material
   custom_dir: docs/overrides
   favicon: assets/favicon.svg
+  features:
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - search.highlight
+    - search.suggest
+    - content.code.copy
+    - content.action.edit
+  # The Aesir brand (docs/overrides/aesir.css): Inter for text, JetBrains Mono for code.
+  font:
+    text: Inter
+    code: JetBrains Mono
+  icon:
+    logo: aesir/mark
+  # Light by default regardless of the OS preference; the toggle switches to dark. The colours are the brand's light
+  # and dark theme mapping, set in docs/overrides/aesir.css.
+  palette:
+    - scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
+  # Shell snippets live as real files so CI runs exactly what the page shows.
+  - pymdownx.snippets:
+      base_path: [docs/completion]
+      check_paths: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+      clickable_checkbox: true
+  - pymdownx.tabbed:
+      alternate_style: true
 
 plugins:
   - search
+  # Aliases (`latest`) are real copies so GitHub Pages serves them without symlinks or redirects,
+  # and every version's pages declare the `latest` URL as canonical for search engines.
+  - mike:
+      alias_type: copy
+      canonical_version: latest
 
 extra:
+  # Repository files published as pages of the site (mkdocs_hooks.py).
   repo_pages:
-    SECURITY.md: security.md
     CHANGELOG.md: changelog.md
-    extensions.json: extensions.json
+    SECURITY.md: security.md
+  # Version selector fed by mike's versions.json; the site root opens `latest`.
+  version:
+    provider: mike
+    default: latest
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/aesir-oss/pixi-sbom
 
 extra_javascript:
-  - javascripts/landing.js
+  - javascripts/lab-progress.js

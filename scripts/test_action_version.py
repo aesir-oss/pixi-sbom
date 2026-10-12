@@ -83,6 +83,18 @@ class ActionVersionTest(unittest.TestCase):
         self.assertEqual(self.version(RELEASES_API=both, ACTION_REF="v0"), "0.12.0")
         self.assertEqual(self.version(RELEASES_API=both), "1.2.0")
 
+    def test_the_standalone_repository_is_read_with_the_other_two(self) -> None:
+        # From 1.13.2 releases live in aesir-oss/pixi-sbom, tagged vX.Y.Z again; 1.12.0 to 1.13.1 stay in
+        # aesir-oss/pixi-ext-contrib as pixi-sbom-vX.Y.Z. The newest across all three lists wins.
+        root = Path(self.api.removeprefix("file://")).parent
+        (root / "standalone").write_text(json.dumps([{"tag_name": "v1.13.2"}, {"tag_name": "v1.14.0-rc.1"}]))
+        (root / "workspace").write_text(json.dumps([{"tag_name": "pixi-sbom-v1.13.1"}, {"tag_name": "pixi-sbom-v1.12.0"}]))
+        three = f"file://{root}/standalone file://{root}/workspace {self.api}"
+        self.assertEqual(self.version(RELEASES_API=three), "1.13.2")
+        self.assertEqual(self.version(RELEASES_API=three, ACTION_REF="v1"), "1.13.2")
+        self.assertEqual(self.version(RELEASES_API=three, ACTION_REF="v1.13.1"), "1.13.1")
+        self.assertEqual(self.version(RELEASES_API=three, ACTION_REF="v0"), "0.12.0")
+
     def test_branch_takes_latest(self) -> None:
         self.assertEqual(self.version(ACTION_REF="main"), "1.0.0")
 

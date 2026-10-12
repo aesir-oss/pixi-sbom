@@ -1,4 +1,4 @@
-"""Record examples/lab-cache: the online answers the training lab (crates/pixi-sbom/docs/lab.md) is replayed from.
+"""Record examples/lab-cache: the online answers the training lab (docs/lab.md) is replayed from.
 
 Run it as `pixi run lab-cache`. It builds the release binary, runs every `pixi sbom` line in the lab
 online, from a scratch copy of the examples, with the cache pointed at a fresh examples/lab-cache, then
@@ -23,7 +23,7 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-LAB = ROOT / "crates" / "pixi-sbom" / "docs" / "lab.md"
+LAB = ROOT / "docs" / "lab.md"
 CACHE = ROOT / "examples" / "lab-cache"
 DATE_PATTERN = re.compile(r"(recorded into `examples/lab-cache/` on )([^,]+?)(,)")
 
@@ -46,14 +46,14 @@ def stamp(text: str, date: str) -> str:
     """The lab with its capture date replaced by `date`."""
     stamped, count = DATE_PATTERN.subn(lambda m: f"{m.group(1)}{date}{m.group(3)}", text)
     if count != 1:
-        raise SystemExit("crates/pixi-sbom/docs/lab.md no longer says when the cache was recorded; restore that sentence")
+        raise SystemExit("docs/lab.md no longer says when the cache was recorded; restore that sentence")
     return stamped
 
 
 def readme(date: str, count: int) -> str:
     return (
         "# Lab cache\n\n"
-        "What the online services answered when the [training lab](../../crates/pixi-sbom/docs/lab.md)'s commands were run on "
+        "What the online services answered when the [training lab](../../docs/lab.md)'s commands were run on "
         f"{date}: OSV advisories, the CISA KEV catalog, FIRST EPSS scores and PyPI release metadata for the "
         f"packages its {count} commands look up. The lab sets `PIXI_SBOM_OFFLINE=1` and points "
         "`PIXI_SBOM_CACHE_DIR` here, so everyone who takes it gets these answers.\n\n"

@@ -29,7 +29,7 @@ on:
     - cron: "17 5 * * 1"
   push:
     # A release candidate, before its final is cut: what the release would cost against the last one.
-    tags: ["pixi-sbom-v*-rc.*"]
+    tags: ["v*-rc.*"]
 
 concurrency:
   group: perf-${{ github.ref }}
@@ -73,7 +73,7 @@ jobs:
           base="${{ inputs.base }}"
           if [ -z "$base" ]; then
             # The last final release: a release candidate's own tag, or an earlier one's, is not a base.
-            base=$(git describe --tags --abbrev=0 --match 'pixi-sbom-v[0-9]*.[0-9]*.[0-9]*' --match 'v[0-9]*.[0-9]*.[0-9]*' \
+            base=$(git describe --tags --abbrev=0 --match 'v[0-9]*.[0-9]*.[0-9]*' \
               --exclude '*-rc.*' 2>/dev/null || echo "")
           fi
           if [ -z "$base" ]; then

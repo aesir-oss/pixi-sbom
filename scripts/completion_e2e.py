@@ -1,6 +1,6 @@
 """Tab completion in real shells: pixi-sbom's own, and `pixi sbom` through the documented snippets.
 
-Each shell loads pixi's completion, pixi-sbom's registration and crates/pixi-sbom/docs/completion/pixi-sbom.<ext>,
+Each shell loads pixi's completion, pixi-sbom's registration and docs/completion/pixi-sbom.<ext>,
 then is asked what Tab offers for a line (tests/completion/probe.*). fish, bash and PowerShell 7 come
 from conda-forge through `pixi exec`; on macOS bash also runs as the system's 3.2; zsh is the system's, because conda-forge's has no zsh/zpty, and
 Windows PowerShell 5.1 is the one Windows ships.
@@ -19,7 +19,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-PROBES = ROOT / "crates" / "pixi-sbom" / "tests" / "completion"
+PROBES = ROOT / "tests" / "completion"
 
 CASES: list[tuple[str, set[str], bool]] = [
     # line, expected candidates, whether they must be all that is offered

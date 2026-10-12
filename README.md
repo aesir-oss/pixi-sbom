@@ -1,38 +1,355 @@
-# pixi-ext-contrib
+# pixi-sbom
 
-Community pixi extensions for software supply-chain security: SBOMs, license and dependency policy, and more.
+Generates a Software Bill of Materials (SBOM) from a lockfile — `pixi.lock`, `uv.lock`, `pylock.toml`, `poetry.lock`,
+`pdm.lock`, `conda-lock.yml`, an explicit conda spec or a JavaScript lockfile — or from an installed conda environment or venv, as
+[CycloneDX](https://cyclonedx.org) 1.6 / 1.7 or [SPDX](https://spdx.dev) 2.3 / 3.0.1 JSON. A [pixi](https://pixi.sh)
+extension (`pixi sbom`) that needs no pixi: the same binary runs as `pixi-sbom`, from PyPI with `uvx pixi-sbom`.
 
-Each tool installs as a `pixi-<name>` executable, which pixi exposes as `pixi <name>`. Documentation:
-https://aesir-oss.github.io/pixi-ext-contrib/
+[![CI](https://github.com/aesir-oss/pixi-sbom/actions/workflows/ci.yml/badge.svg)](https://github.com/aesir-oss/pixi-sbom/actions/workflows/ci.yml)
+[![conda-forge](https://img.shields.io/conda/vn/conda-forge/pixi-sbom?logo=conda-forge&color=brightgreen)](https://anaconda.org/conda-forge/pixi-sbom)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![Docs](https://img.shields.io/badge/docs-aesir--oss.github.io%2Fpixi--ext--contrib-teal.svg)](https://aesir-oss.github.io/pixi-sbom/)
 
-| Extension | Command | What it answers | Status |
-|---|---|---|---|
-| [pixi-sbom](crates/pixi-sbom/README.md) | `pixi sbom` | What's in this environment? CycloneDX or SPDX SBOMs from `pixi.lock` and other lockfiles | Stable (1.x) |
-| [pixi-policy](crates/pixi-policy/README.md) | `pixi policy` | Is it allowed? Channel, package, license and hygiene rules for pixi environments | Release candidate (0.1.0) |
+Full documentation: **https://aesir-oss.github.io/pixi-sbom/**
+What 1.0 freezes, and what it does not: **[stability.md](docs/stability.md)**
+Found a vulnerability? [SECURITY.md](../../SECURITY.md) says where to send it privately and what is in scope.
 
-## Layout
+<p align="center">
+  <img src="docs/assets/demo.gif" alt="A terminal: pixi sbom turns a pixi.lock into a CycloneDX document, then an SPDX 3.0.1 one, prints a license table, and fails a vulnerability gate with exit code 4 on a known-exploited urllib3 advisory." width="100%">
+</p>
 
+Each report has a recording of its own in the [command-line reference](https://aesir-oss.github.io/pixi-sbom/latest/cli/):
+[vulnerabilities](https://aesir-oss.github.io/pixi-sbom/latest/cli/#looking-up-vulnerabilities),
+[licenses](https://aesir-oss.github.io/pixi-sbom/latest/cli/#enforcing-a-license-policy),
+[packages](https://aesir-oss.github.io/pixi-sbom/latest/cli/#looking-instead-of-writing),
+[diff](https://aesir-oss.github.io/pixi-sbom/latest/cli/#looking-instead-of-writing),
+[python](https://aesir-oss.github.io/pixi-sbom/latest/cli/#what-python-the-environment-allows),
+[phantom](https://aesir-oss.github.io/pixi-sbom/latest/cli/#what-is-imported-but-never-declared),
+[outdated](https://aesir-oss.github.io/pixi-sbom/latest/cli/#how-far-behind-the-environment-is),
+[scorecard](https://aesir-oss.github.io/pixi-sbom/latest/cli/#how-well-each-dependency-is-looked-after),
+[quality](https://aesir-oss.github.io/pixi-sbom/latest/cli/#how-complete-the-document-is),
+[EPSS](https://aesir-oss.github.io/pixi-sbom/latest/cli/#exploit-likelihood-first-epss) and
+[a vendor's VEX](https://aesir-oss.github.io/pixi-sbom/latest/cli/#applying-a-vendors-vex).
+
+## What it does
+
+| | |
+|---|---|
+| **Writes** | CycloneDX 1.6 / 1.7 and SPDX 2.3 / 3.0.1, validated against each spec's own schema in CI |
+| **Reads** | `pixi.lock` (formats 1–7), `uv.lock`, `pylock.toml`, `poetry.lock`, `pdm.lock`, `conda-lock.yml`, explicit conda specs, a fully pinned `requirements.txt`, `package-lock.json`, `pnpm-lock.yaml` and `yarn.lock`, an installed conda environment or venv, a tree of projects, or other tools' SBOMs (`--from-sbom`, several merged into one) |
+| **Covers** | conda and PyPI packages together, with purls a scanner can match, license expressions and texts, and the dependency graph |
+| **Finds** | vulnerabilities from OSV with CISA KEV flags and FIRST EPSS scores, yanked releases, outdated packages, OpenSSF scorecards, undeclared imports, how complete a document is |
+| **Gates** | a license policy, a severity threshold, a KEV hit, an EPSS score, an SBOM diff, a quality score — each its own exit code, document still written; a vendor's VEX can clear the findings it covers |
+| **Fits CI** | a GitHub Action, SARIF for code scanning, VEX output, JSON / CSV / Markdown reports, signed build provenance |
+
+What it is **not**: a scanner (it feeds one), a package manager, or a stable Rust library — the
+command line is the interface, and [what 1.0 freezes](docs/stability.md) says exactly which parts.
+
+## Installation
+
+```sh
+pixi global install pixi-sbom
 ```
-crates/
-  pixi-ext-common/  code the extensions share, compiled into each; never released
-  pixi-policy/      the pixi-policy crate: source, tests, docs, PyPI packaging
-  pixi-sbom/        the pixi-sbom crate: source, tests, docs, benchmarks, PyPI packaging
-docs/             the workspace docs site: the extensions page, development, security
-examples/         example projects and lockfiles the tests and docs run against
-scripts/          maintenance and release tooling
+
+Outside the conda ecosystem, `uvx pixi-sbom` runs it from PyPI without installing anything (or `pip install
+pixi-sbom`, `uv tool install pixi-sbom`). Or download a binary from the
+[releases page](https://github.com/aesir-oss/pixi-sbom/releases) and put it on your `PATH`, or build from source:
+
+```sh
+pixi run build
+cp target/release/pixi-sbom ~/.pixi/bin/
 ```
+
+Pixi discovers any `pixi-<name>` executable on `PATH` and exposes it as `pixi <name>`; `pixi --list` shows it.
+
+Every release archive from 0.11.0 onward is signed with build provenance. To check that a downloaded archive really
+was built by this repository, from the commit it claims, in a GitHub Actions run — not just that it arrived
+unchanged, which is all a checksum tells you:
+
+```sh
+gh attestation verify pixi-sbom-<version>-linux-64.tar.gz --repo aesir-oss/pixi-sbom
+```
+
+A `.sigstore.json` bundle ships beside each archive for machines that cannot reach `api.github.com`: add
+`--bundle pixi-sbom-<version>-linux-64.tar.gz.sigstore.json` and the check runs offline. The
+[strict form](https://aesir-oss.github.io/pixi-sbom/latest/installation/#the-strict-form) also pins the release
+workflow and the tag.
+
+## What it supports
+
+| | |
+|---|---|
+| **Lockfile format** | `version:` 1 through 7 — every format pixi has written. Each of rattler's four parsers has a fixture and an end-to-end test. |
+| **pixi** | **0.49.0 or newer** to run it as `pixi sbom`; that release added discovery of `pixi-` prefixed extensions. Older pixi still works if you call the binary directly as `pixi-sbom`. |
+| **Platforms** | linux-64, linux-aarch64, osx-64, osx-arm64, win-64 |
+
+A lockfile newer than this build understands is refused by name rather than half-read:
+
+```console
+$ pixi sbom
+Error: pixi_sbom::lock::parse
+  × cannot read lockfile pixi.lock
+  ╰─▶ found newer lockfile format version 8, but only up to including version 7 is supported
+  help: this build reads pixi.lock up to version 7: run `pixi lock` to rewrite an older or
+        damaged one, or upgrade pixi-sbom if the file's `version:` is higher
+```
+
+## Without pixi
+
+A uv, Poetry, PDM or conda-lock project needs nothing but the binary:
+
+```sh
+uvx pixi-sbom --lockfile uv.lock                            # from PyPI, nothing installed
+pixi-sbom --lockfile poetry.lock --format spdx
+pixi-sbom --prefix .venv --against uv.lock --report diff    # does the venv still match its lock?
+```
+
+See [Using pixi-sbom without pixi](https://aesir-oss.github.io/pixi-sbom/latest/without-pixi/) for each lockfile kind,
+what works with which, and why a `requirements.txt` with ranges is not an input.
+
+## Quick start
+
+```sh
+# CycloneDX SBOM for the default environment on this platform,
+# written next to pixi.lock as sbom.cdx.json
+pixi sbom
+
+# SPDX instead (sbom.spdx.json)
+pixi sbom --format spdx
+
+# Pipe into a scanner instead of writing a file; --primary-purl pypi lets it match
+# conda-installed Python packages (see "Scanning with Grype" in the CI recipes)
+pixi sbom --primary-purl pypi --output - | grype
+
+# Licenses for every package, conda and PyPI alike (add --license-texts for the full texts)
+pixi sbom --fetch-licenses
+
+# Include what maturin compiled into the wheels (PEP 770 embedded SBOMs)
+pixi sbom --embedded-sboms
+
+# Fail CI on copyleft or unlicensed packages (exit code 3, document still written)
+pixi sbom --fetch-licenses --deny-license GPL-3.0-only --require-license
+
+# Known vulnerabilities from OSV, recorded in the document (conda packages match via their PyPI purl)
+pixi sbom --pypi-mapping prefix --vulnerabilities osv
+
+# ... or as a table, worst first
+pixi sbom --pypi-mapping prefix --vulnerabilities osv --report vulnerabilities
+
+# What changed since a previous document (added, removed, version and license changes),
+# and fail the build when anything did
+pixi sbom --report diff --against previous.cdx.json --report-format markdown
+pixi sbom --report diff --against previous.cdx.json --fail-on-diff
+
+# Does this container still match the lockfile? (pip installs and rebuilds included)
+pixi sbom --prefix /opt/conda/envs/app --against pixi.lock --report diff --fail-on-diff
+
+# How far behind the environment is: versions, ages, releases behind, patch/minor/major
+pixi sbom --report outdated --outdated-min major
+
+# Why the next Python is blocked: which packages cap the interpreter
+pixi sbom --report python
+
+# What the code imports but never declared, and what is declared but never imported
+pixi sbom --report phantom
+
+# Fail CI on anything high or critical, except a finding assessed as not affecting you (exit code 4)
+pixi sbom --pypi-mapping prefix --vulnerabilities osv --fail-on-severity high --ignore-vuln "CVE-2023-43804:not reachable"
+
+# How well each dependency is looked after: the OpenSSF Scorecard of its repository
+pixi sbom --fetch-licenses --scorecard --report scorecard
+
+# A standalone CycloneDX VEX beside the document, linked back to it
+pixi sbom --pypi-mapping prefix --vulnerabilities osv --output sbom.cdx.json --vex vex.cdx.json
+
+# Flag what CISA lists as actively exploited, and fail on it
+pixi sbom --pypi-mapping prefix --vulnerabilities osv --kev --fail-on-kev
+
+# Rank the rest by how likely exploitation is (FIRST EPSS), and fail at a 10% chance
+pixi sbom --pypi-mapping prefix --vulnerabilities osv --epss --fail-on-epss 0.1
+
+# Just look: an inventory (with what the manifest declared) or a license table, nothing written
+pixi sbom --report packages
+
+# Where every fact about a package came from, and which sources came back empty
+pixi sbom --fetch-licenses --explain six --explain 'libz*'
+
+# The dependency graph on the terminal, and the licenses grouped rather than listed
+pixi sbom --report packages --tree --depth 2
+pixi sbom --report licenses --group-by license
+pixi sbom --fetch-licenses --report licenses --report-format markdown
+
+# Make conda-installed Python packages scannable: add PyPI purls from the
+# conda-forge mapping and use them as the primary identity
+pixi sbom --pypi-mapping prefix --primary-purl pypi --output - | grype
+
+# Why did it come back empty? Probe the upstreams and print the configuration
+pixi sbom --doctor --fetch-licenses --vulnerabilities osv
+
+# Somebody else's SBOM: the same reports, policy and vulnerability gate
+pixi sbom --from-sbom sbom.cdx.json --vulnerabilities osv --report vulnerabilities
+
+# ... graded first, and with the vendor's VEX applied before the gate
+pixi sbom --from-sbom vendor.cdx.json --report quality
+pixi sbom --from-sbom vendor.cdx.json --min-quality 70 --vulnerabilities osv --fail-on-severity high --vex-in vendor.openvex.json
+
+# Several documents as one: an application and the vendor components it ships
+pixi sbom --from-sbom app.cdx.json --from-sbom vendor.spdx.json --root-name product --output product.cdx.json
+
+# Every pixi workspace in a monorepo, one document each under sboms/
+pixi sbom --scan . --output sboms
+
+# ... or one document for the whole tree
+pixi sbom --scan . --merge --root-name product --output product.cdx.json
+
+# Explicit lockfile and output path
+pixi sbom --lockfile /path/to/pixi.lock --output /tmp/my-project.cdx.json
+
+# A different environment / platform
+pixi sbom -e prod -p linux-64
+
+# An installed environment with no lockfile (pixi global, conda, a container)
+pixi sbom --prefix ~/.pixi/envs/my-tool
+
+# One SBOM per environment: sbom-default.cdx.json, sbom-prod.cdx.json, ...
+pixi sbom --all-environments
+
+# ... into a directory of your choice
+pixi sbom --all-environments --format spdx --output reports/
+
+# Every environment on every platform: sbom-<environment>-<platform>.cdx.json
+pixi sbom --all-environments --all-platforms --output reports/
+```
+
+| Option | Default | Description |
+|---|---|---|
+| `--lockfile <PATH>` | search upward from cwd | `pixi.lock` to read |
+| `--format <cyclonedx\|spdx\|github>` | `cyclonedx` | SBOM format, or `github` for a dependency submission snapshot |
+| `--spec-version <1.6\|1.7\|2.3\|3.0>` | `1.6` / `2.3` | CycloneDX or SPDX version (`3.0` is the SPDX 3.0.1 JSON-LD graph) |
+| `--output <PATH>` | `<lockfile dir>/sbom.cdx.json` or `sbom.spdx.json` | Where to write the SBOM; `-` for stdout |
+| `-e, --environment <NAME>` | `default` | Lock environment to describe |
+| `--all-environments` | off | Write one `sbom-<environment>` file per environment instead; `--output` is then a directory |
+| `-p, --platform <PLATFORM>` | current platform | Platform within that environment |
+| `--all-platforms` | off | Write one `sbom-<platform>` file per locked platform instead (`sbom-<environment>-<platform>` with `--all-environments`) |
+| `--pypi-mapping <lock\|prefix>` | `lock` | `prefix` adds `pkg:pypi` purls to conda-forge packages from the mapping pixi uses (cached daily) |
+| `--pypi-mapping-file <PATH>` | | Offline copy of that mapping |
+| `--primary-purl <conda\|pypi>` | `conda` | `pypi` makes the PyPI purl primary so grype / trivy / osv-scanner can match |
+| `--prefix <DIR>` | | Describe an installed environment (`conda-meta` + `site-packages`) instead of a lockfile |
+| `--config` / `--no-config` | auto | Read `[tool.pixi-sbom]` in `pyproject.toml` or `pixi-sbom.toml` next to the lockfile before the command line; keys mirror the flags, the command line wins |
+| `--exclude` / `--include` / `--exclude-kind` | | Leave packages out (shell-style name patterns or a kind); what only they needed goes too, and the root records `pixi:excluded` |
+| `--fail-on-yanked` | off | With `--fetch-licenses`: exit 7 when a PyPI package is a yanked release (PEP 592) |
+| `--scorecard` | off | With `--fetch-licenses`: record the OpenSSF Scorecard of each package's repository; `--fail-on-scorecard <N>` exits 9 below `N` |
+| `--vex <PATH>` | | With `--vulnerabilities`: also write a standalone CycloneDX VEX there, every finding assessed and linked back to the SBOM |
+| `--ignore-license <PACKAGE[:WHY]>` | | The license policy does not apply to these packages (name or pattern); they are listed as exempt and carry `pixi:license-exempt` |
+| `--fail-on-diff [<SECTION>...]` | off | With `--report diff`: exit 6 when the comparison is not empty (`added`, `removed`, `version`, `license`, `build`, `pip`; bare = any) |
+| `--fail-on-phantom` | off | With `--report phantom`: exit 8 when the workspace imports a package it never declared |
+| `--fetch-licenses` | off | Licenses for every package, conda and PyPI alike (conda from the local package cache or the channel archive, PyPI from the wheel or the index), plus license file names, summary and URLs |
+| `--license-texts` | off | With `--fetch-licenses`, embed the full license texts |
+| `--allow-license` / `--deny-license` / `--require-license` | | License policy; violations are listed and the run exits 3 after writing the document |
+| `--vulnerabilities osv` | off | Look every package with a PyPI / crates.io / npm purl up on [OSV](https://osv.dev) and record the findings in CycloneDX `vulnerabilities[]` (severity, CVSS, fixed version, aliases) |
+| `--kev` / `--fail-on-kev` | off | Mark findings in CISA's Known Exploited Vulnerabilities catalog (rated critical, with due dates); optionally exit 4 on them |
+| `--epss` / `--fail-on-epss <P>` | off | Score findings with FIRST's EPSS (probability of exploitation in the next 30 days, and its percentile); optionally exit 4 at or above `P` |
+| `--vex-in <PATH>` | | Apply a vendor's VEX (CycloneDX or OpenVEX) before the gate: `not_affected`, `false_positive` and `resolved` clear a finding, `exploitable` and `in_triage` are only recorded |
+| `--fail-on-severity` / `--ignore-vuln` | | Vulnerability gate: exit 4 on open findings at or above a severity; accepted findings keep a VEX-style `analysis` block |
+| `--embedded-sboms` | off | Attach the components declared by SBOMs embedded in wheels (PEP 770, e.g. Rust crates) under the wheel; with `--prefix`, also the `cargo auditable` crate list inside the environment's binaries |
+| `--from-sbom <FILE>` | | Read an existing document (CycloneDX, SPDX 2.x or SPDX 3.0 JSON) instead of a lockfile and run the reports, policy and vulnerability gate on it; given more than once, the documents are merged into one |
+| `--min-quality <N>` | | Exit 10 when the document's quality score (NTIA minimum elements, license and hash coverage; see `--report quality`) is below `N` out of 100 |
+| `--doctor` | off | Probe every upstream, print the configuration and caches, exit 1 if anything is unreachable |
+| `--scan <DIR>` | | Describe every project under the directory: one document per lockfile, written under `--output` at the same relative path; `--merge` writes one document for the whole tree instead |
+| `--report <packages\|licenses\|vulnerabilities\|diff\|outdated\|python\|phantom\|scorecard\|quality>` | | Print a table to the terminal instead of writing a document (`--report-format table\|markdown\|csv\|json`, plus `sarif` for vulnerabilities); `diff --against <previous>` lists what changed, `outdated` how far behind each package is, `python` what caps the interpreter, `phantom` which imports and declarations do not line up, `quality` how complete the document is |
+| `--explain <PACKAGE>` | | Print every fact the tool has about the packages matching this name or pattern and where each came from, including the sources that were consulted and came back empty; prints instead of writing, like `--report` |
+| `--color <auto\|always\|never>` | `auto` | Colour the terminal table (honours `NO_COLOR` / `CLICOLOR_FORCE`); fetches show a progress bar on an interactive terminal |
+| `-v` / `-q` | info | More / less logging on stderr |
+
+Output is reproducible: the document identifier is derived from the lockfile, and setting `SOURCE_DATE_EPOCH` pins
+the timestamp so repeated runs are byte-identical.
+
+One document describes one environment on one platform, which is what SBOM consumers expect. Use
+`--all-environments` and `--all-platforms` to cover every environment and platform in the lockfile in one run.
+
+## What goes in the SBOM
+
+| Lockfile data | CycloneDX 1.6 / 1.7 | SPDX 2.3 / 3.0.1 |
+|---|---|---|
+| Workspace name, version, license, homepage, repository (from `pixi.toml` / `pyproject.toml`) | `metadata.component` | root package, `DESCRIBES` relationship |
+| Workspace authors | `metadata.authors[]` | `creationInfo.creators[]` (`Person:`) |
+| Generation context (`pre-build`: derived from the lockfile) | `metadata.lifecycles[]` | `creationInfo.comment` |
+| conda, pixi-build source, and PyPI packages | `components[]` (`type: library`) | `packages[]` |
+| Package URL (`pkg:conda/...`, `pkg:pypi/...`) | `purl`, `bom-ref` | `externalRefs[]` (PACKAGE-MANAGER / purl) |
+| PyPI identity of a conda package (lockfile `purls:`, or `--pypi-mapping`) | `pixi:purl` property, or `purl` with `--primary-purl pypi` | extra `externalRefs[]` entry |
+| Supplier (conda channel or PyPI index) | `supplier` | `supplier` (`Organization:`) |
+| Download URL | `externalReferences[distribution]` | `downloadLocation` |
+| SHA-256 / MD5 | `hashes[]` | `checksums[]` |
+| License (conda: from the lockfile; PyPI: with `--fetch-licenses`) | `licenses[].expression`, or `.license.name` for non-SPDX text | `licenseDeclared`, with `LicenseRef-pixi-*` + `hasExtractedLicensingInfos` for non-SPDX text |
+| License file names, summary, project URLs (`--fetch-licenses`); texts (`--license-texts`) | `pixi:license-file` properties, `description`, `externalReferences[]`; `licenses[].license.text` | `licenseComments`, `summary`, `homepage`; extracted licensing infos |
+| Channel, subdir, build string, build number, size, index URL, ... | `properties[]` (`pixi:*`) | package `comment` (`key=value` lines) |
+| Dependency graph (resolved within the environment) | `dependencies[]` | `DEPENDS_ON` relationships |
+| What the workspace declared itself, per feature (from the manifest's dependency tables) | `pixi:direct` / `pixi:declared-in` properties, and the root's `dependencies` | the same properties in `comment`, and the root's `DEPENDS_ON` |
+| Environment, platform, lockfile name | `metadata.properties[]` | root package `sourceInfo` |
+| Vulnerabilities (`--vulnerabilities osv`), KEV flags, accepted findings | `vulnerabilities[]` | 2.3: not recorded, and it says so. 3.0.1: `security_Vulnerability` elements with CVSS, KEV and VEX assessments |
+
+The documents cover every [CISA 2026 SBOM minimum element](https://www.cisa.gov/sbom) that a lockfile can support:
+author, timestamp, tool, generation context, and per component the name, version, supplier, purl, hashes, license and
+dependency relationships.
+
+License strings are checked with the SPDX license list. Valid expressions (including deprecated identifiers still used
+on conda-forge) pass through unchanged; lenient spellings such as `MIT/Apache-2.0` are rewritten canonically; anything
+else is preserved as free text.
+
+## GitHub Action
+
+The repository is also a GitHub Action, [listed on the GitHub Marketplace](https://github.com/marketplace/actions/pixi-sbom).
+It downloads the release binary, generates the documents and uploads them as an artifact; no pixi setup needed:
+
+```yaml
+- uses: actions/checkout@v4
+- uses: aesir-oss/pixi-sbom-action@v1
+  with:
+    all-environments: "true"
+    fetch-licenses: "true"
+    deny-license: "GPL-3.0-only AGPL-3.0-only"
+```
+
+Add `attest: "true"` (with `id-token: write` and `attestations: write`) to sign the documents; verify one with
+`gh attestation verify sbom.cdx.json --repo <owner>/<repo>`. See the
+[GitHub Action page](https://aesir-oss.github.io/pixi-sbom/latest/github-action/) for every input, or the
+[Marketplace listing](https://github.com/marketplace/actions/pixi-sbom).
+
+## Documentation
+
+| | |
+|---|---|
+| [Installation](https://aesir-oss.github.io/pixi-sbom/latest/installation/) | pixi global, release binaries, building from source |
+| [Command-line reference](https://aesir-oss.github.io/pixi-sbom/latest/cli/) | Every option, the license policy, terminal reports, batch mode, environment variables, exit codes and error messages |
+| [GitHub Action](https://aesir-oss.github.io/pixi-sbom/latest/github-action/) | The action's inputs and outputs, with a worked example |
+| [CI recipes](https://aesir-oss.github.io/pixi-sbom/latest/ci-recipes/) | Scanning with grype, license tables in PR comments, diffing SBOMs, air-gapped runners |
+| [Which format to pick](https://aesir-oss.github.io/pixi-sbom/latest/formats/) | CycloneDX 1.6 / 1.7 against SPDX 2.3 / 3.0.1 |
+| [pixi-sbom and syft](https://aesir-oss.github.io/pixi-sbom/latest/syft/) | What each reads, what Grype finds from each, and what syft does that pixi-sbom does not |
+| [Output format reference](https://aesir-oss.github.io/pixi-sbom/latest/output-format/) | Field-by-field reference for the CycloneDX and SPDX documents, purls, licenses, dependency graph |
+| [What 1.0 freezes](https://aesir-oss.github.io/pixi-sbom/latest/stability/) | The semver contract: flags, config keys, exit codes, `pixi:*` names, the action's inputs — and what is deliberately not covered |
+| [Security policy](https://aesir-oss.github.io/pixi-sbom/latest/security/) | Reporting a vulnerability privately, what is in scope, verifying a release |
+| [Architecture](https://aesir-oss.github.io/pixi-sbom/latest/architecture/) | Pipeline, modules, and the design decisions behind them |
+| [Development](https://aesir-oss.github.io/pixi-sbom/latest/development/) | Toolchain, tasks, the change harness, tests and fixtures, conventions, releasing |
+| [Changelog](https://aesir-oss.github.io/pixi-sbom/latest/changelog/) | Every release's notes |
+
+The pages are the Markdown files in [`docs/`](docs/), so they can be read in the repository too.
 
 ## Development
 
-Everything runs through [pixi](https://pixi.sh):
-
 ```sh
-pixi run test   # unit and end-to-end tests
-pixi run ci     # the full gate: pre-commit, build, check, lint, coverage
+pixi install            # toolchain (rust, cargo-llvm-cov, pre-commit, ...)
+pixi run bootstrap      # install git hooks
+pixi run test           # cargo test (unit + end-to-end)
+pixi run lint           # clippy with -D warnings
+pixi run cov            # coverage gate (>= 90% lines)
+pixi run ci             # full gate: pre-commit, build, check, lint, cov
 ```
 
-See [docs/development.md](docs/development.md) for the details.
+Cargo is never invoked directly; every command is a pixi task so the pinned toolchain is always used. End-to-end
+tests validate generated documents against the official JSON schemas vendored in `tests/schemas/`. See
+the [development page](https://aesir-oss.github.io/pixi-sbom/latest/development/) for the full workflow, test layers, fixtures,
+and the release process.
 
 ## License
 
-[Apache-2.0](LICENSE). A community project, not affiliated with prefix.dev.
+Apache-2.0. See [LICENSE](LICENSE).

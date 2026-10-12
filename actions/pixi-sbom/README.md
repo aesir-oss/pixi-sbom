@@ -2,7 +2,7 @@
 
 A GitHub Action that writes a CycloneDX or SPDX SBOM for a pixi project, or a uv, Poetry, PDM, pylock or conda-lock
 one, with licenses, vulnerabilities and a license policy gate. It downloads the
-[pixi-sbom](https://github.com/aesir-oss/pixi-ext-contrib/tree/main/crates/pixi-sbom) release binary for the runner,
+[pixi-sbom](https://github.com/aesir-oss/pixi-sbom) release binary for the runner,
 verifies its checksum, runs it and uploads the documents as a workflow artifact. pixi itself is not needed.
 
 ```yaml
@@ -21,11 +21,11 @@ verifies its checksum, runs it and uploads the documents as a workflow artifact.
 changes underneath you.
 
 Every input and output, and more examples, are in the
-[GitHub Action guide](https://aesir-oss.github.io/pixi-ext-contrib/pixi-sbom/latest/github-action/).
+[GitHub Action guide](https://aesir-oss.github.io/pixi-sbom/latest/github-action/).
 
 This repository is published from
-[`actions/pixi-sbom`](https://github.com/aesir-oss/pixi-ext-contrib/tree/main/actions/pixi-sbom) in
-[aesir-oss/pixi-ext-contrib](https://github.com/aesir-oss/pixi-ext-contrib) on each release; issues and changes go
+[`actions/pixi-sbom`](https://github.com/aesir-oss/pixi-sbom/tree/main/actions/pixi-sbom) in
+[aesir-oss/pixi-sbom](https://github.com/aesir-oss/pixi-sbom) on each release; issues and changes go
 there.
 
 ## License

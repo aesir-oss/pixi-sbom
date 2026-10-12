@@ -1,6 +1,6 @@
 name: CPE table upkeep
 
-# Weekly checks that the curated CPE table (crates/pixi-sbom/data/cpe.toml) has not gone stale (#435): products NVD
+# Weekly checks that the curated CPE table (data/cpe.toml) has not gone stale (#435): products NVD
 # has deprecated, entries NVD does not know, conda-forge versions spelled unlike NVD's, and native
 # packages with no entry. The findings are one issue, edited in place. Deprecated entries are
 # rewritten to NVD's replacement in a pull request for review; new entries are never added here.
@@ -50,7 +50,7 @@ jobs:
       - name: Did any entry change?
         id: changed
         run: |
-          if git diff --quiet -- crates/pixi-sbom/data/cpe.toml; then echo "table=false" >> "$GITHUB_OUTPUT"; else echo "table=true" >> "$GITHUB_OUTPUT"; fi
+          if git diff --quiet -- data/cpe.toml; then echo "table=false" >> "$GITHUB_OUTPUT"; else echo "table=true" >> "$GITHUB_OUTPUT"; fi
       # A pull request opened with the workflow's own token does not trigger CI, so this one uses
       # the release workflow's GitHub App.
       - name: Mint a token for the pull request
@@ -80,7 +80,7 @@ jobs:
           git push origin "$branch"
           gh pr create --head "$branch" --title "$title" --body-file target/cpe-upkeep.md
 
-  # The bundled-library signatures (crates/pixi-sbom/data/signatures.toml) read against conda-forge's
+  # The bundled-library signatures (data/signatures.toml) read against conda-forge's
   # latest builds of each library for Linux, macOS and Windows (#23). A library that changes how it
   # spells its version, or a toolchain that compiles a version function differently, fails this job,
   # and the report in the job summary says which.

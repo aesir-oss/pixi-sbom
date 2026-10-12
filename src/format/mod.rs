@@ -1,0 +1,887 @@
+//! SBOM serializers. Each format consumes the shared [`Sbom`] model.
+
+pub mod cyclonedx;
+pub mod github;
+pub mod spdx;
+pub mod spdx3;
+
+use std::ffi::OsStr;
+use std::io::Write;
+
+use chrono::{DateTime, Utc};
+use miette::Diagnostic;
+use thiserror::Error;
+
+use crate::cli::{Format, SpecVersion};
+use crate::model::Sbom;
+
+/// Namespace for the UUIDv5 document identifiers pixi-sbom derives. Fixed for all time so
+/// that the same input always maps to the same identifier.
+const DOCUMENT_NAMESPACE: uuid::Uuid = uuid::uuid!("6b1f7f0a-3d0e-5c3a-9e2b-7f1c2d4e5a60");
+
+/// Environment variable that pins the document timestamp, per the reproducible-builds
+/// convention: <https://reproducible-builds.org/specs/source-date-epoch/>.
+pub const SOURCE_DATE_EPOCH: &str = "SOURCE_DATE_EPOCH";
+
+/// Document-level values that are not part of the [`Sbom`] model: the timestamp, the
+/// identifier, and the generating tool's version. Injected so tests can produce stable output.
+#[derive(Debug, Clone)]
+pub struct WriteContext {
+    /// When the document was created.
+    pub timestamp: DateTime<Utc>,
+    /// The document identifier (CycloneDX `serialNumber`, part of the SPDX namespace).
+    pub uuid: uuid::Uuid,
+    /// Version of pixi-sbom recorded as the generating tool.
+    pub tool_version: String,
+    /// CycloneDX specification version to write; ignored by the SPDX writer.
+    pub spec_version: SpecVersion,
+}
+
+impl WriteContext {
+    /// Context for a real run. The identifier is a UUIDv5 derived from the lockfile text,
+    /// the environment, the platform, the format, and this crate's version, so identical
+    /// inputs yield identical documents. The timestamp is `SOURCE_DATE_EPOCH` when set,
+    /// otherwise now.
+    pub fn for_document(lock_contents: &str, sbom: &Sbom, format: Format, spec_version: SpecVersion) -> Self {
+        let tool_version = env!("CARGO_PKG_VERSION").to_string();
+        Self {
+            timestamp: timestamp_from_env(),
+            uuid: document_uuid(lock_contents, sbom, format, &tool_version),
+            tool_version,
+            spec_version,
+        }
+    }
+}
+
+fn document_uuid(lock_contents: &str, sbom: &Sbom, format: Format, tool_version: &str) -> uuid::Uuid {
+    let mut name = Vec::with_capacity(lock_contents.len() + 64);
+    for part in [
+        lock_contents,
+        &sbom.environment,
+        &sbom.platform,
+        format.extension(),
+        tool_version,
+    ] {
+        name.extend_from_slice(part.as_bytes());
+        name.push(0);
+    }
+    uuid::Uuid::new_v5(&DOCUMENT_NAMESPACE, &name)
+}
+
+/// The document timestamp: `SOURCE_DATE_EPOCH` (seconds since the Unix epoch) when set and
+/// valid, otherwise the current time. An unusable value is logged and ignored.
+pub fn timestamp_from_env() -> DateTime<Utc> {
+    timestamp_from(std::env::var_os(SOURCE_DATE_EPOCH).as_deref())
+}
+
+fn timestamp_from(source_date_epoch: Option<&OsStr>) -> DateTime<Utc> {
+    let Some(raw) = source_date_epoch else {
+        return Utc::now();
+    };
+    let parsed = raw
+        .to_str()
+        .and_then(|text| text.trim().parse::<i64>().ok())
+        .and_then(|seconds| DateTime::from_timestamp(seconds, 0));
+    match parsed {
+        Some(timestamp) => timestamp,
+        None => {
+            tracing::warn!(
+                value = ?raw,
+                "ignoring {SOURCE_DATE_EPOCH}: not a whole number of seconds since the Unix epoch"
+            );
+            Utc::now()
+        }
+    }
+}
+
+/// Serialization failure.
+#[derive(Debug, Error, Diagnostic)]
+pub enum WriteError {
+    /// JSON encoding failed.
+    #[error("cannot serialize SBOM")]
+    #[diagnostic(
+        code(pixi_sbom::format::serialize),
+        help(
+            "the document this build assembled cannot be encoded, which is a fault in pixi-sbom rather than \
+             in your workspace: please report it at https://github.com/aesir-oss/pixi-sbom/issues"
+        )
+    )]
+    Serialize(#[from] serde_json::Error),
+
+    /// Writing to the destination failed.
+    #[error("cannot write SBOM")]
+    #[diagnostic(
+        code(pixi_sbom::format::io),
+        help(
+            "the message chain names the path; check that --output points somewhere writable and that its \
+             directory exists"
+        )
+    )]
+    Io(#[from] std::io::Error),
+}
+
+/// Whether the document already at `path` is the one `format::write` would write now, but for
+/// its timestamp: rendered with the existing file's own timestamp, it is the same bytes. A rerun
+/// that changes nothing then leaves the file alone, which is what a pre-commit hook needs (a hook
+/// that rewrites a file every time fails every time) and what keeps a diff to real changes.
+///
+/// The comparison streams: the render is checked against the file as it is produced, so no copy
+/// of a large document is held. `false` when there is no such file, or its timestamp is not
+/// where this tool writes it (near the top), or any byte differs.
+pub fn unchanged_but_for_timestamp(format: Format, sbom: &Sbom, ctx: &WriteContext, path: &std::path::Path) -> bool {
+    use std::io::{BufRead, BufReader, Read};
+    let Ok(file) = std::fs::File::open(path) else {
+        return false;
+    };
+    let mut reader = BufReader::with_capacity(64 * 1024, file);
+    let Ok(head) = reader.fill_buf() else {
+        return false;
+    };
+    let Some(timestamp) = existing_timestamp(&String::from_utf8_lossy(&head[..head.len().min(8192)])) else {
+        return false;
+    };
+    let pinned = WriteContext {
+        timestamp,
+        uuid: ctx.uuid,
+        tool_version: ctx.tool_version.clone(),
+        spec_version: ctx.spec_version,
+    };
+    let mut comparer = Comparer {
+        existing: reader,
+        same: true,
+        theirs: Vec::new(),
+    };
+    if write(format, sbom, &pinned, &mut comparer).is_err() || !comparer.same {
+        return false;
+    }
+    // Everything rendered matched; the file must also end where the render did.
+    let mut rest = [0u8; 1];
+    matches!(comparer.existing.read(&mut rest), Ok(0))
+}
+
+/// The timestamp a document this tool wrote carries near its top: CycloneDX `"timestamp"`,
+/// SPDX 2.3 and 3.0.1 `"created"`, a GitHub snapshot `"scanned"`.
+pub fn existing_timestamp(head: &str) -> Option<DateTime<Utc>> {
+    ["\"timestamp\": \"", "\"created\": \"", "\"scanned\": \""]
+        .iter()
+        .find_map(|key| {
+            let start = head.find(key)? + key.len();
+            let end = head[start..].find('"')? + start;
+            DateTime::parse_from_rfc3339(&head[start..end])
+                .ok()
+                .map(|t| t.with_timezone(&Utc))
+        })
+}
+
+/// A writer that checks what is written against an existing file instead of storing it.
+struct Comparer<R: std::io::Read> {
+    existing: R,
+    same: bool,
+    /// Reused for each piece, since the serializer writes in many small ones.
+    theirs: Vec<u8>,
+}
+
+impl<R: std::io::Read> Write for Comparer<R> {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        if self.same {
+            self.theirs.resize(buf.len(), 0);
+            if self.existing.read_exact(&mut self.theirs).is_err() || self.theirs != buf {
+                self.same = false;
+            }
+        }
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+/// Serialize `sbom` in `format` to `out` as pretty-printed JSON.
+///
+/// Straight from the writer's own structs to the output. Going through a
+/// [`serde_json::Value`] first would hold the whole document twice — once as a tree of boxed
+/// strings and maps, once as the bytes — which with `--license-texts` on a large environment
+/// is tens of megabytes of each. The bytes are identical either way: the structs are written
+/// in field order and `Value` preserves insertion order.
+pub fn write(format: Format, sbom: &Sbom, ctx: &WriteContext, out: &mut dyn Write) -> Result<(), WriteError> {
+    match (format, ctx.spec_version) {
+        (Format::Cyclonedx, _) => serde_json::to_writer_pretty(&mut *out, &cyclonedx::document(sbom, ctx))?,
+        (Format::Github, _) => serde_json::to_writer_pretty(&mut *out, &github::document(sbom, ctx, &run_env))?,
+        (Format::Spdx, SpecVersion::V3_0) => serde_json::to_writer_pretty(&mut *out, &spdx3::document(sbom, ctx))?,
+        (Format::Spdx, _) => serde_json::to_writer_pretty(&mut *out, &spdx::document(sbom, ctx))?,
+    }
+    out.write_all(b"\n")?;
+    Ok(())
+}
+
+/// The environment of this run, for the GitHub snapshot's commit and workflow run.
+fn run_env(name: &str) -> Option<String> {
+    std::env::var(name).ok().filter(|value| !value.is_empty())
+}
+
+/// The SPDX 3 `software_sbomType` for a CycloneDX lifecycle phase. SPDX has six types to
+/// CycloneDX's seven phases; `decommission` has no counterpart and is left out rather than forced.
+pub fn phase_to_spdx3(phase: &str) -> Option<&'static str> {
+    Some(match phase {
+        "design" => "design",
+        "pre-build" | "build" | "post-build" => "build",
+        "operations" => "deployed",
+        "discovery" => "analyzed",
+        _ => return None,
+    })
+}
+
+/// The CycloneDX phase for an SPDX 3 `software_sbomType`, for a document read with `--from-sbom`.
+pub fn phase_from_spdx3(sbom_type: &str) -> Option<&'static str> {
+    Some(match sbom_type {
+        "design" => "design",
+        "source" => "pre-build",
+        "build" => "build",
+        "deployed" | "runtime" => "operations",
+        "analyzed" => "discovery",
+        _ => return None,
+    })
+}
+
+/// What a document was generated from and at which phase, for the creator comment SPDX uses in
+/// place of a lifecycle field: `Generated from the lockfile pixi.lock (resolved dependencies)
+/// before any build; lifecycle phase: pre-build`. `with_target` adds the environment and platform.
+pub fn generation_comment(sbom: &Sbom, with_target: bool) -> String {
+    let target = if with_target {
+        format!(" (environment {}, platform {})", sbom.environment, sbom.platform)
+    } else {
+        String::new()
+    };
+    let what = if let Some(prefix) = &sbom.prefix {
+        format!("the installed environment {prefix}{target}")
+    } else if sbom.document.is_some() {
+        format!("the {}{target}", sbom.input_description())
+    } else if with_target {
+        format!(
+            "the {}{target}, its resolved dependencies before any build",
+            sbom.input_description()
+        )
+    } else {
+        format!(
+            "the {} (resolved dependencies) before any build",
+            sbom.input_description()
+        )
+    };
+    if sbom.lifecycles.is_empty() {
+        format!("Generated from {what}")
+    } else {
+        format!("Generated from {what}; lifecycle phase: {}", sbom.lifecycles.join(", "))
+    }
+}
+
+/// Build the standalone CycloneDX VEX for `sbom`: its findings with an analysis each, linked
+/// back to the document `ctx` identifies.
+pub fn vex_to_value(
+    sbom: &Sbom,
+    ctx: &WriteContext,
+    open_state: &'static str,
+) -> Result<serde_json::Value, WriteError> {
+    Ok(serde_json::to_value(cyclonedx::vex(sbom, ctx, open_state))?)
+}
+
+/// Build the JSON document for `format` without writing it anywhere. The schema validators in
+/// the tests and the report writers need a tree; [`write`] does not and does not build one.
+pub fn to_value(format: Format, sbom: &Sbom, ctx: &WriteContext) -> Result<serde_json::Value, WriteError> {
+    let value = match (format, ctx.spec_version) {
+        (Format::Cyclonedx, _) => serde_json::to_value(cyclonedx::document(sbom, ctx))?,
+        (Format::Github, _) => serde_json::to_value(github::document(sbom, ctx, &run_env))?,
+        (Format::Spdx, SpecVersion::V3_0) => serde_json::to_value(spdx3::document(sbom, ctx))?,
+        (Format::Spdx, _) => serde_json::to_value(spdx::document(sbom, ctx))?,
+    };
+    Ok(value)
+}
+
+/// Ids of the packages the root component depends on: the ones the workspace manifest
+/// declared itself, plus the ones nothing else in the SBOM depends on. Without a manifest the
+/// second half is the whole answer, which is the graph-root heuristic this always used.
+pub(crate) fn top_level_ids(sbom: &Sbom) -> Vec<&str> {
+    let direct = |p: &&crate::model::Package| p.properties.contains_key(crate::manifest::DIRECT_PROPERTY);
+    if sbom.declared_roots {
+        return sbom.packages.iter().filter(direct).map(|p| p.id.as_str()).collect();
+    }
+    let depended_on: std::collections::HashSet<&str> = sbom
+        .packages
+        .iter()
+        .flat_map(|p| p.dependencies.iter().map(String::as_str))
+        .collect();
+    sbom.packages
+        .iter()
+        .filter(|p| !depended_on.contains(p.id.as_str()) || p.properties.contains_key(crate::manifest::DIRECT_PROPERTY))
+        .map(|p| p.id.as_str())
+        .collect()
+}
+
+#[cfg(test)]
+pub(crate) mod testing {
+    use super::*;
+    use crate::model::{Author, LicenseFile, Package, PackageKind, Root, Supplier};
+    use std::collections::BTreeMap;
+
+    /// A fixed context so snapshots do not change between runs.
+    pub fn fixed_context() -> WriteContext {
+        WriteContext {
+            timestamp: DateTime::parse_from_rfc3339("2026-09-18T12:00:00Z")
+                .unwrap()
+                .with_timezone(&Utc),
+            uuid: uuid::Uuid::parse_str("11111111-2222-4333-8444-555555555555").unwrap(),
+            tool_version: "0.0.0-test".into(),
+            spec_version: SpecVersion::V1_6,
+        }
+    }
+
+    /// The fixed context, writing CycloneDX 1.7.
+    pub fn fixed_context_1_7() -> WriteContext {
+        WriteContext {
+            spec_version: SpecVersion::V1_7,
+            ..fixed_context()
+        }
+    }
+
+    /// The fixed context, writing SPDX 3.0.
+    pub fn fixed_context_3_0() -> WriteContext {
+        WriteContext {
+            spec_version: SpecVersion::V3_0,
+            ..fixed_context()
+        }
+    }
+
+    /// A small hand-built model covering every package kind and edge case.
+    pub fn sample_sbom() -> Sbom {
+        let zlib_id = "pkg:conda/zlib@1.3.1?build=h1&channel=conda-forge&subdir=linux-64&type=conda";
+        let libzlib_id = "pkg:conda/libzlib@1.3.1?build=h1&channel=conda-forge&subdir=linux-64&type=conda";
+        let six_id = "pkg:pypi/six@1.17.0";
+        let src_id = "pkg:conda/mylib@0.1.0";
+        Sbom {
+            root: Root {
+                name: "demo".into(),
+                version: Some("2.0.0".into()),
+                authors: vec![
+                    Author {
+                        name: "Ada Lovelace".into(),
+                        email: Some("ada@example.org".into()),
+                    },
+                    Author {
+                        name: "Anonymous".into(),
+                        email: None,
+                    },
+                ],
+                license: Some("Apache-2.0".into()),
+                homepage: Some("https://demo.example".into()),
+                repository: Some("https://github.com/example/demo".into()),
+            },
+            environment: "default".into(),
+            platform: "linux-64".into(),
+            lockfile: "pixi.lock".into(),
+            prefix: None,
+            document: None,
+            packages: vec![
+                Package {
+                    id: libzlib_id.into(),
+                    name: "libzlib".into(),
+                    version: Some("1.3.1".into()),
+                    kind: PackageKind::CondaBinary,
+                    purl: libzlib_id.into(),
+                    supplier: Some(Supplier {
+                        name: "conda-forge".into(),
+                        url: Some("https://conda.anaconda.org/conda-forge/".into()),
+                    }),
+                    extra_purls: vec![],
+                    purls_from_lock: false,
+                    location: "https://conda.anaconda.org/conda-forge/linux-64/libzlib-1.3.1-h1.conda".into(),
+                    sha256: Some("a".repeat(64)),
+                    md5: Some("b".repeat(32)),
+                    sha512: None,
+                    license: Some("Zlib".into()),
+                    license_files: vec![LicenseFile {
+                        name: "LICENSE.txt".into(),
+                        text: Some("zlib license text".into()),
+                    }],
+                    description: Some("zlib data compression library".into()),
+                    homepage: Some("https://zlib.net".into()),
+                    repository: Some("https://github.com/madler/zlib".into()),
+                    documentation: None,
+                    yanked: None,
+                    properties: BTreeMap::from([
+                        ("pixi:channel".to_string(), "conda-forge".to_string()),
+                        ("pixi:subdir".to_string(), "linux-64".to_string()),
+                    ]),
+                    dependencies: vec![],
+                    occurrences: Vec::new(),
+                },
+                Package {
+                    id: zlib_id.into(),
+                    name: "zlib".into(),
+                    version: Some("1.3.1".into()),
+                    kind: PackageKind::CondaBinary,
+                    purl: zlib_id.into(),
+                    supplier: Some(Supplier {
+                        name: "conda-forge".into(),
+                        url: None,
+                    }),
+                    extra_purls: vec!["pkg:pypi/zlib@1.3.1".into()],
+                    purls_from_lock: true,
+                    location: "https://conda.anaconda.org/conda-forge/linux-64/zlib-1.3.1-h1.conda".into(),
+                    sha256: Some("c".repeat(64)),
+                    md5: None,
+                    sha512: None,
+                    license: Some("MIT/Apache-2.0".into()),
+                    license_files: vec![
+                        LicenseFile {
+                            name: "LICENSE-APACHE".into(),
+                            text: None,
+                        },
+                        LicenseFile {
+                            name: "LICENSE-MIT".into(),
+                            text: None,
+                        },
+                    ],
+                    description: None,
+                    homepage: None,
+                    repository: None,
+                    documentation: Some("https://zlib.net/manual.html".into()),
+                    yanked: None,
+                    properties: BTreeMap::from([("pixi:channel".to_string(), "conda-forge".to_string())]),
+                    dependencies: vec![libzlib_id.into()],
+                    occurrences: Vec::new(),
+                },
+                Package {
+                    id: src_id.into(),
+                    name: "mylib".into(),
+                    version: None,
+                    kind: PackageKind::CondaSource,
+                    purl: src_id.into(),
+                    supplier: None,
+                    extra_purls: vec![],
+                    purls_from_lock: false,
+                    location: "./packages/mylib".into(),
+                    sha256: None,
+                    md5: None,
+                    sha512: None,
+                    license: Some("Proprietary".into()),
+                    license_files: vec![LicenseFile {
+                        name: "EULA".into(),
+                        text: Some("all rights reserved".into()),
+                    }],
+                    description: None,
+                    homepage: None,
+                    repository: None,
+                    documentation: None,
+                    yanked: None,
+                    properties: BTreeMap::new(),
+                    dependencies: vec![zlib_id.into()],
+                    occurrences: Vec::new(),
+                },
+                Package {
+                    id: six_id.into(),
+                    name: "six".into(),
+                    version: Some("1.17.0".into()),
+                    kind: PackageKind::Pypi,
+                    purl: six_id.into(),
+                    supplier: Some(Supplier {
+                        name: "pypi.org".into(),
+                        url: Some("https://pypi.org/simple".into()),
+                    }),
+                    extra_purls: vec![],
+                    purls_from_lock: true,
+                    location: "https://files.pythonhosted.org/packages/six-1.17.0-py2.py3-none-any.whl".into(),
+                    sha256: Some("d".repeat(64)),
+                    md5: None,
+                    sha512: None,
+                    license: None,
+                    license_files: vec![],
+                    description: None,
+                    homepage: None,
+                    repository: None,
+                    documentation: None,
+                    yanked: None,
+                    properties: BTreeMap::from([("pixi:requires-python".to_string(), ">=2.7".to_string())]),
+                    dependencies: vec![],
+                    occurrences: Vec::new(),
+                },
+            ],
+            vulnerabilities: Vec::new(),
+            excluded: Vec::new(),
+            declared_missing: Vec::new(),
+            incomplete: crate::model::Incomplete::default(),
+            lifecycles: vec![crate::model::PHASE_LOCKFILE.into()],
+            declared_roots: false,
+            scopes: std::collections::BTreeMap::new(),
+            interpreter: None,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_rerun_that_changes_only_the_timestamp_leaves_the_file_alone() {
+        let dir = tempfile::tempdir().unwrap();
+        let sbom = testing::sample_sbom();
+        for (format, spec) in [
+            (Format::Cyclonedx, SpecVersion::V1_6),
+            (Format::Spdx, SpecVersion::default()),
+            (Format::Spdx, SpecVersion::V3_0),
+        ] {
+            let path = dir.path().join(format!("{format:?}-{spec:?}.json"));
+            let mut ctx = testing::fixed_context();
+            ctx.spec_version = spec;
+            assert!(!unchanged_but_for_timestamp(format, &sbom, &ctx, &path), "no file yet");
+            let mut file = std::fs::File::create(&path).unwrap();
+            write(format, &sbom, &ctx, &mut file).unwrap();
+            drop(file);
+
+            let mut later = ctx.clone();
+            later.timestamp += chrono::Duration::hours(3);
+            assert!(
+                unchanged_but_for_timestamp(format, &sbom, &later, &path),
+                "{format:?} {spec:?}"
+            );
+
+            let mut changed = sbom.clone();
+            changed.packages[0].version = Some("9.9.9".into());
+            assert!(
+                !unchanged_but_for_timestamp(format, &changed, &later, &path),
+                "a real change"
+            );
+
+            let mut longer = std::fs::read(&path).unwrap();
+            longer.extend_from_slice(b"\n");
+            std::fs::write(&path, &longer).unwrap();
+            assert!(
+                !unchanged_but_for_timestamp(format, &sbom, &later, &path),
+                "trailing bytes"
+            );
+        }
+        std::fs::write(dir.path().join("other.json"), "{\"name\": \"not ours\"}").unwrap();
+        assert!(!unchanged_but_for_timestamp(
+            Format::Cyclonedx,
+            &sbom,
+            &testing::fixed_context(),
+            &dir.path().join("other.json")
+        ));
+        assert_eq!(existing_timestamp("no timestamp here"), None);
+        assert_eq!(existing_timestamp("\"created\": \"not a date\""), None);
+    }
+
+    #[test]
+    fn writing_straight_out_produces_the_same_bytes_as_building_a_tree_first() {
+        // `write` no longer builds a `serde_json::Value`, which is where the memory went. The
+        // bytes must not have moved with it: every document this tool has written compares
+        // against these, and a reordered key would be a silent change to all of them.
+        let sbom = testing::sample_sbom();
+        for ctx in [
+            testing::fixed_context(),
+            testing::fixed_context_1_7(),
+            testing::fixed_context_3_0(),
+        ] {
+            for format in [Format::Cyclonedx, Format::Spdx] {
+                let mut streamed = Vec::new();
+                write(format, &sbom, &ctx, &mut streamed).expect("writes");
+
+                let mut through_a_tree =
+                    serde_json::to_vec_pretty(&to_value(format, &sbom, &ctx).expect("builds")).expect("serializes");
+                through_a_tree.push(b'\n');
+
+                assert_eq!(
+                    String::from_utf8(streamed).expect("utf-8"),
+                    String::from_utf8(through_a_tree).expect("utf-8"),
+                    "{format:?} at {:?}",
+                    ctx.spec_version
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn every_error_carries_a_code_and_a_next_step() {
+        let bad_json = serde_json::from_str::<serde_json::Value>("{").expect_err("truncated JSON");
+        for err in [
+            WriteError::Serialize(bad_json),
+            WriteError::Io(std::io::Error::other("permission denied")),
+        ] {
+            crate::assert_actionable(&err);
+        }
+    }
+
+    #[test]
+    fn top_level_ids_are_packages_nobody_depends_on() {
+        let sbom = testing::sample_sbom();
+        let ids = top_level_ids(&sbom);
+        assert_eq!(ids, ["pkg:conda/mylib@0.1.0", "pkg:pypi/six@1.17.0"]);
+    }
+
+    #[test]
+    fn a_declared_package_is_top_level_even_when_something_depends_on_it() {
+        let mut sbom = testing::sample_sbom();
+        let libzlib = sbom.packages.iter_mut().find(|p| p.name == "libzlib").unwrap();
+        libzlib
+            .properties
+            .insert(crate::manifest::DIRECT_PROPERTY.to_string(), "true".to_string());
+        assert_eq!(
+            top_level_ids(&sbom),
+            [
+                "pkg:conda/libzlib@1.3.1?build=h1&channel=conda-forge&subdir=linux-64&type=conda",
+                "pkg:conda/mylib@0.1.0",
+                "pkg:pypi/six@1.17.0"
+            ]
+        );
+    }
+
+    #[test]
+    fn document_context_is_deterministic_for_identical_input() {
+        let sbom = testing::sample_sbom();
+        let a = WriteContext::for_document("version: 6\n", &sbom, Format::Cyclonedx, SpecVersion::V1_6);
+        let b = WriteContext::for_document("version: 6\n", &sbom, Format::Cyclonedx, SpecVersion::V1_7);
+        assert_eq!(a.tool_version, env!("CARGO_PKG_VERSION"));
+        assert_eq!(a.uuid.get_version_num(), 5);
+        assert_eq!(a.uuid, b.uuid, "the spec version does not change the document identity");
+        assert_eq!(b.spec_version, SpecVersion::V1_7);
+    }
+
+    #[test]
+    fn document_uuid_changes_with_every_input() {
+        let sbom = testing::sample_sbom();
+        let base = document_uuid("lock", &sbom, Format::Cyclonedx, "1.0.0");
+        assert_ne!(base, document_uuid("lock!", &sbom, Format::Cyclonedx, "1.0.0"));
+        assert_ne!(base, document_uuid("lock", &sbom, Format::Spdx, "1.0.0"));
+        assert_ne!(base, document_uuid("lock", &sbom, Format::Cyclonedx, "1.0.1"));
+        let mut other_env = sbom.clone();
+        other_env.environment = "prod".into();
+        assert_ne!(base, document_uuid("lock", &other_env, Format::Cyclonedx, "1.0.0"));
+        let mut other_platform = sbom.clone();
+        other_platform.platform = "win-64".into();
+        assert_ne!(base, document_uuid("lock", &other_platform, Format::Cyclonedx, "1.0.0"));
+    }
+
+    #[test]
+    fn timestamp_honors_source_date_epoch() {
+        let pinned = timestamp_from(Some(OsStr::new("1700000000")));
+        assert_eq!(pinned.to_rfc3339(), "2023-11-14T22:13:20+00:00");
+        assert_eq!(timestamp_from(Some(OsStr::new(" 0 "))).timestamp(), 0);
+    }
+
+    #[test]
+    fn timestamp_falls_back_to_now_when_unset_or_invalid() {
+        let before = Utc::now();
+        for value in [
+            None,
+            Some(OsStr::new("")),
+            Some(OsStr::new("yesterday")),
+            Some(OsStr::new("1.5")),
+        ] {
+            let ts = timestamp_from(value);
+            assert!(ts >= before && ts <= Utc::now(), "{value:?} -> {ts}");
+        }
+    }
+}
+
+#[cfg(test)]
+mod schema_tests {
+    use super::*;
+    use crate::format::testing::{fixed_context, sample_sbom};
+
+    fn schema(name: &str) -> serde_json::Value {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/schemas")
+            .join(name);
+        serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap()
+    }
+
+    fn assert_valid(validator: &jsonschema::Validator, doc: &serde_json::Value) {
+        let errors: Vec<String> = validator
+            .iter_errors(doc)
+            .map(|e| format!("{} at {}", e, e.instance_path()))
+            .collect();
+        assert!(errors.is_empty(), "schema violations:\n{}", errors.join("\n"));
+    }
+
+    fn cyclonedx_validator(version: &str) -> jsonschema::Validator {
+        let registry = jsonschema::Registry::new()
+            .add(
+                "http://cyclonedx.org/schema/spdx.schema.json",
+                schema("spdx.schema.json"),
+            )
+            .unwrap()
+            .add(
+                "http://cyclonedx.org/schema/jsf-0.82.schema.json",
+                schema("jsf-0.82.schema.json"),
+            )
+            .unwrap()
+            .add(
+                "http://cyclonedx.org/schema/cryptography-defs.schema.json",
+                schema("cryptography-defs.schema.json"),
+            )
+            .unwrap()
+            .prepare()
+            .unwrap();
+        jsonschema::options()
+            .with_registry(&registry)
+            .offline()
+            .build(&schema(&format!("bom-{version}.schema.json")))
+            .unwrap()
+    }
+
+    #[test]
+    fn the_lifecycle_phase_follows_the_input() {
+        // #329: a lockfile is pre-build, an installed environment is in operation, and somebody
+        // else's document keeps the phases it claimed (or claims none, rather than a guess).
+        let lockfile = sample_sbom();
+        let installed = Sbom {
+            lockfile: String::new(),
+            prefix: Some("app".into()),
+            lifecycles: vec![crate::model::PHASE_INSTALLED.into()],
+            declared_roots: false,
+            scopes: std::collections::BTreeMap::new(),
+            interpreter: None,
+            ..sample_sbom()
+        };
+        let document = |phases: &[&str]| Sbom {
+            lockfile: String::new(),
+            document: Some("urn:uuid:aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee".into()),
+            lifecycles: phases.iter().map(|p| p.to_string()).collect(),
+            declared_roots: false,
+            scopes: std::collections::BTreeMap::new(),
+            interpreter: None,
+            ..sample_sbom()
+        };
+        let cases = [
+            ("lockfile", lockfile),
+            ("installed", installed),
+            ("document with phases", document(&["build", "operations"])),
+            ("document without phases", document(&[])),
+        ];
+        let spdx2 = jsonschema::options()
+            .offline()
+            .build(&schema("spdx-2.3.schema.json"))
+            .unwrap();
+        let spdx3 = jsonschema::options()
+            .offline()
+            .build(&schema("spdx-3.0.1.schema.json"))
+            .unwrap();
+        let mut seen = serde_json::Map::new();
+        for (name, sbom) in &cases {
+            let cdx16 = to_value(Format::Cyclonedx, sbom, &fixed_context()).unwrap();
+            let cdx17 = to_value(Format::Cyclonedx, sbom, &crate::format::testing::fixed_context_1_7()).unwrap();
+            let spdx23 = to_value(Format::Spdx, sbom, &fixed_context()).unwrap();
+            let spdx30 = to_value(Format::Spdx, sbom, &crate::format::testing::fixed_context_3_0()).unwrap();
+            assert_valid(&cyclonedx_validator("1.6"), &cdx16);
+            assert_valid(&cyclonedx_validator("1.7"), &cdx17);
+            assert_valid(&spdx2, &spdx23);
+            assert_valid(&spdx3, &spdx30);
+            let graph = spdx30["@graph"].as_array().unwrap();
+            let node = |kind: &str| graph.iter().find(|n| n["type"] == kind).cloned().unwrap_or_default();
+            seen.insert(
+                (*name).to_string(),
+                serde_json::json!({
+                    "cyclonedx-1.6 lifecycles": cdx16["metadata"]["lifecycles"],
+                    "cyclonedx-1.7 lifecycles": cdx17["metadata"]["lifecycles"],
+                    "spdx-2.3 comment": spdx23["creationInfo"]["comment"],
+                    "spdx-3.0 software_sbomType": node("software_Sbom")["software_sbomType"],
+                    "spdx-3.0 comment": node("CreationInfo")["comment"],
+                }),
+            );
+        }
+        insta::assert_json_snapshot!(seen);
+    }
+
+    #[test]
+    fn phases_map_between_cyclonedx_and_spdx_3() {
+        for (phase, spdx) in [
+            ("design", "design"),
+            ("pre-build", "build"),
+            ("operations", "deployed"),
+            ("discovery", "analyzed"),
+        ] {
+            assert_eq!(phase_to_spdx3(phase), Some(spdx), "{phase}");
+        }
+        assert_eq!(phase_to_spdx3("decommission"), None, "no SPDX counterpart");
+        for (spdx, phase) in [
+            ("source", "pre-build"),
+            ("build", "build"),
+            ("deployed", "operations"),
+            ("runtime", "operations"),
+            ("analyzed", "discovery"),
+        ] {
+            assert_eq!(phase_from_spdx3(spdx), Some(phase), "{spdx}");
+        }
+        assert_eq!(phase_from_spdx3("unknown"), None);
+    }
+
+    #[test]
+    fn sample_cyclonedx_document_is_schema_valid() {
+        let doc = to_value(Format::Cyclonedx, &sample_sbom(), &fixed_context()).unwrap();
+        assert_valid(&cyclonedx_validator("1.6"), &doc);
+    }
+
+    #[test]
+    fn sample_cyclonedx_1_7_document_is_schema_valid() {
+        let doc = to_value(
+            Format::Cyclonedx,
+            &sample_sbom(),
+            &crate::format::testing::fixed_context_1_7(),
+        )
+        .unwrap();
+        assert_valid(&cyclonedx_validator("1.7"), &doc);
+        // and is not accepted by 1.6 (the citations element is new), proving the version matters
+        assert!(cyclonedx_validator("1.6").iter_errors(&doc).next().is_some());
+    }
+
+    #[test]
+    fn sample_spdx_3_document_is_schema_valid() {
+        let validator = jsonschema::options()
+            .offline()
+            .build(&schema("spdx-3.0.1.schema.json"))
+            .unwrap();
+        let doc = to_value(
+            Format::Spdx,
+            &sample_sbom(),
+            &crate::format::testing::fixed_context_3_0(),
+        )
+        .unwrap();
+        assert_valid(&validator, &doc);
+        assert_eq!(doc["@context"], "https://spdx.org/rdf/3.0.1/spdx-context.jsonld");
+    }
+
+    #[test]
+    fn sample_spdx_document_is_schema_valid() {
+        let validator = jsonschema::options()
+            .offline()
+            .build(&schema("spdx-2.3.schema.json"))
+            .unwrap();
+
+        let doc = to_value(Format::Spdx, &sample_sbom(), &fixed_context()).unwrap();
+        assert_valid(&validator, &doc);
+    }
+
+    #[test]
+    fn write_emits_pretty_json_with_trailing_newline() {
+        let mut out = Vec::new();
+        write(Format::Cyclonedx, &sample_sbom(), &fixed_context(), &mut out).unwrap();
+        let text = String::from_utf8(out).unwrap();
+        assert!(text.starts_with("{\n  \"$schema\""));
+        assert!(text.ends_with("}\n"));
+    }
+
+    #[test]
+    fn write_reports_io_failure() {
+        struct Broken;
+        impl Write for Broken {
+            fn write(&mut self, _: &[u8]) -> std::io::Result<usize> {
+                Err(std::io::Error::other("disk full"))
+            }
+            fn flush(&mut self) -> std::io::Result<()> {
+                Ok(())
+            }
+        }
+        let err = write(Format::Spdx, &sample_sbom(), &fixed_context(), &mut Broken).unwrap_err();
+        assert!(matches!(err, WriteError::Serialize(_) | WriteError::Io(_)));
+    }
+}

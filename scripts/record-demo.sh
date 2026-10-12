@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Re-records crates/pixi-sbom/docs/assets/demo.gif. Run it as `pixi run demo`.
+# Re-records docs/assets/demo.gif. Run it as `pixi run demo`.
 #
 # vhs is not a project dependency on purpose: it pulls ttyd and ffmpeg, which is 95 packages and
 # doubles pixi.lock, for a task that runs by hand every few months and never in CI.
@@ -29,7 +29,7 @@ workspace="$staging/workspace"
 # there. PIXI_CACHE_DIR points at nothing on purpose: the demo must not read the real package
 # cache, or the output would depend on what the recorder happens to have downloaded.
 # One tape per recording: the overview at the top of the README, and one per feature embedded
-# beside the prose that explains it in crates/pixi-sbom/docs/cli.md. `pixi run demo <name>` re-records just one.
+# beside the prose that explains it in docs/cli.md. `pixi run demo <name>` re-records just one.
 # vhs runs from the repository root so that `Source` and `Output` in a tape resolve against it.
 # The recorded shell cds into the staged workspace itself, via $DEMO_WORKSPACE, which keeps the
 # committed tapes free of anyone's temporary directory.
@@ -57,13 +57,13 @@ done
 
 if [ "$recorded" -eq 0 ]; then
   echo "no tape matched '${wanted}'. Available:" >&2
-  for tape in crates/pixi-sbom/docs/assets/*.tape; do
+  for tape in docs/assets/*.tape; do
     case "$(basename "$tape")" in _*) continue ;; esac
     basename "$tape" .tape | sed 's/^/  /' >&2
   done
   exit 1
 fi
 printf '%-34s %s\n' "recording" "size"
-for gif in crates/pixi-sbom/docs/assets/*.gif; do
+for gif in docs/assets/*.gif; do
   printf '%-34s %s\n' "$gif" "$(du -h "$gif" | cut -f1)"
 done

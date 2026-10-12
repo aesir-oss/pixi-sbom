@@ -1,16 +1,16 @@
 # Development guide
 
 This page is how the code is built, checked, tested, and released. For what the code does, see
-[pixi-sbom's architecture page](https://aesir-oss.github.io/pixi-ext-contrib/pixi-sbom/latest/architecture/).
+[the architecture page](architecture.md).
 
 ## Toolchain
 
 Everything runs through [pixi](https://pixi.sh). `pixi.toml` pins the Rust toolchain from conda-forge and defines
-every task; `crates/pixi-sbom/Cargo.toml` describes the crate. You do not need rustup or a system Rust.
+every task; `Cargo.toml` describes the crate. You do not need rustup or a system Rust.
 
 ```sh
-git clone https://github.com/aesir-oss/pixi-ext-contrib
-cd pixi-ext-contrib
+git clone https://github.com/aesir-oss/pixi-sbom
+cd pixi-sbom
 pixi install          # rust, cargo-llvm-cov, pre-commit, taplo, typos, git-cliff, ...
 pixi run bootstrap    # installs the git pre-commit and commit-msg hooks
 ```
@@ -23,36 +23,22 @@ prefer adding a task.
 | `fmt` | `cargo fmt` | Format (`rustfmt.toml`: edition 2024, 120 columns) |
 | `lint` | `cargo clippy --all-targets -- -D warnings` | Lint; warnings are errors |
 | `check` | `cargo check --all-targets` | Type-check without building |
-| `test` | `cargo test` | Unit tests (in `crates/pixi-sbom/src/`), end-to-end tests (`crates/pixi-sbom/tests/cli.rs`) and network tests (`crates/pixi-sbom/tests/network.rs`) |
+| `test` | `cargo test` | Unit tests (in `src/`), end-to-end tests (`tests/cli.rs`) and network tests (`tests/network.rs`) |
 | `test-integration` | `cargo test --test '*'` | End-to-end tests only |
 | `cov` | `cargo llvm-cov --all-targets --fail-under-lines 90` | Full suite with a 90% line-coverage gate |
 | `build` | `cargo build --release` | Optimized binary (`lto`, `codegen-units = 1`, stripped) at `target/release/pixi-sbom` |
 | `pre-commit-run` | `pre-commit run --all-files` | All hooks over the tree |
 | `ci` | `pre-commit-run` → `build` → `check` → `lint` → `cov` | The gate; must exit 0 before work is considered done |
-| `changelog-of` | `python scripts/changelog.py write <extension>` | Regenerate one extension's changelog from the commits that touched it |
+| `changelog` | `bash scripts/changelog.sh vX.Y.Z` | Add a release's section to `CHANGELOG.md`; the release workflow runs it |
 | `bootstrap` | `pre-commit install ...` | One-time hook installation |
-| `docs-preview` | `python scripts/pages.py preview` (`docs` environment) | Build every site laid out as on GitHub Pages and serve it at http://127.0.0.1:8000/pixi-ext-contrib/ |
-| `docs-serve`, `docs-serve-sbom`, `docs-serve-policy` | `mkdocs serve -f <config>` (`docs` environment) | Live preview of one site, reloading as you edit |
-| `docs-build` | `mkdocs build --strict`, once per site (`docs` environment) | Build every site into `site/`; a broken link or a page missing from the nav fails |
+| `docs-serve` | `mkdocs serve` (`docs` environment) | Live preview of the documentation site at http://127.0.0.1:8000 |
+| `docs-build` | `mkdocs build --strict` (`docs` environment) | Build the site into `site/`; a broken link or a page missing from the nav fails |
 
-The documentation is [MkDocs](https://www.mkdocs.org) with the Material theme, as one site per extension plus the
-workspace's own (#6):
-
-| Site | Config | Pages | Served at |
-|---|---|---|---|
-| The workspace | `mkdocs.yml` | `docs/`: the extensions page, this page, the security policy, the changelog index | `/` |
-| pixi-sbom | `crates/pixi-sbom/mkdocs.yml` | `crates/pixi-sbom/docs/` | `/pixi-sbom/<version>/` |
-| pixi-policy | `crates/pixi-policy/mkdocs.yml` | `crates/pixi-policy/docs/` | `/pixi-policy/<version>/` |
-
-What they share is in `mkdocs.base.yml`, which each config names with `INHERIT`, and `docs/overrides/`: the Aesir
-brand (`aesir.css`, the A mark in `.icons/`), the extension switcher beside the version selector, and the 404 page
-that forwards the old pre-#6 addresses (`/latest/cli/`) to `/pixi-sbom/`. Repository files that are also pages, such
-as `SECURITY.md` and each extension's `CHANGELOG.md`, are added at build time by `mkdocs_hooks.py` from each site's
-`extra.repo_pages`. `extensions.json` lists the extensions for the extensions page and the switcher; a new
-extension's site is a `crates/<extension>/mkdocs.yml` and a row there, and `pixi run pages-test` fails until both
-exist. Links from one site to another are absolute URLs, since each site builds on its own. The `docs` pixi
-environment is separate from the Rust one, so `pixi run -e docs docs-preview` does not pull the Rust toolchain into a
-docs-only checkout.
+The documentation site is [MkDocs](https://www.mkdocs.org) with the Material theme and the Aesir brand
+(`docs/overrides/`: `aesir.css` and the A mark in `.icons/`), configured in `mkdocs.yml`. The pages are the Markdown
+files in `docs/`, plus `CHANGELOG.md` and `SECURITY.md`, which `mkdocs_hooks.py` publishes as the changelog and
+security pages at build time from `extra.repo_pages`. The `docs` pixi environment is separate from the Rust one, so
+`pixi run -e docs docs-serve` does not pull the Rust toolchain into a docs-only checkout.
 
 ## The change harness
 
@@ -107,7 +93,7 @@ check specific fields.
 
 ### The minimum supported Rust version
 
-`rust-version` in `crates/pixi-sbom/Cargo.toml` is **1.88**, and the `msrv` environment pins exactly that toolchain so the claim is
+`rust-version` in `Cargo.toml` is **1.88**, and the `msrv` environment pins exactly that toolchain so the claim is
 checked rather than asserted: `pixi run -e msrv msrv-check`, which CI runs on every pull request.
 
 It was 1.85 until someone looked. That number came from edition 2024 and was never true — this crate uses
@@ -116,16 +102,16 @@ built on the toolchain `pixi.toml` pins, which is far newer.
 
 Raising the MSRV is a breaking change for anyone pinned to an older toolchain, so after 1.0 it belongs in a minor
 release at the earliest, with the new number in the changelog. Lowering it is free. Either way the `msrv`
-environment and `crates/pixi-sbom/Cargo.toml` change together, or the check is measuring the wrong thing.
+environment and `Cargo.toml` change together, or the check is measuring the wrong thing.
 
 ### Benchmarks (`benches/`, criterion)
 
 `pixi run bench` times the lockfile reader, the model builder, each writer, license normalization, the report
 renderers and the offline enrichment path, against this repository's own lockfile and a generated 2000-package
-one. The numbers and what they say are in [pixi-sbom's benchmarks page](https://aesir-oss.github.io/pixi-ext-contrib/pixi-sbom/latest/benchmarks/); CI runs `pixi run bench-test`, which
+one. The numbers and what they say are in [the benchmarks page](benchmarks.md); CI runs `pixi run bench-test`, which
 executes each benchmark once without timing it, since a shared runner's timings are noise.
 
-The benchmarks reach into the crate through the library target (`crates/pixi-sbom/src/lib.rs`), which exists for them and for the
+The benchmarks reach into the crate through the library target (`src/lib.rs`), which exists for them and for the
 tests.
 
 **That library is deliberately not an API.** It is not published (#106); every module is marked `#[doc(hidden)]`
@@ -143,7 +129,7 @@ guarantees, not to let them reach into this one.
 
 ### Snapshot tests (`insta`)
 
-Each writer has one `insta::assert_json_snapshot!` over the sample model, stored in `crates/pixi-sbom/src/format/snapshots/`. They
+Each writer has one `insta::assert_json_snapshot!` over the sample model, stored in `src/format/snapshots/`. They
 catch unintended output changes. A `WriteContext` with a fixed timestamp, UUID and tool version keeps them stable.
 When an output change is intended, review the diff and accept it:
 
@@ -155,14 +141,14 @@ pixi run cargo insta review                # or: INSTA_UPDATE=always pixi run ca
 ### End-to-end tests (`tests/cli.rs`)
 
 Run the built binary with `assert_cmd` against copies of the fixtures in temp directories, then read the file it
-wrote and validate it with the `jsonschema` crate against the schemas in `crates/pixi-sbom/tests/schemas/`. They cover lockfile
+wrote and validate it with the `jsonschema` crate against the schemas in `tests/schemas/`. They cover lockfile
 discovery, every option including `--all-environments`, both formats, and each error path's message and exit code.
 They run with `PIXI_SBOM_OFFLINE=1`, so they never make a request.
 
 ### Network tests (`tests/network.rs`)
 
 The third kind, for behaviour that only shows in how requests go over the wire: unit tests stub `Fetch` and never
-speak HTTP, and the end-to-end tests are offline. `crates/pixi-sbom/tests/support/` is a small HTTP/1.1 server on `127.0.0.1` (the
+speak HTTP, and the end-to-end tests are offline. `tests/support/` is a small HTTP/1.1 server on `127.0.0.1` (the
 standard library and threads, no dependency) that answers a script and records every request: which connection
 carried it, when it started and finished, and its body. The tests run the real binary with every upstream pointed at
 it through the `PIXI_SBOM_*_URL` overrides, so nothing leaves the machine. They cover connection reuse, batched
@@ -195,7 +181,7 @@ own tables), and scans both documents with the same Grype and the same database.
 `pixi exec` at versions pinned in the script, so neither is a dependency of the project.
 
 Every conda, Python or npm finding from syft's document must also come from pixi-sbom's. One that does not fails the
-run unless `crates/pixi-sbom/tests/grype/exceptions.toml` lists it, for that environment, with a reason: an exception is for a
+run unless `tests/grype/exceptions.toml` lists it, for that environment, with a reason: an exception is for a
 difference that is right, such as a Grype match on a CPE syft guessed from a name for code the package does not
 contain. Findings only pixi-sbom's document produces are printed, not failed. The run prints the Grype database's
 build date, because findings change as advisories are published.
@@ -211,7 +197,7 @@ the comparison itself.
 
 ### Schema validation
 
-`crates/pixi-sbom/tests/schemas/` contains the official CycloneDX 1.6 and 1.7 schemas (with the `spdx.schema.json`,
+`tests/schemas/` contains the official CycloneDX 1.6 and 1.7 schemas (with the `spdx.schema.json`,
 `jsf-0.82.schema.json` and `cryptography-defs.schema.json` they reference, registered under their canonical `$id`s so
 no network access happens), the SPDX 2.3 schema, the SPDX 3.0.1 JSON schema and the SARIF 2.1.0 schema. Both the sample model and every end-to-end document are validated,
 CycloneDX against the schema of the version written. When adding a spec version, vendor its schema and extend
@@ -227,7 +213,7 @@ CycloneDX against the schema of the version written. When adding a spec version,
 | `multi-env` | Hand-composed | Environment ordering for `--all-environments` |
 
 To refresh a real fixture, run `pixi lock` in a scratch copy of its `pixi.toml` and copy the resulting `pixi.lock`
-back; then update any version-specific assertions in `crates/pixi-sbom/src/lock.rs` and `crates/pixi-sbom/tests/cli.rs`. Hand-composed fixtures are
+back; then update any version-specific assertions in `src/lock.rs` and `tests/cli.rs`. Hand-composed fixtures are
 deliberately tiny and reuse the `libzlib` record from `conda-only` so their hashes are real.
 
 ## Trying it as a real extension
@@ -252,17 +238,17 @@ real document; the fixtures are small by design.
 - Rust: edition 2024, `rustfmt` defaults at 120 columns, clippy clean with `-D warnings`. Public items in every module
   carry a doc comment; error enums derive `thiserror::Error` and `miette::Diagnostic` with a `code(...)`.
 - Every behavior change comes with a test in the layer that owns the behavior (model changes → `lock.rs` tests;
-  output changes → writer tests and snapshots; CLI changes → `crates/pixi-sbom/tests/cli.rs`; request behaviour → `crates/pixi-sbom/tests/network.rs`).
+  output changes → writer tests and snapshots; CLI changes → `tests/cli.rs`; request behaviour → `tests/network.rs`).
 - Dependencies: prefer what `rattler_lock` already pulls in; avoid git dependencies. `serde_json` uses
   `preserve_order` so keys are emitted in struct order.
 - Never print to stdout; logs go through `tracing` to stderr.
 
 ## The CPE table
 
-`crates/pixi-sbom/data/cpe.toml` maps a conda package name to NVD's `vendor:product`, and is compiled into the binary
-(`crates/pixi-sbom/src/cpe.rs`). A package missing from it gets no CPE: one is never guessed from a name.
+`data/cpe.toml` maps a conda package name to NVD's `vendor:product`, and is compiled into the binary
+(`src/cpe.rs`). A package missing from it gets no CPE: one is never guessed from a name.
 
-**Adding an entry** is one line in `crates/pixi-sbom/data/cpe.toml`, `<conda name> = "<vendor>:<product>"`, plus nothing else:
+**Adding an entry** is one line in `data/cpe.toml`, `<conda name> = "<vendor>:<product>"`, plus nothing else:
 `cpe::tests::every_entry_is_a_valid_vendor_and_product` checks every line's format, and the Grype comparison
 (`pixi run grype-compare`) shows what the entry matches. Before adding one, check the pair is the one NVD and Grype's
 database use for that code:
@@ -283,10 +269,10 @@ issue, *CPE table upkeep*, up to date with what it finds:
 | Unknown to NVD | The pair is wrong or was withdrawn: correct or remove the entry |
 | Not a conda-forge package | The name is not one conda-forge uses, so the entry can never match: rename or remove it |
 | Version spelled unlike NVD's | conda-forge's latest version has a different shape from every version NVD records; check whether CPEs from it still match |
-| Candidates | Native packages in the examples with neither a CPE nor a PyPI identity. Add an entry, or list the package in `crates/pixi-sbom/tests/cpe/reviewed.toml` with the reason it has none, so it is not proposed again |
+| Candidates | Native packages in the examples with neither a CPE nor a PyPI identity. Add an entry, or list the package in `tests/cpe/reviewed.toml` with the reason it has none, so it is not proposed again |
 
 Nothing is added to the table automatically: which CPE a package should get is a person's call.
-**The CRAN table** (`crates/pixi-sbom/data/cran.toml`, #436) is generated, not curated: `pixi run cran-table` rebuilds it from CRAN's
+**The CRAN table** (`data/cran.toml`, #436) is generated, not curated: `pixi run cran-table` rebuilds it from CRAN's
 package list and archive and conda-forge's channel data, and `pixi run cran-table --check` says whether it is out of
 date. It lists only the exceptions: `r-*` packages CRAN spells differently and the ones never on CRAN.
 `pixi run cran-table-test` tests the generator.
@@ -296,10 +282,10 @@ thirty seconds without an API key); `pixi run cpe-upkeep-test` tests them.
 
 ## The bundled-library signatures
 
-`crates/pixi-sbom/data/signatures.toml` says how each [bundled native library](https://aesir-oss.github.io/pixi-ext-contrib/pixi-sbom/latest/output-format/#bundled-native-libraries)
+`data/signatures.toml` says how each [bundled native library](output-format.md#bundled-native-libraries)
 is recognized: the files it is installed as, the conda packages that are the library itself, the CPE table key, and
 where its version is (`text` after a prefix, an exported `symbol` holding the string, a `symbol-pointer` to it, or a
-`packed-function` returning `major << 16 | minor << 8 | patch`). `crates/pixi-sbom/src/bundled.rs` reads it.
+`packed-function` returning `major << 16 | minor << 8 | patch`). `src/bundled.rs` reads it.
 
 **Adding a library** is one table in that file, plus its two releases in `bundled::tests::RELEASES`, which builds
 synthetic ELF, Mach-O and PE files for each and reads the version back. Find where the real library keeps its
@@ -337,10 +323,10 @@ must pass:
 | Pull request changes | Runs |
 |---|---|
 | Rust code, any `Cargo.toml`, `Cargo.lock`, `pixi.toml`, `pixi.lock`, `rustfmt.toml`, `ci.yml` | Tests on Linux, macOS and Windows; coverage, MSRV, benchmarks |
-| Files the tests read: `docs/`, `examples/`, `README.md`, the MkDocs configs, `extensions.json`, `actions/pixi-sbom/action.yml`, the release workflows, `scripts/whats_new.py` | Tests on Linux only |
-| `docs/`, `crates/*/docs/`, the MkDocs configs, the hook, `extensions.json`, the changelogs, `SECURITY.md` | The docs build |
+| Files the tests read: `docs/`, `examples/`, `README.md`, `mkdocs.yml`, `actions/pixi-sbom/action.yml`, the release workflows, `scripts/whats_new.py` | Tests on Linux only |
+| `docs/`, `mkdocs.yml`, the hook, `CHANGELOG.md`, `SECURITY.md` | The docs build |
 | `Cargo.lock`, any `Cargo.toml`, `deny.toml` | Dependency advisories and licenses |
-| `cli.rs`, `main.rs`, `Cargo.lock`, `crates/pixi-sbom/docs/completion/`, `scripts/completion_e2e.py` | Shell completion on all three |
+| `cli.rs`, `main.rs`, `Cargo.lock`, `docs/completion/`, `scripts/completion_e2e.py` | Shell completion on all three |
 | `actions/`, `cli.rs`, `main.rs` | SBOM via action on all five, and the action on a uv project |
 | Anything | Lint and the script tests |
 
@@ -352,10 +338,10 @@ A newer push to a pull request cancels its running CI; on `main` every commit's 
 | Test | `ubuntu-latest`, `macos-latest`, `windows-latest` | `pixi run test` |
 | Coverage gate | ubuntu | `pixi run cov` |
 | Dependency advisories and licenses | ubuntu | `pixi run -e lint deny`: RUSTSEC advisories, license terms, banned crates and unexpected sources |
-| Builds on the MSRV | ubuntu | `pixi run -e msrv msrv-check`: the oldest toolchain `crates/pixi-sbom/Cargo.toml` claims |
+| Builds on the MSRV | ubuntu | `pixi run -e msrv msrv-check`: the oldest toolchain `Cargo.toml` claims |
 | Benchmarks compile and run | ubuntu | `pixi run bench-test`: every benchmark runs once, untimed, in a debug build |
 | Script tests | ubuntu | The Python scripts' own tests: `action-test`, `perf-test`, `whats-new-test`, `repo-release-test`, `changelog-test` and the rest |
-| Performance (separate workflow) | all five release platforms | `pixi run perf`: builds two refs on one runner and compares them; fails on binary size or peak memory, reports wall time. On demand, weekly and for each release candidate (its tag, against the last final release); not on pull requests or pushes to `main` (#91). See [pixi-sbom's benchmarks page](https://aesir-oss.github.io/pixi-ext-contrib/pixi-sbom/latest/benchmarks/) |
+| Performance (separate workflow) | all five release platforms | `pixi run perf`: builds two refs on one runner and compares them; fails on binary size or peak memory, reports wall time. On demand, weekly and for each release candidate (its tag, against the last final release); not on pull requests or pushes to `main` (#91). See [the benchmarks page](benchmarks.md) |
 | Build | same three | `pixi run build` and `--version` smoke test, with the release profile; on `main` only, not on pull requests (#91) |
 | Docs | ubuntu | `pixi run docs-build`: the site must build with `--strict` |
 | SBOM via action | all five release platforms | The repository's own action against its own lockfile; SARIF and the attestation from the linux-64 leg only. See [The GitHub Action](#the-github-action) |
@@ -365,20 +351,15 @@ A newer push to a pull request cancels its running CI; on `main` every commit's 
 The per-pull-request run cannot see an advisory published after a merge, and the weekly one is what catches it:
 nothing about the repository changes and one day the answer is different.
 
-`.github/workflows/docs.yml` publishes the sites to GitHub Pages (https://aesir-oss.github.io/pixi-ext-contrib/) every
-time a release is published, building from the release tag so each extension's site matches its released binary.
-Each extension's site is versioned with [mike](https://github.com/jimporter/mike) under its own prefix, the way
-pixi's own docs are versioned: a release deploys under its version (`/pixi-sbom/v1.13.0/`), `latest` is an alias of
-the extension's newest final release and `/<extension>/` opens it, so links should use `/<extension>/latest/...`,
-and `dev` follows `main`. Before an extension's first final, `/<extension>/` opens `dev`. A release deploys only its
-own extension; a push to `main` that touches the docs redeploys `dev` for every extension. The workspace site is not
-versioned and is rebuilt at the root on every run. `scripts/pages.py` decides what each run deploys and lays out the
-branch, and its first run after #6 moved pixi-sbom's earlier versions from the root to `/pixi-sbom/`. Everything
-lives on the `gh-pages` branch, which the workflow then publishes as the Pages artifact; the repository's Pages
-source stays "GitHub Actions" and the `github-pages` environment records every deployment.
-`gh workflow run docs.yml -f ref=<extension>-vX.Y.Z` redeploys a release's docs; any other ref (or none) redeploys
-`dev`. `pixi run -e docs mike serve -F crates/<extension>/mkdocs.yml --deploy-prefix <extension>` previews one
-extension's deployed versions locally from `gh-pages`.
+`.github/workflows/docs.yml` publishes the site to GitHub Pages (https://aesir-oss.github.io/pixi-sbom/) every time
+a release is published, building from the release tag so the site matches the released binary. The site is versioned
+with [mike](https://github.com/jimporter/mike) the way pixi's own docs are: each release deploys under its tag
+(`/v1.13.2/`), `latest` is an alias of the newest final release and the root opens it, so links should use
+`/latest/...`, and `dev` follows `main`. The versions live on the `gh-pages` branch, which the workflow then publishes
+as the Pages artifact; the repository's Pages source stays "GitHub Actions" and the `github-pages` environment, which
+allows `main` and `v*` tags, records every deployment. `gh workflow run docs.yml -f ref=<tag>` redeploys a release's
+docs; any other ref (or none) redeploys `dev`. `pixi run -e docs mike serve` previews every deployed version locally
+from `gh-pages`. Docs for 1.12.0 to 1.13.1 stay on aesir-oss/pixi-ext-contrib's site, where they were published.
 
 The `github-pages` environment's deployment branch policy must allow the `v*` tag pattern as well as `main`
 (Settings → Environments → github-pages), because a release event runs on the tag; without it the deploy job fails
@@ -399,8 +380,8 @@ binary once, as a wheel (step 5), cross-compiling osx-64 on the arm runner.
 
 ## The README recording
 
-`crates/pixi-sbom/docs/assets/demo.gif` is generated, not captured by hand: `pixi run demo` replays
-`crates/pixi-sbom/docs/assets/demo.tape` through [vhs](https://github.com/charmbracelet/vhs) and overwrites the GIF.
+`docs/assets/demo.gif` is generated, not captured by hand: `pixi run demo` replays
+`docs/assets/demo.tape` through [vhs](https://github.com/charmbracelet/vhs) and overwrites the GIF.
 Re-record it when the output it shows changes.
 
 **vhs is not a project dependency.** It pulls ttyd and ffmpeg — 95 packages, and it more than
@@ -415,7 +396,7 @@ Everything in the recording is real output from a release build. What is staged 
 `scripts/demo-workspace.sh` builds a throwaway workspace from the `with-pypi` fixture with urllib3
 pinned back to a vulnerable 1.26.4, and drops the recorded OSV and CISA KEV responses the tests
 already use into the cache, so the run needs no network and takes the same time every time. It
-makes the same substitution as `workspace_with_vulnerable_urllib3` in `crates/pixi-sbom/tests/cli.rs` and fails
+makes the same substitution as `workspace_with_vulnerable_urllib3` in `tests/cli.rs` and fails
 loudly if the fixture has drifted out from under it. The 1.8 clips add three more inputs: the recorded FIRST EPSS
 answer written into the cache the way a lookup leaves it, the OpenVEX fixture trimmed to its one urllib3 statement
 (so the clip is not buried in warnings about statements this workspace has nothing for), and syft's document for a
@@ -445,76 +426,30 @@ the second run of anything looks like.
 ## Releasing
 
 Two workflows. `release.yml` is run by hand from the Actions tab (*Release* → *Run workflow* on `main`) and ends at
-the tag push; that tag then starts `release-artifacts.yml`, which builds, signs and publishes everything. It serves
-every extension (#69): the tag's prefix (`pixi-sbom-v`, `pixi-policy-v`) picks the crate, binary, wheels and PyPI project,
-and the action repository and pre-commit mirror run for pixi-sbom only. A new extension is added to its `EXTENSIONS`
-and tag patterns and to `release.yml`'s `crate` options, and gets a maturin `pyproject.toml`; a test checks all four. One
-operator action, two runs.
+the tag push; that tag then starts `release-artifacts.yml`, which builds, signs and publishes everything: the archives
+(`pixi-sbom-vX.Y.Z-<platform>`), the wheels, the GitHub release, PyPI (TestPyPI for a release candidate), and, for a
+final, the action repository and the pre-commit mirror. One operator action, two runs. A final release is this
+repository's *Latest*; a release candidate never is.
 
-**Two kinds of release.** Each extension's releases (`pixi-sbom-vX.Y.Z`, release candidates included) are published
-with `make_latest: false`, so no extension holds GitHub's *Latest* badge. After every successful final release,
-`repository-release.yml` publishes the repository's own release, `pixi-ext-contrib-YYYY.MM.N` (N counts up within the
-month), marked *Latest*: no assets, just a table of every extension's newest final release. `scripts/repo_release.py`
-plans it from the release list and makes none when the newest repository release already lists the same versions, so
-a release candidate, a re-run or a dispatch from the Actions tab with nothing new changes nothing. Without it GitHub
-would show the newest full release as *Latest*, whichever extension that was. The repository tag matches no
-extension pattern (`v*`, `pixi-sbom-v*`, `cliff.toml`'s `tag_pattern`, the Action's lookup), which
-`pixi run repo-release-test` checks.
+Releases are tagged `vX.Y.Z`. Those up to 1.11.x were made in millsks/pixi-sbom and those from 1.12.0 to 1.13.1 in
+aesir-oss/pixi-ext-contrib (tagged `pixi-sbom-vX.Y.Z` there); their tags are carried here as `vX.Y.Z`, and their
+GitHub releases, archives and attestations stay in those repositories. The action reads all three release lists.
 
 `release.yml` inputs:
 
 | Input | Default | Meaning |
 |---|---|---|
-| `crate` | `pixi-sbom` | What to release: `pixi-sbom` or `pixi-policy`. The shared crate is never released. |
 | `version` | blank | Version to release without the `v` (e.g. `1.2.0`). Blank auto-increments the patch of the latest `v*` tag; for the very first release it uses `Cargo.toml`'s version. |
 | `force_recreate` | false | Delete an existing tag and release of that version first, then recreate them. |
 
 A **pre-release is expressed in the version**, not by a separate flag: `1.0.0-rc.1` is one and `1.0.0` is not.
 
-### The shared crate
-
-`pixi-ext-common` is never released (#106). Each extension compiles it from this repository as a path
-dependency, so a release of an extension carries whatever the shared crate holds at that commit, and its changes
-appear in the extension's changelog (#51).
-
 ### Changelogs
 
-Each extension has its own changelog beside its crate, `crates/<extension>/CHANGELOG.md`; the root `CHANGELOG.md`
-only links to them. `scripts/changelog.py` writes one with git-cliff from the commits that touched:
-
-- the extension's own crate;
-- every workspace crate it depends on, read from `cargo metadata`, so adding a dependency on a shared crate needs no
-  other change;
-- the extra paths its `Cargo.toml` claims under `[package.metadata.changelog] include`. pixi-sbom claims
-  `examples/**` and `actions/pixi-sbom/**`, and `docs/**` because its released sections list commits made when its
-  pages lived there; its pages are now in its crate (#6).
-
-A commit that touches only another extension, or only repository-wide files (`.github/`, `.claude/`, the root
-configuration), appears in no extension's changelog. A commit to a shared crate appears in the changelog of every
-extension built on it, because every one of those binaries changed. Releases are the extension's own
-`<extension>-vX.Y.Z` tags; release candidates are not sections of their own. `Cargo.lock` is never an include path:
-dependency bumps touch it for every crate, and they are `chore(deps)` commits, which the changelog skips anyway.
-
-`pixi run changelog-of paths pixi-sbom` prints the paths, and `pixi run changelog-of write pixi-sbom` regenerates the
-file with an *Unreleased* section if you want to preview it; do not commit that. `notes` prints the newest release's
-section, which is what the GitHub release carries. Commit types map to sections via `cliff.toml`: `feat` → Features,
-`fix` → Bug Fixes, `perf`, `refactor`, `docs`, `test`, `ci`/`build` → CI and Build; `chore` commits are omitted.
-
-**Work that spans a shared crate and the extensions** is split into pull requests by concern: the shared change first,
-then one pull request per extension that adopts it. Pull requests are squash-merged, so one that touches the shared
-crate and two extensions becomes a single commit in both extensions' changelogs, described in words that fit neither.
-Commit scopes stay the area of change (`feat(lock)`, `fix(diff)`); which extension a commit belongs to comes from the
-paths it touches, and its issue's label.
-
-**A new extension** gets its changelog with no setup: its first `write` creates `crates/<extension>/CHANGELOG.md`.
-Give its release workflow `changelog-of write <extension> --tag <extension>-vX.Y.Z` and `changelog-of notes
-<extension> --tag <tag>`, add a row to the root `CHANGELOG.md`, and claim any paths outside its crate in its `Cargo.toml`.
-
-**The shared crate**, `pixi-ext-common` in `crates/pixi-ext-common`, holds the code the
-extensions share. It is `publish = false` and never released (#106): each extension compiles it from this
-repository, and its README and crate docs say it is not an API. Extensions depend on it by path, under a short name:
-
-```toml
-[dependencies]
-common = { package = "pixi-ext-common", path = "../pixi-ext-common" }
-```
+`CHANGELOG.md` gets one section per release, added by `scripts/changelog.sh` (git-cliff, `cliff.toml`) below the
+header and above the newest section. Sections already there are never regenerated: those from 1.12.0 to 1.13.1 were
+written in aesir-oss/pixi-ext-contrib and those before in millsks/pixi-sbom, and their links point at the
+repositories they were written in. Never edit them. Release candidates are not sections of their own. Commit types map
+to sections via `cliff.toml`: `feat` → Features, `fix` → Bug Fixes, `perf`, `refactor`, `docs`, `test`,
+`ci`/`build` → CI and Build; `chore` commits are omitted. `pixi run changelog-notes` prints the newest release's
+section, which is what the GitHub release carries.

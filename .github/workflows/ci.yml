@@ -35,7 +35,10 @@ jobs:
         with:
           filters: |
             code:
-              - "crates/**"
+              - "src/**"
+              - "tests/**"
+              - "benches/**"
+              - "data/**"
               - "Cargo.toml"
               - "Cargo.lock"
               - "pixi.toml"
@@ -49,21 +52,15 @@ jobs:
               - "examples/**"
               - "README.md"
               - "mkdocs.yml"
-              - "crates/*/mkdocs.yml"
-              - "extensions.json"
               - "actions/pixi-sbom/action.yml"
               - ".github/workflows/release.yml"
               - ".github/workflows/release-artifacts.yml"
               - "scripts/whats_new.py"
             docs:
               - "docs/**"
-              - "crates/*/docs/**"
               - "mkdocs.yml"
-              - "crates/*/mkdocs.yml"
               - "mkdocs_hooks.py"
-              - "extensions.json"
               - "CHANGELOG.md"
-              - "crates/*/CHANGELOG.md"
               - "SECURITY.md"
               - ".github/workflows/ci.yml"
             deps:
@@ -72,16 +69,16 @@ jobs:
               - "deny.toml"
               - ".github/workflows/ci.yml"
             completion:
-              - "crates/pixi-sbom/src/cli.rs"
-              - "crates/pixi-sbom/src/main.rs"
+              - "src/cli.rs"
+              - "src/main.rs"
               - "Cargo.lock"
-              - "crates/pixi-sbom/docs/completion/**"
+              - "docs/completion/**"
               - "scripts/completion_e2e.py"
               - ".github/workflows/ci.yml"
             action:
               - "actions/**"
-              - "crates/pixi-sbom/src/cli.rs"
-              - "crates/pixi-sbom/src/main.rs"
+              - "src/cli.rs"
+              - "src/main.rs"
               - ".github/workflows/ci.yml"
       # On a pull request every OS runs the tests only for code; the files the tests read run them on Linux.
       - name: Which operating systems test
@@ -99,9 +96,9 @@ jobs:
           else
             echo 'list=[]' >> "$GITHUB_OUTPUT"
           fi
-      # Every binary the workspace builds (one per extension), for the Build matrix: a new extension joins it without
+      # Every binary the crate builds, for the Build matrix: a new binary joins it without
       # an edit here. --no-deps reads the manifests only; the runner's preinstalled cargo is enough.
-      - name: Which binaries the workspace builds
+      - name: Which binaries the crate builds
         id: bins
         run: |
           list=$(cargo metadata --no-deps --format-version 1 \
@@ -260,16 +257,6 @@ jobs:
       # a mistake here either blocks every release or ships one with the wrong heading.
       - name: The What's new release step's own tests
         run: pixi run whats-new-test
-      # Which repository release is made, and that its tag stays invisible to everything reading extension tags.
-      - name: The repository release planner's own tests
-        run: pixi run repo-release-test
-      # Where each site lands on gh-pages; a mistake here deletes published versions or the old layout's links.
-      - name: The Pages layout's own tests
-        run: pixi run pages-test
-      # Which commits each extension's changelog and release notes list; a mistake puts one extension's
-      # work in another's notes, or drops a shared crate's change from the extensions built on it.
-      - name: The per-extension changelog's own tests
-        run: pixi run changelog-test
       - name: The Grype comparison's own tests
         run: pixi run grype-compare-test
       - name: The CPE table upkeep's own tests
@@ -325,7 +312,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        # One job per extension, from cargo metadata (the changes job); each builds only its own binary.
+        # One job per binary, from cargo metadata (the changes job); each builds only its own binary.
         binary: ${{ fromJSON(needs.changes.outputs.binaries) }}
     steps:
       - uses: actions/checkout@v4

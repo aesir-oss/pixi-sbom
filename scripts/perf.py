@@ -240,7 +240,7 @@ SIZE_LIMIT_PERCENT = 5.0
 # Peak memory is steady within a few percent as long as both sides use the same allocator.
 # Every comparison now starts from v0.10.0, which has mimalloc, so they do. The limit was 60%
 # for one release, to let the 0.9.5 -> 0.10.0 allocator change through without failing every
-# comparison spanning it; that window is closed and crates/pixi-sbom/docs/benchmarks.md keeps the record of
+# comparison spanning it; that window is closed and docs/benchmarks.md keeps the record of
 # what that change cost.
 MEMORY_LIMIT_PERCENT = 15.0
 

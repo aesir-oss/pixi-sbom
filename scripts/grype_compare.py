@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-EXCEPTIONS = ROOT / "crates" / "pixi-sbom" / "tests" / "grype" / "exceptions.toml"
+EXCEPTIONS = ROOT / "tests" / "grype" / "exceptions.toml"
 SYFT = "syft==1.54.1"
 GRYPE = "grype==0.120.1"
 

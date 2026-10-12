@@ -1,0 +1,1329 @@
+//! CycloneDX 1.6 / 1.7 JSON serializer.
+
+use serde::Serialize;
+
+use super::{WriteContext, top_level_ids};
+use crate::cli::SpecVersion;
+use crate::license::{self, License};
+use crate::model::{Author, LicenseFile, Package, PackageKind, Sbom, Supplier, Vulnerability};
+
+const ROOT_REF: &str = "root";
+/// The document is derived from a lockfile, i.e. from resolved inputs before any build runs.
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct Bom {
+    #[serde(rename = "$schema")]
+    schema: &'static str,
+    bom_format: &'static str,
+    spec_version: &'static str,
+    serial_number: String,
+    version: u32,
+    metadata: Metadata,
+    components: Vec<Component>,
+    dependencies: Vec<Dependency>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    vulnerabilities: Vec<VulnerabilityEntry>,
+    /// CycloneDX 1.7 only: who supplied which fields.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    citations: Vec<Citation>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct VulnerabilityEntry {
+    #[serde(rename = "bom-ref")]
+    bom_ref: String,
+    id: String,
+    source: VulnSource,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    references: Vec<VulnReference>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    ratings: Vec<VulnRating>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    cwes: Vec<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    detail: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    recommendation: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    advisories: Vec<Advisory>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    published: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    updated: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    analysis: Option<AnalysisEntry>,
+    affects: Vec<Affects>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    properties: Vec<Property>,
+}
+
+#[derive(Debug, Serialize)]
+struct AnalysisEntry {
+    state: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    justification: Option<&'static str>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    response: Vec<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    detail: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct VulnSource {
+    name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    url: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct VulnReference {
+    id: String,
+    source: VulnSource,
+}
+
+#[derive(Debug, Serialize)]
+struct VulnRating {
+    source: VulnSource,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    score: Option<f64>,
+    severity: &'static str,
+    method: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    vector: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct Advisory {
+    url: String,
+}
+
+#[derive(Debug, Serialize)]
+struct Affects {
+    #[serde(rename = "ref")]
+    reference: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct Citation {
+    pointers: Vec<&'static str>,
+    timestamp: String,
+    attributed_to: String,
+    note: String,
+}
+
+impl SpecVersion {
+    /// The `specVersion` string; SPDX versions cannot reach this writer and fall back to 1.6.
+    fn number(self) -> &'static str {
+        match self {
+            SpecVersion::V1_7 => "1.7",
+            SpecVersion::V1_6 | SpecVersion::V2_3 | SpecVersion::V3_0 => "1.6",
+        }
+    }
+
+    fn schema_url(self) -> &'static str {
+        match self {
+            SpecVersion::V1_7 => "http://cyclonedx.org/schema/bom-1.7.schema.json",
+            SpecVersion::V1_6 | SpecVersion::V2_3 | SpecVersion::V3_0 => {
+                "http://cyclonedx.org/schema/bom-1.6.schema.json"
+            }
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct Metadata {
+    timestamp: String,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    lifecycles: Vec<Lifecycle>,
+    tools: Tools,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    authors: Vec<Contact>,
+    component: Component,
+    properties: Vec<Property>,
+}
+
+#[derive(Debug, Serialize)]
+struct Lifecycle {
+    phase: String,
+}
+
+#[derive(Debug, Serialize)]
+struct Contact {
+    name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    email: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct Entity {
+    name: String,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    url: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct Tools {
+    components: Vec<Component>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct Component {
+    #[serde(rename = "type")]
+    kind: &'static str,
+    #[serde(rename = "bom-ref")]
+    bom_ref: String,
+    name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    version: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    supplier: Option<Entity>,
+    /// NVD's identity for a native conda package, from `crate::cpe`'s table; never guessed.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    cpe: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    purl: Option<String>,
+    /// `required` or `optional`, when the input says which (see `crate::scope`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    scope: Option<&'static str>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    hashes: Vec<Hash>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    licenses: Vec<LicenseChoice>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    external_references: Vec<ExternalReference>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    properties: Vec<Property>,
+    /// Where an installed environment holds the component (`--prefix`); absent for a lockfile.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    evidence: Option<Evidence>,
+}
+
+#[derive(Debug, Serialize)]
+struct Evidence {
+    occurrences: Vec<Occurrence>,
+}
+
+#[derive(Debug, Serialize)]
+struct Occurrence {
+    location: String,
+}
+
+#[derive(Debug, Serialize)]
+struct Hash {
+    alg: &'static str,
+    content: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(untagged)]
+enum LicenseChoice {
+    Expression { expression: String },
+    License { license: LicenseObject },
+}
+
+/// A CycloneDX `license` object: an SPDX `id` or a free-text `name`, optionally with the text.
+#[derive(Debug, Serialize)]
+struct LicenseObject {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    text: Option<Attachment>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    acknowledgement: Option<&'static str>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct Attachment {
+    content_type: &'static str,
+    content: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ExternalReference {
+    #[serde(rename = "type")]
+    kind: &'static str,
+    url: String,
+}
+
+#[derive(Debug, Serialize)]
+struct Property {
+    name: String,
+    value: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct Dependency {
+    #[serde(rename = "ref")]
+    reference: String,
+    depends_on: Vec<String>,
+}
+
+/// Build the CycloneDX document for `sbom`.
+pub(crate) fn document(sbom: &Sbom, ctx: &WriteContext) -> Bom {
+    let mut dependencies = Vec::with_capacity(sbom.packages.len() + 1);
+    dependencies.push(Dependency {
+        reference: ROOT_REF.into(),
+        depends_on: top_level_ids(sbom).into_iter().map(str::to_string).collect(),
+    });
+    dependencies.extend(sbom.packages.iter().map(|p| Dependency {
+        reference: p.id.clone(),
+        depends_on: p.dependencies.clone(),
+    }));
+
+    let timestamp = ctx.timestamp.to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+    let citations = match ctx.spec_version {
+        SpecVersion::V1_6 | SpecVersion::V2_3 | SpecVersion::V3_0 => vec![],
+        SpecVersion::V1_7 => vec![Citation {
+            pointers: vec!["/metadata/component", "/components", "/dependencies"],
+            timestamp: timestamp.clone(),
+            attributed_to: tool_ref(ctx),
+            note: format!(
+                "Derived from the pixi {} (environment {}, platform {}) and the workspace manifest",
+                sbom.input_description(),
+                sbom.environment,
+                sbom.platform
+            ),
+        }],
+    };
+
+    Bom {
+        schema: ctx.spec_version.schema_url(),
+        bom_format: "CycloneDX",
+        spec_version: ctx.spec_version.number(),
+        serial_number: format!("urn:uuid:{}", ctx.uuid),
+        version: 1,
+        metadata: Metadata {
+            timestamp,
+            // The phase the input describes: a lockfile before anything is built, an installed
+            // environment in operation, or whatever the source document said.
+            lifecycles: sbom
+                .lifecycles
+                .iter()
+                .map(|phase| Lifecycle { phase: phase.clone() })
+                .collect(),
+            tools: Tools {
+                components: vec![tool_component(ctx)],
+            },
+            authors: sbom.root.authors.iter().map(contact).collect(),
+            component: root_component(sbom),
+            properties: [
+                property("pixi:environment", &sbom.environment),
+                property("pixi:platform", &sbom.platform),
+                property(sbom.input_property().0, sbom.input_property().1),
+            ]
+            .into_iter()
+            .chain((!sbom.excluded.is_empty()).then(|| property("pixi:excluded", &sbom.excluded.join(", "))))
+            .chain(
+                sbom.interpreter
+                    .as_deref()
+                    .map(|python| property("pixi:python-version", python)),
+            )
+            .chain(incomplete_properties(&sbom.incomplete))
+            .collect(),
+        },
+        components: sbom
+            .packages
+            .iter()
+            .map(|package| Component {
+                scope: sbom.scopes.get(&package.id).map(|scope| scope.cyclonedx()),
+                ..component(package)
+            })
+            .collect(),
+        dependencies,
+        vulnerabilities: sbom.vulnerabilities.iter().map(|v| vulnerability(v, sbom)).collect(),
+        citations,
+    }
+}
+
+/// What the run could not finish, as root metadata properties. Absent when everything
+/// answered, so a complete document is byte-for-byte what it always was.
+fn incomplete_properties(incomplete: &crate::model::Incomplete) -> Vec<Property> {
+    let mut properties = Vec::new();
+    if !incomplete.steps.is_empty() {
+        properties.push(property("pixi:incomplete", &incomplete.step_names().join(", ")));
+        properties.push(property("pixi:incomplete-detail", &incomplete.steps.join("; ")));
+    }
+    if !incomplete.stale.is_empty() {
+        properties.push(property("pixi:stale-cache", &incomplete.stale.join("; ")));
+    }
+    properties
+}
+
+/// The `vulnerabilities[]` entry for one finding. Aliases become `references` with the
+/// database they name (NVD for CVEs, GitHub for GHSAs, OSV otherwise); the recommendation
+/// names the fixed version per affected package.
+fn vulnerability(vuln: &Vulnerability, sbom: &Sbom) -> VulnerabilityEntry {
+    let references = vuln
+        .aliases
+        .iter()
+        .map(|alias| VulnReference {
+            id: alias.clone(),
+            source: alias_source(alias),
+        })
+        .collect();
+    let ratings = vuln
+        .ratings
+        .iter()
+        .map(|r| VulnRating {
+            source: VulnSource {
+                name: r.source.clone(),
+                url: None,
+            },
+            score: r.score,
+            severity: r.severity.name(),
+            method: r.method,
+            vector: r.vector.clone(),
+        })
+        .collect();
+    let mut upgrades: Vec<String> = vuln
+        .affects
+        .iter()
+        .filter_map(|a| {
+            let fixed = a.fixed_version.as_deref()?;
+            let name = sbom
+                .packages
+                .iter()
+                .find(|p| p.id == a.package_id)
+                .map(|p| p.name.as_str())
+                .unwrap_or(&a.package_id);
+            Some(format!("Upgrade {name} to {fixed}"))
+        })
+        .collect();
+    upgrades.dedup();
+    let mut properties = Vec::new();
+    if let Some(kev) = &vuln.kev {
+        properties.push(property("pixi:kev", "true"));
+        properties.push(property("pixi:kev-cve", &kev.cve_id));
+        if let Some(date) = &kev.date_added {
+            properties.push(property("pixi:kev-date-added", date));
+        }
+        if let Some(date) = &kev.due_date {
+            properties.push(property("pixi:kev-due-date", date));
+        }
+        properties.push(property(
+            "pixi:kev-ransomware",
+            if kev.ransomware { "true" } else { "false" },
+        ));
+        // With no fix to name, CISA's required action is the best advice there is.
+        if upgrades.is_empty()
+            && let Some(action) = &kev.required_action
+        {
+            upgrades.push(format!("CISA KEV: {action}"));
+        }
+    }
+    if let Some(source) = vuln.analysis.as_ref().and_then(|a| a.source.as_ref()) {
+        properties.push(property("pixi:vex-source", source));
+    }
+    if let Some(epss) = &vuln.epss {
+        properties.push(property("pixi:epss", &epss.score.to_string()));
+        properties.push(property("pixi:epss-percentile", &epss.percentile.to_string()));
+        properties.push(property("pixi:epss-cve", &epss.cve_id));
+        if let Some(date) = &epss.date {
+            properties.push(property("pixi:epss-date", date));
+        }
+    }
+    VulnerabilityEntry {
+        bom_ref: format!("vuln-{}", vuln.id),
+        id: vuln.id.clone(),
+        source: VulnSource {
+            name: vuln.source.clone(),
+            url: Some(vuln.url.clone()),
+        },
+        references,
+        ratings,
+        cwes: vuln.cwes.clone(),
+        description: vuln.summary.clone(),
+        detail: vuln.details.clone(),
+        recommendation: (!upgrades.is_empty()).then(|| upgrades.join("; ")),
+        advisories: vuln
+            .references
+            .iter()
+            .map(|url| Advisory { url: url.clone() })
+            .collect(),
+        published: vuln.published.clone(),
+        updated: vuln.modified.clone(),
+        analysis: vuln.analysis.as_ref().map(|a| AnalysisEntry {
+            state: a.state,
+            justification: a.justification,
+            response: a.response.clone(),
+            detail: a.detail.clone(),
+        }),
+        affects: vuln
+            .affects
+            .iter()
+            .map(|a| Affects {
+                reference: a.package_id.clone(),
+            })
+            .collect(),
+        properties,
+    }
+}
+
+/// A standalone CycloneDX VEX for `sbom`: the same findings, no components, and every
+/// `affects[].ref` a BOM-Link into the document this run writes, so the two can be published
+/// and updated separately.
+///
+/// Every finding carries an analysis: the one `--ignore-vuln` gave it, or `open_state` for the
+/// ones nobody has assessed.
+pub(crate) fn vex(sbom: &Sbom, ctx: &WriteContext, open_state: &'static str) -> Bom {
+    // The VEX is its own document, with its own identity derived from the SBOM's, so the two
+    // never share a serial number.
+    let serial = uuid::Uuid::new_v5(&ctx.uuid, b"vex");
+    let link = |package_id: &str| format!("urn:cdx:{}/{}#{package_id}", ctx.uuid, 1);
+    let mut document = document(sbom, ctx);
+    document.serial_number = format!("urn:uuid:{serial}");
+    document.components = Vec::new();
+    document.dependencies = Vec::new();
+    document.citations = Vec::new();
+    document
+        .metadata
+        .properties
+        .push(property("pixi:vex-for", &format!("urn:uuid:{}", ctx.uuid)));
+    document.vulnerabilities = sbom
+        .vulnerabilities
+        .iter()
+        .map(|vuln| {
+            let mut entry = vulnerability(vuln, sbom);
+            entry.analysis = Some(entry.analysis.unwrap_or(AnalysisEntry {
+                state: open_state,
+                justification: None,
+                response: Vec::new(),
+                detail: None,
+            }));
+            entry.affects = vuln
+                .affects
+                .iter()
+                .map(|a| Affects {
+                    reference: link(&a.package_id),
+                })
+                .collect();
+            entry
+        })
+        .collect();
+    document
+}
+
+/// Where an alias id can be looked up.
+fn alias_source(id: &str) -> VulnSource {
+    if id.starts_with("CVE-") {
+        VulnSource {
+            name: "NVD".into(),
+            url: Some(format!("https://nvd.nist.gov/vuln/detail/{id}")),
+        }
+    } else if id.starts_with("GHSA-") {
+        VulnSource {
+            name: "GitHub Advisory Database".into(),
+            url: Some(format!("https://github.com/advisories/{id}")),
+        }
+    } else {
+        VulnSource {
+            name: "OSV".into(),
+            url: Some(crate::osv::record_url(id)),
+        }
+    }
+}
+
+fn tool_ref(ctx: &WriteContext) -> String {
+    format!("pkg:cargo/pixi-sbom@{}", ctx.tool_version)
+}
+
+fn tool_component(ctx: &WriteContext) -> Component {
+    Component {
+        kind: "application",
+        bom_ref: tool_ref(ctx),
+        name: "pixi-sbom".into(),
+        version: Some(ctx.tool_version.clone()),
+        description: None,
+        supplier: None,
+        cpe: None,
+        purl: None,
+        scope: None,
+        hashes: vec![],
+        licenses: vec![],
+        external_references: vec![ExternalReference {
+            kind: "vcs",
+            url: env!("CARGO_PKG_REPOSITORY").into(),
+        }],
+        properties: vec![],
+        evidence: None,
+    }
+}
+
+fn root_component(sbom: &Sbom) -> Component {
+    let root = &sbom.root;
+    Component {
+        kind: "application",
+        bom_ref: ROOT_REF.into(),
+        name: root.name.clone(),
+        version: root.version.clone(),
+        description: None,
+        supplier: None,
+        cpe: None,
+        purl: None,
+        scope: None,
+        hashes: vec![],
+        licenses: root.license.as_deref().and_then(license_choice).into_iter().collect(),
+        external_references: project_references(root.homepage.as_deref(), root.repository.as_deref(), None),
+        properties: vec![],
+        evidence: None,
+    }
+}
+
+fn project_references(
+    homepage: Option<&str>,
+    repository: Option<&str>,
+    documentation: Option<&str>,
+) -> Vec<ExternalReference> {
+    [
+        ("website", homepage),
+        ("vcs", repository),
+        ("documentation", documentation),
+    ]
+    .into_iter()
+    .filter_map(|(kind, url)| {
+        url.map(|url| ExternalReference {
+            kind,
+            url: url.to_string(),
+        })
+    })
+    .collect()
+}
+
+fn contact(author: &Author) -> Contact {
+    Contact {
+        name: author.name.clone(),
+        email: author.email.clone(),
+    }
+}
+
+fn entity(supplier: &Supplier) -> Entity {
+    Entity {
+        name: supplier.name.clone(),
+        url: supplier.url.iter().cloned().collect(),
+    }
+}
+
+fn component(package: &Package) -> Component {
+    let mut properties: Vec<Property> = package
+        .properties
+        .iter()
+        .filter(|(k, _)| k.as_str() != crate::cpe::DOCUMENT_CPE)
+        .map(|(k, v)| property(k, v))
+        .collect();
+    properties.push(property("pixi:kind", kind_name(package.kind)));
+    properties.extend(package.extra_purls.iter().map(|purl| property("pixi:purl", purl)));
+    let licenses = package_licenses(package);
+    if !matches!(licenses.first(), Some(LicenseChoice::License { .. })) {
+        // File names travel as properties whenever they are not carried as license objects.
+        properties.extend(
+            package
+                .license_files
+                .iter()
+                .map(|f| property("pixi:license-file", &f.name)),
+        );
+    }
+
+    let mut hashes = Vec::new();
+    if let Some(sha256) = &package.sha256 {
+        hashes.push(Hash {
+            alg: "SHA-256",
+            content: sha256.clone(),
+        });
+    }
+    if let Some(md5) = &package.md5 {
+        hashes.push(Hash {
+            alg: "MD5",
+            content: md5.clone(),
+        });
+    }
+    if let Some(sha512) = &package.sha512 {
+        hashes.push(Hash {
+            alg: "SHA-512",
+            content: sha512.clone(),
+        });
+    }
+
+    Component {
+        kind: "library",
+        bom_ref: package.id.clone(),
+        name: package.name.clone(),
+        version: package.version.clone(),
+        description: package.description.clone(),
+        supplier: package.supplier.as_ref().map(entity),
+        cpe: crate::cpe::for_package(package),
+        purl: Some(package.purl.clone()),
+        scope: None,
+        hashes,
+        licenses,
+        // A package may have no known location: Poetry records file names and hashes, not URLs.
+        external_references: (!package.location.is_empty())
+            .then(|| ExternalReference {
+                kind: if package.location.starts_with("git+") {
+                    "vcs"
+                } else {
+                    "distribution"
+                },
+                url: package.location.clone(),
+            })
+            .into_iter()
+            .chain(project_references(
+                package.homepage.as_deref(),
+                package.repository.as_deref(),
+                package.documentation.as_deref(),
+            ))
+            .collect(),
+        properties,
+        evidence: (!package.occurrences.is_empty()).then(|| Evidence {
+            occurrences: package
+                .occurrences
+                .iter()
+                .map(|location| Occurrence {
+                    location: location.clone(),
+                })
+                .collect(),
+        }),
+    }
+}
+
+/// The `licenses` array for a package. Without texts this is the declared license as an
+/// expression or a name, as always. With texts (`--license-texts`) CycloneDX allows either one
+/// expression or a list of license objects, so texts are attached only when the declared
+/// license is a single SPDX identifier (as `id` + `text`) or free text (as `name` + `text`);
+/// a compound expression is kept as is and the files are listed as properties instead.
+/// Additional files become further named entries.
+fn package_licenses(package: &Package) -> Vec<LicenseChoice> {
+    let with_text: Vec<&LicenseFile> = package.license_files.iter().filter(|f| f.text.is_some()).collect();
+    let Some(raw) = package.license.as_deref() else {
+        return with_text.iter().map(|f| named_file(f)).collect();
+    };
+    let (first, files) = match license::normalize(raw) {
+        License::Expression(expression) if with_text.is_empty() || !license::is_single_id(&expression) => {
+            return vec![LicenseChoice::Expression { expression }];
+        }
+        // A LicenseRef- is a valid expression but not an SPDX list identifier, which is all
+        // the `id` field accepts; it travels as a name.
+        License::Expression(id) => (
+            LicenseObject {
+                name: id.starts_with("LicenseRef-").then(|| id.clone()),
+                id: (!id.starts_with("LicenseRef-")).then_some(id),
+                text: with_text.first().map(|f| attachment(f)),
+                acknowledgement: Some("declared"),
+            },
+            &with_text[1..],
+        ),
+        License::Text(name) if name.is_empty() => return vec![],
+        License::Text(name) => (
+            LicenseObject {
+                id: None,
+                name: Some(name),
+                text: with_text.first().map(|f| attachment(f)),
+                acknowledgement: with_text.first().map(|_| "declared"),
+            },
+            with_text.get(1..).unwrap_or_default(),
+        ),
+    };
+    std::iter::once(LicenseChoice::License { license: first })
+        .chain(files.iter().map(|f| named_file(f)))
+        .collect()
+}
+
+fn named_file(file: &LicenseFile) -> LicenseChoice {
+    LicenseChoice::License {
+        license: LicenseObject {
+            id: None,
+            name: Some(file.name.clone()),
+            text: Some(attachment(file)),
+            acknowledgement: None,
+        },
+    }
+}
+
+fn attachment(file: &LicenseFile) -> Attachment {
+    Attachment {
+        content_type: "text/plain",
+        content: file.text.clone().unwrap_or_default(),
+    }
+}
+
+fn license_choice(raw: &str) -> Option<LicenseChoice> {
+    match license::normalize(raw) {
+        License::Expression(expression) => Some(LicenseChoice::Expression { expression }),
+        License::Text(name) if name.is_empty() => None,
+        License::Text(name) => Some(LicenseChoice::License {
+            license: LicenseObject {
+                id: None,
+                name: Some(name),
+                text: None,
+                acknowledgement: None,
+            },
+        }),
+    }
+}
+
+fn kind_name(kind: PackageKind) -> &'static str {
+    kind.name()
+}
+
+fn property(name: &str, value: &str) -> Property {
+    Property {
+        name: name.into(),
+        value: value.into(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::format::testing::{fixed_context, sample_sbom};
+
+    fn json() -> serde_json::Value {
+        serde_json::to_value(document(&sample_sbom(), &fixed_context())).unwrap()
+    }
+
+    #[test]
+    fn snapshot() {
+        insta::assert_json_snapshot!(json());
+    }
+
+    #[test]
+    fn snapshot_1_7() {
+        let doc = serde_json::to_value(document(&sample_sbom(), &crate::format::testing::fixed_context_1_7())).unwrap();
+        insta::assert_json_snapshot!(doc);
+    }
+
+    #[test]
+    fn an_incomplete_run_says_so_in_the_root_metadata() {
+        // Everything answered: the document is what it always was.
+        let properties = json()["metadata"]["properties"].clone();
+        let names: Vec<&str> = properties
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|p| p["name"].as_str().unwrap())
+            .collect();
+        assert!(!names.contains(&"pixi:incomplete"), "{names:?}");
+        assert!(!names.contains(&"pixi:incomplete-detail"), "{names:?}");
+        assert!(!names.contains(&"pixi:stale-cache"), "{names:?}");
+
+        let mut sbom = sample_sbom();
+        sbom.incomplete.note_failures("pypi-releases", 12, 38, "index lookups");
+        sbom.incomplete
+            .note("osv: 0 of 24 packages queryable (no purl the database answers to)");
+        sbom.incomplete.stale = vec!["kev: 9 days old".into()];
+        let doc = serde_json::to_value(document(&sbom, &fixed_context())).unwrap();
+        let properties = doc["metadata"]["properties"].as_array().unwrap().clone();
+        let value = |name: &str| {
+            properties
+                .iter()
+                .find(|p| p["name"] == name)
+                .map(|p| p["value"].as_str().unwrap().to_string())
+        };
+        assert_eq!(value("pixi:incomplete").as_deref(), Some("osv, pypi-releases"));
+        assert_eq!(
+            value("pixi:incomplete-detail").as_deref(),
+            Some(
+                "osv: 0 of 24 packages queryable (no purl the database answers to); \
+                 pypi-releases: 12 of 38 index lookups failed"
+            )
+        );
+        assert_eq!(value("pixi:stale-cache").as_deref(), Some("kev: 9 days old"));
+
+        // Old data on its own is not a failed step.
+        let mut only_stale = sample_sbom();
+        only_stale.incomplete.stale = vec!["mapping: 3 days old".into()];
+        let doc = serde_json::to_value(document(&only_stale, &fixed_context())).unwrap();
+        let properties = doc["metadata"]["properties"].as_array().unwrap().clone();
+        assert!(properties.iter().all(|p| p["name"] != "pixi:incomplete"));
+        assert!(properties.iter().any(|p| p["name"] == "pixi:stale-cache"));
+    }
+
+    #[test]
+    fn spec_version_1_7_adds_schema_and_citation() {
+        let doc = json();
+        assert_eq!(doc["specVersion"], "1.6");
+        assert_eq!(doc["$schema"], "http://cyclonedx.org/schema/bom-1.6.schema.json");
+        assert!(doc.get("citations").is_none());
+
+        let doc = serde_json::to_value(document(&sample_sbom(), &crate::format::testing::fixed_context_1_7())).unwrap();
+        assert_eq!(doc["specVersion"], "1.7");
+        assert_eq!(doc["$schema"], "http://cyclonedx.org/schema/bom-1.7.schema.json");
+        let citation = &doc["citations"][0];
+        assert_eq!(citation["attributedTo"], "pkg:cargo/pixi-sbom@0.0.0-test");
+        assert_eq!(citation["pointers"][1], "/components");
+        assert_eq!(citation["timestamp"], "2026-09-18T12:00:00Z");
+        assert!(citation["note"].as_str().unwrap().contains("pixi.lock"));
+        assert_eq!(doc["serialNumber"], json()["serialNumber"]);
+    }
+
+    #[test]
+    fn header_and_metadata() {
+        let doc = json();
+        assert_eq!(doc["bomFormat"], "CycloneDX");
+        assert_eq!(doc["specVersion"], "1.6");
+        assert_eq!(doc["serialNumber"], "urn:uuid:11111111-2222-4333-8444-555555555555");
+        assert_eq!(doc["metadata"]["timestamp"], "2026-09-18T12:00:00Z");
+        assert_eq!(doc["metadata"]["component"]["name"], "demo");
+        assert_eq!(doc["metadata"]["component"]["version"], "2.0.0");
+        assert_eq!(doc["metadata"]["tools"]["components"][0]["name"], "pixi-sbom");
+        assert_eq!(doc["metadata"]["tools"]["components"][0]["version"], "0.0.0-test");
+        assert_eq!(doc["metadata"]["lifecycles"][0]["phase"], "pre-build");
+    }
+
+    #[test]
+    fn authors_and_root_metadata_come_from_the_manifest() {
+        let doc = json();
+        let authors = doc["metadata"]["authors"].as_array().unwrap();
+        assert_eq!(authors.len(), 2);
+        assert_eq!(authors[0]["name"], "Ada Lovelace");
+        assert_eq!(authors[0]["email"], "ada@example.org");
+        assert!(authors[1].get("email").is_none());
+        let root = &doc["metadata"]["component"];
+        assert_eq!(root["licenses"][0]["expression"], "Apache-2.0");
+        assert_eq!(root["externalReferences"][0]["type"], "website");
+        assert_eq!(root["externalReferences"][0]["url"], "https://demo.example");
+        assert_eq!(root["externalReferences"][1]["type"], "vcs");
+        assert!(root.get("supplier").is_none());
+
+        let mut bare = sample_sbom();
+        bare.root = crate::model::Root {
+            name: "bare".into(),
+            ..Default::default()
+        };
+        let doc = serde_json::to_value(document(&bare, &fixed_context())).unwrap();
+        assert!(doc["metadata"].get("authors").is_none());
+        assert!(doc["metadata"]["component"].get("licenses").is_none());
+        assert!(doc["metadata"]["component"].get("externalReferences").is_none());
+    }
+
+    #[test]
+    fn suppliers_are_channels_and_indexes() {
+        let doc = json();
+        let components = doc["components"].as_array().unwrap();
+        let by_name = |name: &str| components.iter().find(|c| c["name"] == name).unwrap();
+        assert_eq!(by_name("libzlib")["supplier"]["name"], "conda-forge");
+        assert_eq!(
+            by_name("libzlib")["supplier"]["url"][0],
+            "https://conda.anaconda.org/conda-forge/"
+        );
+        assert!(by_name("zlib")["supplier"].get("url").is_none());
+        assert_eq!(by_name("six")["supplier"]["name"], "pypi.org");
+        assert!(by_name("mylib").get("supplier").is_none());
+    }
+
+    #[test]
+    fn licenses_are_expressions_ids_with_text_or_names() {
+        let doc = json();
+        let components = doc["components"].as_array().unwrap();
+        let by_name = |name: &str| components.iter().find(|c| c["name"] == name).unwrap();
+
+        // Single SPDX id with a license file: id + text.
+        let libzlib = &by_name("libzlib")["licenses"];
+        assert_eq!(libzlib[0]["license"]["id"], "Zlib");
+        assert_eq!(libzlib[0]["license"]["text"]["contentType"], "text/plain");
+        assert_eq!(libzlib[0]["license"]["text"]["content"], "zlib license text");
+        assert_eq!(libzlib[0]["license"]["acknowledgement"], "declared");
+        assert_eq!(libzlib.as_array().unwrap().len(), 1);
+
+        // Files without text (no --license-texts): expression plus file-name properties.
+        let zlib = by_name("zlib");
+        assert_eq!(zlib["licenses"][0]["expression"], "MIT OR Apache-2.0");
+        assert_eq!(zlib["licenses"].as_array().unwrap().len(), 1);
+        let files: Vec<_> = zlib["properties"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|p| p["name"] == "pixi:license-file")
+            .map(|p| p["value"].as_str().unwrap())
+            .collect();
+        assert_eq!(files, ["LICENSE-APACHE", "LICENSE-MIT"]);
+
+        // Free text with a file: name + text.
+        let mylib = &by_name("mylib")["licenses"][0]["license"];
+        assert_eq!(mylib["name"], "Proprietary");
+        assert_eq!(mylib["text"]["content"], "all rights reserved");
+        assert!(mylib.get("id").is_none());
+
+        assert!(by_name("six").get("licenses").is_none());
+    }
+
+    #[test]
+    fn license_ref_with_text_is_a_named_license_not_an_id() {
+        let mut sbom = sample_sbom();
+        sbom.packages[0].license = Some("LicenseRef-Public-Domain".into());
+        let doc = serde_json::to_value(document(&sbom, &fixed_context())).unwrap();
+        let license = &doc["components"][0]["licenses"][0]["license"];
+        assert_eq!(license["name"], "LicenseRef-Public-Domain");
+        assert!(license.get("id").is_none());
+        assert_eq!(license["text"]["content"], "zlib license text");
+        // Without a text it stays an expression, as before.
+        sbom.packages[0].license_files.clear();
+        let doc = serde_json::to_value(document(&sbom, &fixed_context())).unwrap();
+        assert_eq!(
+            doc["components"][0]["licenses"][0]["expression"],
+            "LicenseRef-Public-Domain"
+        );
+    }
+
+    #[test]
+    fn compound_expression_with_texts_keeps_the_expression() {
+        let mut sbom = sample_sbom();
+        for file in &mut sbom.packages[1].license_files {
+            file.text = Some(format!("text of {}", file.name));
+        }
+        let doc = serde_json::to_value(document(&sbom, &fixed_context())).unwrap();
+        let zlib = doc["components"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|c| c["name"] == "zlib")
+            .unwrap();
+        assert_eq!(zlib["licenses"][0]["expression"], "MIT OR Apache-2.0");
+        assert_eq!(zlib["licenses"].as_array().unwrap().len(), 1);
+        assert_eq!(
+            zlib["properties"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter(|p| p["name"] == "pixi:license-file")
+                .count(),
+            2
+        );
+    }
+
+    #[test]
+    fn extra_license_files_become_named_entries_and_no_text_means_plain_choice() {
+        let mut sbom = sample_sbom();
+        sbom.packages[0].license_files.push(crate::model::LicenseFile {
+            name: "NOTICE".into(),
+            text: Some("notice".into()),
+        });
+        sbom.packages[2].license_files.clear();
+        sbom.packages[3].license_files.push(crate::model::LicenseFile {
+            name: "LICENSE".into(),
+            text: Some("six text".into()),
+        });
+        let doc = serde_json::to_value(document(&sbom, &fixed_context())).unwrap();
+        let components = doc["components"].as_array().unwrap();
+        let by_name = |name: &str| components.iter().find(|c| c["name"] == name).unwrap();
+        let libzlib = by_name("libzlib")["licenses"].as_array().unwrap();
+        assert_eq!(libzlib.len(), 2);
+        assert_eq!(libzlib[1]["license"]["name"], "NOTICE");
+        assert_eq!(libzlib[1]["license"]["text"]["content"], "notice");
+        assert_eq!(by_name("mylib")["licenses"][0]["license"]["name"], "Proprietary");
+        assert!(by_name("mylib")["licenses"][0]["license"].get("text").is_none());
+        // No declared license but a file: the file alone.
+        assert_eq!(by_name("six")["licenses"][0]["license"]["name"], "LICENSE");
+    }
+
+    #[test]
+    fn package_metadata_becomes_description_and_references() {
+        let doc = json();
+        let components = doc["components"].as_array().unwrap();
+        let by_name = |name: &str| components.iter().find(|c| c["name"] == name).unwrap();
+        let libzlib = by_name("libzlib");
+        assert_eq!(libzlib["description"], "zlib data compression library");
+        let refs: Vec<_> = libzlib["externalReferences"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|r| (r["type"].as_str().unwrap(), r["url"].as_str().unwrap()))
+            .collect();
+        assert_eq!(
+            refs,
+            [
+                (
+                    "distribution",
+                    "https://conda.anaconda.org/conda-forge/linux-64/libzlib-1.3.1-h1.conda"
+                ),
+                ("website", "https://zlib.net"),
+                ("vcs", "https://github.com/madler/zlib"),
+            ]
+        );
+        assert_eq!(by_name("zlib")["externalReferences"][1]["type"], "documentation");
+        assert!(by_name("six").get("description").is_none());
+    }
+
+    #[test]
+    fn hashes_and_references() {
+        let doc = json();
+        let libzlib = &doc["components"][0];
+        assert_eq!(libzlib["hashes"][0]["alg"], "SHA-256");
+        assert_eq!(libzlib["hashes"][1]["alg"], "MD5");
+        assert_eq!(libzlib["externalReferences"][0]["type"], "distribution");
+        let mylib = doc["components"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|c| c["name"] == "mylib")
+            .unwrap();
+        assert!(mylib.get("hashes").is_none());
+        assert!(mylib.get("version").is_none());
+    }
+
+    #[test]
+    fn dependency_graph_starts_at_root() {
+        let doc = json();
+        let deps = doc["dependencies"].as_array().unwrap();
+        assert_eq!(deps[0]["ref"], "root");
+        assert_eq!(deps[0]["dependsOn"].as_array().unwrap().len(), 2);
+        let zlib = deps
+            .iter()
+            .find(|d| d["ref"].as_str().unwrap().contains("/zlib@"))
+            .unwrap();
+        assert!(zlib["dependsOn"][0].as_str().unwrap().contains("libzlib"));
+    }
+
+    #[test]
+    fn git_locations_are_vcs_references() {
+        let mut sbom = sample_sbom();
+        sbom.packages[2].location = "git+https://example.com/repo.git@abc".into();
+        let doc = serde_json::to_value(document(&sbom, &fixed_context())).unwrap();
+        let mylib = doc["components"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|c| c["name"] == "mylib")
+            .unwrap();
+        assert_eq!(mylib["externalReferences"][0]["type"], "vcs");
+    }
+
+    #[test]
+    fn extra_purls_become_properties() {
+        let doc = json();
+        let zlib = doc["components"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|c| c["name"] == "zlib")
+            .unwrap();
+        let props = zlib["properties"].as_array().unwrap();
+        assert!(
+            props
+                .iter()
+                .any(|p| p["name"] == "pixi:purl" && p["value"] == "pkg:pypi/zlib@1.3.1")
+        );
+        assert!(props.iter().any(|p| p["name"] == "pixi:kind" && p["value"] == "conda"));
+    }
+
+    #[test]
+    fn a_vex_carries_only_findings_and_links_them_into_the_sbom() {
+        use crate::model::{Affected, Analysis, Vulnerability};
+        let mut sbom = sample_sbom();
+        let finding = |id: &str, analysis: Option<Analysis>| Vulnerability {
+            id: id.into(),
+            source: "OSV".into(),
+            url: format!("https://osv.dev/vulnerability/{id}"),
+            aliases: Vec::new(),
+            summary: None,
+            details: None,
+            severity: crate::model::Severity::High,
+            ratings: Vec::new(),
+            cwes: Vec::new(),
+            references: Vec::new(),
+            published: None,
+            modified: None,
+            affects: vec![Affected {
+                package_id: "pkg:pypi/six@1.17.0".into(),
+                purl: "pkg:pypi/six@1.17.0".into(),
+                fixed_version: None,
+            }],
+            analysis,
+            kev: None,
+            epss: None,
+        };
+        sbom.vulnerabilities.push(finding("GHSA-open", None));
+        sbom.vulnerabilities.push(finding(
+            "GHSA-assessed",
+            Some(Analysis {
+                state: "not_affected",
+                justification: Some("code_not_reachable"),
+                response: vec!["will_not_fix"],
+                detail: Some("only used at build time".into()),
+                source: None,
+            }),
+        ));
+
+        let ctx = fixed_context();
+        let doc = serde_json::to_value(vex(&sbom, &ctx, "in_triage")).unwrap();
+        assert_eq!(doc["bomFormat"], "CycloneDX");
+        assert!(doc["components"].as_array().unwrap().is_empty());
+        assert!(doc["dependencies"].as_array().unwrap().is_empty());
+        assert_ne!(
+            doc["serialNumber"],
+            format!("urn:uuid:{}", ctx.uuid),
+            "its own identity"
+        );
+        assert!(
+            doc["metadata"]["properties"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|p| p["name"] == "pixi:vex-for" && p["value"] == format!("urn:uuid:{}", ctx.uuid))
+        );
+        let findings = doc["vulnerabilities"].as_array().unwrap();
+        assert_eq!(findings.len(), 2);
+        // The assessment that was given survives; the one nobody made gets the open state.
+        assert_eq!(findings[0]["analysis"]["state"], "in_triage");
+        assert_eq!(findings[1]["analysis"]["state"], "not_affected");
+        assert_eq!(findings[1]["analysis"]["detail"], "only used at build time");
+        assert_eq!(findings[1]["analysis"]["justification"], "code_not_reachable");
+        assert!(findings[0]["analysis"].get("justification").is_none());
+        assert_eq!(findings[1]["analysis"]["response"], serde_json::json!(["will_not_fix"]));
+        assert!(
+            findings[0]["analysis"].get("response").is_none(),
+            "an empty list is left out"
+        );
+        assert_eq!(
+            findings[0]["affects"][0]["ref"],
+            format!("urn:cdx:{}/1#pkg:pypi/six@1.17.0", ctx.uuid),
+            "a BOM-Link element into the SBOM"
+        );
+        // And the open state is what the caller asked for.
+        let doc = serde_json::to_value(vex(&sbom, &ctx, "exploitable")).unwrap();
+        assert_eq!(doc["vulnerabilities"][0]["analysis"]["state"], "exploitable");
+    }
+
+    #[test]
+    fn vulnerabilities_become_entries_with_references_ratings_and_affects() {
+        use crate::model::{Affected, Rating, Severity, Vulnerability};
+        let mut sbom = sample_sbom();
+        sbom.vulnerabilities.push(Vulnerability {
+            id: "GHSA-q2q7-5pp4-w6pg".into(),
+            source: "OSV".into(),
+            url: "https://osv.dev/vulnerability/GHSA-q2q7-5pp4-w6pg".into(),
+            aliases: vec!["CVE-2021-33503".into(), "PYSEC-2021-108".into()],
+            summary: Some("Catastrophic backtracking".into()),
+            details: Some("Long text".into()),
+            severity: Severity::High,
+            ratings: vec![
+                Rating {
+                    source: "GitHub Advisory Database".into(),
+                    score: None,
+                    severity: Severity::High,
+                    method: "other",
+                    vector: None,
+                },
+                Rating {
+                    source: "OSV".into(),
+                    score: Some(7.5),
+                    severity: Severity::High,
+                    method: "CVSSv31",
+                    vector: Some("CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H".into()),
+                },
+            ],
+            cwes: vec![400],
+            references: vec!["https://github.com/advisories/GHSA-q2q7-5pp4-w6pg".into()],
+            published: Some("2021-06-01T21:19:32Z".into()),
+            modified: Some("2026-07-08T06:00:54.217433740Z".into()),
+            affects: vec![Affected {
+                package_id: "pkg:pypi/six@1.17.0".into(),
+                purl: "pkg:pypi/six@1.17.0".into(),
+                fixed_version: Some("1.26.5".into()),
+            }],
+            analysis: Some(crate::model::Analysis {
+                state: "not_affected",
+                justification: Some("requires_environment"),
+                response: vec![],
+                detail: Some("only used at build time".into()),
+                source: None,
+            }),
+            kev: Some(crate::model::Kev {
+                cve_id: "CVE-2021-33503".into(),
+                name: None,
+                date_added: Some("2026-09-01".into()),
+                due_date: Some("2026-09-22".into()),
+                ransomware: true,
+                required_action: Some("Apply updates per vendor instructions.".into()),
+            }),
+            epss: Some(crate::model::Epss {
+                cve_id: "CVE-2021-33503".into(),
+                score: 0.03273,
+                percentile: 0.88073,
+                date: Some("2026-10-08".into()),
+            }),
+        });
+        let doc = serde_json::to_value(document(&sbom, &fixed_context())).unwrap();
+        let vuln = &doc["vulnerabilities"][0];
+        assert_eq!(vuln["analysis"]["state"], "not_affected");
+        assert_eq!(vuln["analysis"]["detail"], "only used at build time");
+        assert_eq!(vuln["analysis"]["justification"], "requires_environment");
+        let props = vuln["properties"].as_array().unwrap();
+        assert!(props.iter().any(|p| p["name"] == "pixi:kev" && p["value"] == "true"));
+        assert!(
+            props
+                .iter()
+                .any(|p| p["name"] == "pixi:kev-due-date" && p["value"] == "2026-09-22")
+        );
+        assert!(
+            props
+                .iter()
+                .any(|p| p["name"] == "pixi:kev-ransomware" && p["value"] == "true")
+        );
+        assert!(
+            props
+                .iter()
+                .any(|p| p["name"] == "pixi:epss" && p["value"] == "0.03273")
+        );
+        assert!(
+            props
+                .iter()
+                .any(|p| p["name"] == "pixi:epss-percentile" && p["value"] == "0.88073")
+        );
+        assert!(
+            props
+                .iter()
+                .any(|p| p["name"] == "pixi:epss-date" && p["value"] == "2026-10-08")
+        );
+
+        // Without a fixed version, the KEV required action is the recommendation.
+        sbom.vulnerabilities[0].affects[0].fixed_version = None;
+        let doc = serde_json::to_value(document(&sbom, &fixed_context())).unwrap();
+        assert_eq!(
+            doc["vulnerabilities"][0]["recommendation"],
+            "CISA KEV: Apply updates per vendor instructions."
+        );
+        assert_eq!(vuln["bom-ref"], "vuln-GHSA-q2q7-5pp4-w6pg");
+        assert_eq!(vuln["id"], "GHSA-q2q7-5pp4-w6pg");
+        assert_eq!(vuln["source"]["name"], "OSV");
+        assert_eq!(vuln["references"][0]["id"], "CVE-2021-33503");
+        assert_eq!(vuln["references"][0]["source"]["name"], "NVD");
+        assert_eq!(
+            vuln["references"][0]["source"]["url"],
+            "https://nvd.nist.gov/vuln/detail/CVE-2021-33503"
+        );
+        assert_eq!(vuln["references"][1]["source"]["name"], "OSV");
+        assert_eq!(vuln["ratings"][0]["severity"], "high");
+        assert_eq!(vuln["ratings"][0]["method"], "other");
+        assert!(vuln["ratings"][0].get("score").is_none());
+        assert_eq!(vuln["ratings"][1]["score"], 7.5);
+        assert_eq!(vuln["ratings"][1]["method"], "CVSSv31");
+        assert_eq!(vuln["cwes"][0], 400);
+        assert_eq!(vuln["description"], "Catastrophic backtracking");
+        assert_eq!(vuln["detail"], "Long text");
+        assert_eq!(vuln["recommendation"], "Upgrade six to 1.26.5");
+        assert_eq!(
+            vuln["advisories"][0]["url"],
+            "https://github.com/advisories/GHSA-q2q7-5pp4-w6pg"
+        );
+        assert_eq!(vuln["published"], "2021-06-01T21:19:32Z");
+        assert_eq!(vuln["affects"][0]["ref"], "pkg:pypi/six@1.17.0");
+
+        // No findings: the array is left out entirely.
+        let doc = json();
+        assert!(doc.get("vulnerabilities").is_none());
+    }
+}
