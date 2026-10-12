@@ -27,6 +27,7 @@ jobs:
       completion: ${{ steps.filter.outputs.completion }}
       action: ${{ steps.filter.outputs.action }}
       test-os: ${{ steps.os.outputs.list }}
+      binaries: ${{ steps.bins.outputs.list }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -93,6 +94,15 @@ jobs:
           else
             echo 'list=[]' >> "$GITHUB_OUTPUT"
           fi
+      # Every binary the workspace builds (one per extension), for the Build matrix: a new extension joins it without
+      # an edit here. --no-deps reads the manifests only; the runner's preinstalled cargo is enough.
+      - name: Which binaries the workspace builds
+        id: bins
+        run: |
+          list=$(cargo metadata --no-deps --format-version 1 \
+            | jq -c '[.packages[].targets[] | select(.kind | index("bin")) | .name] | sort')
+          [ "$list" != "[]" ] || { echo "::error::cargo metadata lists no binaries"; exit 1; }
+          echo "list=$list" >> "$GITHUB_OUTPUT"
 
   lint:
     name: Lint
@@ -297,7 +307,7 @@ jobs:
         run: pixi run completion-e2e
 
   build:
-    name: Build (${{ matrix.os }})
+    name: Build ${{ matrix.binary }} (${{ matrix.os }})
     needs: changes
     # The release profile (LTO, one codegen unit) on main only (#91): a pull request's tests already compile and
     # run on all three, and the release workflow builds every platform again before anything ships.
@@ -307,6 +317,8 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
+        # One job per extension, from cargo metadata (the changes job); each builds only its own binary.
+        binary: ${{ fromJSON(needs.changes.outputs.binaries) }}
     steps:
       - uses: actions/checkout@v4
       - uses: prefix-dev/setup-pixi@v0.8.1
@@ -314,14 +326,16 @@ jobs:
           environments: default
           cache: true
           activate-environment: true
-      # Compiled dependencies, restored from what main saved; a pull request never writes its own (#89).
+      # Compiled dependencies, restored from what main saved; a pull request never writes its own (#89). One cache
+      # per binary, so the matrix jobs do not overwrite each other's.
       - uses: Swatinem/rust-cache@v2
         with:
+          key: ${{ matrix.binary }}
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Release build
-        run: pixi run build
+        run: pixi run cargo build --release --bin ${{ matrix.binary }}
       - name: Smoke test
-        run: pixi run cargo run --release -- --version
+        run: pixi run cargo run --release --bin ${{ matrix.binary }} -- --version
 
   docs:
     name: Docs

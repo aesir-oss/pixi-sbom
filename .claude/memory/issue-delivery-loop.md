@@ -18,6 +18,9 @@ pixi-ext-contrib specifics on top of it (since 2026-10-11 the repository is aesi
   It happened again on 2026-10-11: PR #107 merged with cargo-deny and `CI result` red because the merge was chained
   after `gh pr checks --watch` in the same command, which printed the failures and merged anyway; #108 fixed `main`.
   The merge belongs in a script that counts non-passing rows and only merges at zero.
+- some CI jobs run on `main` only (the release Build matrix, #91), so a green PR can still turn `main` red: after
+  every merge, watch `main`'s CI run to the end before starting the next issue. On 2026-10-11 #110 broke the Build
+  smoke test (`cargo run` with two binaries) and seven merges went by before it was noticed; #118 fixed it.
 - `pixi run ci` does not run cargo-deny; CI's `deny` job does. A change to `Cargo.toml` dependencies or `deny.toml`
   gets `pixi run -e lint deny` locally before the PR.
 - milestones and labels name the component (2026-10-11): `pixi-sbom 1.13.0`, `pixi-sbom 2.0.0`, `pixi-sbom launch`,
