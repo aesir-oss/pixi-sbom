@@ -7,7 +7,10 @@ name: Release artifacts
 # dispatched from — one commit before the release bump that the build job then checks out. The
 # v0.11.0 archives are attested to 05fc3c8 although they were built from 4029b71 (#218).
 #
-# Triggered by the tag push, the same run is the thing being attested: `refs/tags/pixi-sbom-vX.Y.Z` at the
+# One workflow for every extension (#69): the tag's prefix says which (`pixi-sbom-v1.13.0`, `pixi-policy-v0.1.0`), and
+# every job but the pixi-sbom-only ones (the action repository, the pre-commit mirror) works from that name.
+#
+# Triggered by the tag push, the same run is the thing being attested: `refs/tags/<extension>-vX.Y.Z` at the
 # commit the binaries were actually built from. The tag push in release.yml is made with the
 # release GitHub App's token, and App-token pushes do start workflows — the default GITHUB_TOKEN
 # is the one that cannot, which is why this split works at all.
@@ -19,11 +22,11 @@ name: Release artifacts
 on:
   push:
     # Release tags only.
-    tags: ["pixi-sbom-v[0-9]+.[0-9]+.[0-9]+*"]
+    tags: ["pixi-sbom-v[0-9]+.[0-9]+.[0-9]+*", "pixi-policy-v[0-9]+.[0-9]+.[0-9]+*"]
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag to (re)build and publish (e.g. v1.2.0)"
+        description: "Release tag to (re)build and publish (e.g. pixi-sbom-v1.13.0, pixi-policy-v0.1.0)"
         required: true
         type: string
       dry-run:
@@ -46,19 +49,33 @@ jobs:
     outputs:
       tag: ${{ steps.resolve.outputs.tag }}
       prerelease: ${{ steps.resolve.outputs.prerelease }}
+      # The extension (its crate, binary and PyPI project are all this name) and its wheel's file-name stem.
+      crate: ${{ steps.resolve.outputs.crate }}
+      wheel-stem: ${{ steps.resolve.outputs.wheel-stem }}
     steps:
       - name: Resolve
         id: resolve
+        env:
+          # Every extension this workflow releases; a new one adds its name here and to the tag patterns above.
+          EXTENSIONS: "pixi-sbom pixi-policy"
         run: |
           set -euo pipefail
           tag="${{ inputs.tag || github.ref_name }}"
-          if ! echo "$tag" | grep -qE '^pixi-sbom-v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?$'; then
-            echo "::error::'$tag' is not a release tag (pixi-sbom-vX.Y.Z or pixi-sbom-vX.Y.Z-suffix)"
+          crate=""
+          for extension in $EXTENSIONS; do
+            if echo "$tag" | grep -qE "^${extension}-v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?$"; then crate="$extension"; fi
+          done
+          if [ -z "$crate" ]; then
+            echo "::error::'$tag' is not a release tag (<extension>-vX.Y.Z or <extension>-vX.Y.Z-suffix, for one of: $EXTENSIONS)"
             exit 1
           fi
-          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          {
+            echo "tag=${tag}"
+            echo "crate=${crate}"
+            echo "wheel-stem=${crate//-/_}"
+          } >> "$GITHUB_OUTPUT"
           # Semver: a hyphen after the version is a pre-release, and nothing else is.
-          if echo "${tag#pixi-sbom-v}" | grep -q -- '-'; then
+          if echo "${tag#"${crate}"-v}" | grep -q -- '-'; then
             echo "prerelease=true" >> "$GITHUB_OUTPUT"
           else
             echo "prerelease=false" >> "$GITHUB_OUTPUT"
@@ -104,19 +121,23 @@ jobs:
           path: wheel
       - name: Take the binary out of the wheel
         shell: bash
+        env:
+          BIN: ${{ needs.tag.outputs.crate }}${{ matrix.ext }}
         run: |
           set -euo pipefail
           unzip -q wheel/*.whl -d wheel/unpacked
-          binary=$(find wheel/unpacked -path "*.data/scripts/pixi-sbom${{ matrix.ext }}" -type f)
+          binary=$(find wheel/unpacked -path "*.data/scripts/${BIN}" -type f)
           test -n "$binary"
-          mkdir -p bin && cp "$binary" "bin/pixi-sbom${{ matrix.ext }}" && chmod +x "bin/pixi-sbom${{ matrix.ext }}"
+          mkdir -p bin && cp "$binary" "bin/${BIN}" && chmod +x "bin/${BIN}"
       # The floor the manylinux tag promises, checked on the binary that ships in the archive.
       - name: The Linux binary needs nothing newer than glibc 2.17
         if: startsWith(matrix.target, 'linux')
         shell: bash
+        env:
+          BIN: ${{ needs.tag.outputs.crate }}
         run: |
           set -euo pipefail
-          needs=$(strings bin/pixi-sbom | grep -oE 'GLIBC_[0-9]+\.[0-9]+(\.[0-9]+)?' | sed 's/GLIBC_//' | sort -V | tail -n 1)
+          needs=$(strings "bin/${BIN}" | grep -oE 'GLIBC_[0-9]+\.[0-9]+(\.[0-9]+)?' | sed 's/GLIBC_//' | sort -V | tail -n 1)
           echo "needs glibc ${needs}"
           if [ "$(printf '%s\n2.17\n' "$needs" | sort -V | tail -n 1)" != "2.17" ]; then
             echo "::error::the ${{ matrix.target }} binary needs glibc ${needs}, newer than the 2.17 the archive promises"
@@ -126,8 +147,10 @@ jobs:
       # in the run that shipped it, not discovered by someone downloading it.
       - name: Record the binary size
         shell: bash
+        env:
+          BIN: ${{ needs.tag.outputs.crate }}${{ matrix.ext }}
         run: |
-          bytes=$(wc -c < "bin/pixi-sbom${{ matrix.ext }}" | tr -d ' ')
+          bytes=$(wc -c < "bin/${BIN}" | tr -d ' ')
           {
             echo "### Binary size"
             echo
@@ -139,11 +162,12 @@ jobs:
         shell: bash
         env:
           TAG: ${{ needs.tag.outputs.tag }}
+          CRATE: ${{ needs.tag.outputs.crate }}
         run: |
           set -euo pipefail
           name="${TAG}-${{ matrix.target }}"
           mkdir -p dist/"$name"
-          cp "bin/pixi-sbom${{ matrix.ext }}" LICENSE crates/pixi-sbom/README.md crates/pixi-sbom/CHANGELOG.md dist/"$name"/
+          cp "bin/${CRATE}${{ matrix.ext }}" LICENSE "crates/${CRATE}/README.md" "crates/${CRATE}/CHANGELOG.md" dist/"$name"/
           cd dist
           if [[ "${{ matrix.arc }}" == zip ]]; then
             zip -qr "$name.zip" "$name"
@@ -183,7 +207,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: pixi-sbom-${{ matrix.target }}
+          name: archive-${{ matrix.target }}
           path: dist/*
 
   # ---------------------------------------------------------------------------
@@ -199,6 +223,8 @@ jobs:
       contents: write
     env:
       TAG: ${{ needs.tag.outputs.tag }}
+      CRATE: ${{ needs.tag.outputs.crate }}
+      WHEEL_STEM: ${{ needs.tag.outputs.wheel-stem }}
     steps:
       - name: Generate GitHub App token
         id: app-token
@@ -218,7 +244,7 @@ jobs:
       # `attach-wheels` adds those itself.
       - uses: actions/download-artifact@v4
         with:
-          pattern: pixi-sbom-*
+          pattern: archive-*
           path: dist
           merge-multiple: true
 
@@ -226,9 +252,10 @@ jobs:
         run: |
           set -euo pipefail
           # An optional hand-written preamble, for a release where the list of commits is not the
-          # story: `docs/release-notes/v1.2.3.md` for `pixi-sbom-v1.2.3`. git-cliff rewrites the changelog wholesale from
+          # story: `docs/release-notes/v1.2.3.md` for `pixi-sbom-v1.2.3` (pixi-sbom's, from before the workspace), and
+          # `docs/release-notes/<tag>.md` for any other extension. git-cliff rewrites the changelog wholesale from
           # the commit log every release, so this is the one place a narrative survives.
-          preamble="docs/release-notes/${TAG#pixi-sbom-}.md"
+          if [ "$CRATE" = pixi-sbom ]; then preamble="docs/release-notes/${TAG#pixi-sbom-}.md"; else preamble="docs/release-notes/${TAG}.md"; fi
           if [ -f "$preamble" ]; then
             cat "$preamble" > RELEASE_NOTES.md
             printf '\n---\n\n' >> RELEASE_NOTES.md
@@ -236,7 +263,7 @@ jobs:
           else
             : > RELEASE_NOTES.md
           fi
-          pixi run changelog-of notes pixi-sbom --tag "$TAG" >> RELEASE_NOTES.md
+          pixi run changelog-of notes "$CRATE" --tag "$TAG" >> RELEASE_NOTES.md
           {
             echo
             echo "---"
@@ -253,7 +280,7 @@ jobs:
             echo
             echo "Each archive has a \`.sha256\` and a signed \`.sigstore.json\` provenance bundle beside it."
             echo
-            echo "The same binary is attached as Python wheels (\`pixi_sbom-*.whl\`, no Python code) for Linux glibc and musl"
+            echo "The same binary is attached as Python wheels (\`${WHEEL_STEM}-*.whl\`, no Python code) for Linux glibc and musl"
             echo "x86_64 and aarch64, macOS x86_64 and arm64, and Windows x86_64, published to PyPI (TestPyPI for a release"
             echo "candidate) as well. Where PyPI is out of reach, install one straight from this release:"
             echo "\`pip install https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/<wheel>\`."
@@ -269,7 +296,7 @@ jobs:
             echo
             echo "Add \`--bundle ${TAG}-linux-64.tar.gz.sigstore.json\` to verify without reaching GitHub."
             echo
-            echo "Full changelog: [CHANGELOG.md](https://github.com/${GITHUB_REPOSITORY}/blob/main/crates/pixi-sbom/CHANGELOG.md)"
+            echo "Full changelog: [CHANGELOG.md](https://github.com/${GITHUB_REPOSITORY}/blob/main/crates/${CRATE}/CHANGELOG.md)"
           } >> RELEASE_NOTES.md
           cat RELEASE_NOTES.md
 
@@ -295,13 +322,15 @@ jobs:
             echo
             echo "Release: ${{ steps.create_release.outputs.url }}"
             echo
-            echo "conda-forge follows from here: the feedstock's autotick bot opens the version"
-            echo "bump against the source tarball on its own, usually within a few hours."
+            if [ "$CRATE" = pixi-sbom ]; then
+              echo "conda-forge follows from here: the feedstock's autotick bot opens the version"
+              echo "bump against the source tarball on its own, usually within a few hours."
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
 
   # ---------------------------------------------------------------------------
   # Every platform's one compile: the binary as a platform wheel for PyPI (maturin, `bindings = "bin"`),
-  # so `uvx pixi-sbom` and `pip install pixi-sbom` work for projects that do not use pixi, and from the
+  # so `uvx <extension>` and `pip install <extension>` work for projects that do not use pixi, and from the
   # same wheel the archive (`archive`). Built from the tagged commit with the Rust pixi.toml pins.
   # ---------------------------------------------------------------------------
   wheels:
@@ -337,18 +366,20 @@ jobs:
           rust-toolchain: "1.98.1"
           target: ${{ matrix.target }}
           manylinux: ${{ matrix.manylinux }}
-          args: --release --locked --out dist --manifest-path crates/pixi-sbom/Cargo.toml
+          args: --release --locked --out dist --manifest-path crates/${{ needs.tag.outputs.crate }}/Cargo.toml
       # A musllinux wheel cannot run on the glibc runner; the others are installed and run.
       # pip's own platform matching is not what is under test, and an x86-64 Python under Rosetta found no
       # wheel it would install: the binary is checked to be x86-64 and run directly instead.
       - name: Smoke test (x86-64 under Rosetta)
         if: matrix.rosetta
         shell: bash
+        env:
+          CRATE: ${{ needs.tag.outputs.crate }}
         run: |
           set -euo pipefail
           /usr/bin/pgrep -q oahd || softwareupdate --install-rosetta --agree-to-license
           unzip -q dist/*.whl -d smoke
-          binary=$(find smoke -path '*.data/scripts/pixi-sbom' -type f)
+          binary=$(find smoke -path "*.data/scripts/${CRATE}" -type f)
           test "$(lipo -archs "$binary")" = x86_64
           chmod +x "$binary"
           arch -x86_64 "$binary" --version
@@ -359,12 +390,14 @@ jobs:
       - name: Smoke test
         if: matrix.run
         shell: bash
+        env:
+          CRATE: ${{ needs.tag.outputs.crate }}
         run: |
           set -euo pipefail
           python -m venv smoke
           if [[ -d smoke/Scripts ]]; then bin=smoke/Scripts; else bin=smoke/bin; fi
-          "$bin/python" -m pip install --no-index --find-links dist pixi-sbom
-          "$bin/pixi-sbom" --version
+          "$bin/python" -m pip install --no-index --find-links dist "$CRATE"
+          "$bin/$CRATE" --version
       - name: Attest the wheel's provenance
         if: ${{ !inputs.dry-run }}
         uses: actions/attest-build-provenance@v2
@@ -408,7 +441,8 @@ jobs:
 
   # Trusted publishing: no token, PyPI checks this workflow's OIDC identity against the
   # publisher registered for the project (repository aesir-oss/pixi-ext-contrib, workflow
-  # release-artifacts.yml, and the environment named here). A release candidate goes to
+  # release-artifacts.yml, and the environment named here); each extension's PyPI and TestPyPI project registers
+  # the same publisher. A release candidate goes to
   # TestPyPI, a final release to PyPI, and either only once the GitHub Release is out.
   testpypi:
     name: Publish the wheels to TestPyPI
@@ -417,7 +451,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: testpypi
-      url: https://test.pypi.org/project/pixi-sbom/
+      url: https://test.pypi.org/project/${{ needs.tag.outputs.crate }}/
     permissions:
       id-token: write
     steps:
@@ -442,7 +476,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: pypi
-      url: https://pypi.org/project/pixi-sbom/
+      url: https://pypi.org/project/${{ needs.tag.outputs.crate }}/
     permissions:
       id-token: write
     steps:
@@ -464,6 +498,8 @@ jobs:
   action-repo:
     name: Update the action repository
     needs: [tag, publish]
+    # The action is pixi-sbom's.
+    if: needs.tag.outputs.crate == 'pixi-sbom'
     runs-on: ubuntu-latest
     env:
       TAG: ${{ needs.tag.outputs.tag }}
@@ -537,7 +573,8 @@ jobs:
   pre-commit-mirror:
     name: Update the pre-commit mirror
     needs: [tag, pypi]
-    if: needs.tag.outputs.prerelease == 'false'
+    # The pre-commit hooks are pixi-sbom's.
+    if: needs.tag.outputs.prerelease == 'false' && needs.tag.outputs.crate == 'pixi-sbom'
     runs-on: ubuntu-latest
     env:
       TAG: ${{ needs.tag.outputs.tag }}

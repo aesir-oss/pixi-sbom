@@ -427,7 +427,10 @@ the second run of anything looks like.
 ## Releasing
 
 Two workflows. `release.yml` is run by hand from the Actions tab (*Release* → *Run workflow* on `main`) and ends at
-the tag push; that tag then starts `release-artifacts.yml`, which builds, signs and publishes everything. One
+the tag push; that tag then starts `release-artifacts.yml`, which builds, signs and publishes everything. It serves
+every extension (#69): the tag's prefix (`pixi-sbom-v`, `pixi-policy-v`) picks the crate, binary, wheels and PyPI project,
+and the action repository and pre-commit mirror run for pixi-sbom only. A new extension is added to its `EXTENSIONS`
+and tag patterns and to `release.yml`'s `crate` options, and gets a maturin `pyproject.toml`; a test checks all four. One
 operator action, two runs.
 
 **Two kinds of release.** Each extension's releases (`pixi-sbom-vX.Y.Z`, release candidates included) are published
@@ -444,7 +447,7 @@ extension pattern (`v*`, `pixi-sbom-v*`, `cliff.toml`'s `tag_pattern`, the Actio
 
 | Input | Default | Meaning |
 |---|---|---|
-| `crate` | `pixi-sbom` | What to release: `pixi-sbom` (pixi-policy joins with #69). The shared crate is never released. |
+| `crate` | `pixi-sbom` | What to release: `pixi-sbom` or `pixi-policy`. The shared crate is never released. |
 | `version` | blank | Version to release without the `v` (e.g. `1.2.0`). Blank auto-increments the patch of the latest `v*` tag; for the very first release it uses `Cargo.toml`'s version. |
 | `force_recreate` | false | Delete an existing tag and release of that version first, then recreate them. |
 

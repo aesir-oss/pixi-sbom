@@ -9806,6 +9806,47 @@ fn no_release_is_marked_latest() {
     assert!(workflow.contains("make_latest: false"));
 }
 
+/// Every extension in the workspace (a crate with a binary) can be released (#69): release-artifacts.yml knows its
+/// name and its tag pattern, release.yml offers it, and it has a maturin pyproject.toml for its wheels.
+#[test]
+fn every_extension_is_wired_into_the_release_workflows() {
+    let root = repo_root();
+    let artifacts = std::fs::read_to_string(root.join(".github/workflows/release-artifacts.yml")).unwrap();
+    let release = std::fs::read_to_string(root.join(".github/workflows/release.yml")).unwrap();
+    let extensions = artifacts
+        .lines()
+        .find_map(|line| line.trim().strip_prefix("EXTENSIONS: "))
+        .expect("release-artifacts.yml lists its EXTENSIONS")
+        .trim_matches('"')
+        .to_string();
+    let mut seen = Vec::new();
+    for entry in std::fs::read_dir(root.join("crates")).unwrap() {
+        let dir = entry.unwrap().path();
+        if !dir.join("src/main.rs").is_file() {
+            continue;
+        }
+        let name = dir.file_name().unwrap().to_string_lossy().into_owned();
+        assert!(
+            extensions.split_whitespace().any(|e| e == name),
+            "{name} is not in release-artifacts.yml's EXTENSIONS"
+        );
+        assert!(
+            artifacts.contains(&format!("\"{name}-v[0-9]+.[0-9]+.[0-9]+*\"")),
+            "no tag pattern for {name}"
+        );
+        let options = release.lines().find(|l| l.trim().starts_with("options:")).unwrap();
+        assert!(options.contains(&name), "release.yml does not offer {name}: {options}");
+        let pyproject = std::fs::read_to_string(dir.join("pyproject.toml")).unwrap_or_default();
+        assert!(
+            pyproject.contains(&format!("name = \"{name}\"")) && pyproject.contains("bindings = \"bin\""),
+            "{name}: no maturin pyproject.toml"
+        );
+        seen.push(name);
+    }
+    seen.sort();
+    assert_eq!(seen, ["pixi-policy", "pixi-sbom"]);
+}
+
 /// The release archives are named after the tag (`pixi-sbom-vX.Y.Z-<platform>`), and every step that
 /// names an archive spells it the same way. 1.12.0-rc.1's build failed at the attestation because one
 /// step still prefixed `pixi-sbom-` to a tag that already carries it.
@@ -9820,7 +9861,12 @@ fn release_archives_are_named_after_the_tag_everywhere() {
         workflow.contains("subject-path: dist/${{ needs.tag.outputs.tag }}-${{ matrix.target }}.${{ matrix.arc }}"),
         "the attestation does not name the archive the Package step writes"
     );
-    for doubled in ["pixi-sbom-${TAG}", "pixi-sbom-${{ needs.tag.outputs.tag }}"] {
+    for doubled in [
+        "pixi-sbom-${TAG}",
+        "pixi-sbom-${{ needs.tag.outputs.tag }}",
+        "${CRATE}-${TAG}",
+        "${{ needs.tag.outputs.crate }}-${{ needs.tag.outputs.tag }}",
+    ] {
         assert!(
             !workflow.contains(doubled),
             "{doubled} names an archive pixi-sbom-pixi-sbom-v…: the tag already starts with pixi-sbom-"

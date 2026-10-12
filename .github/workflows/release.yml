@@ -25,7 +25,7 @@ on:
         description: "What to release"
         required: true
         type: choice
-        options: [pixi-sbom]
+        options: [pixi-sbom, pixi-policy]
         default: pixi-sbom
       version:
         description: "Version to release (e.g. 1.0.0); leave blank to auto-increment the patch"
