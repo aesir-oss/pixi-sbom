@@ -1952,11 +1952,12 @@ edges, error variants). <code>format/*</code> tests run each writer over <code>f
 covering every package kind plus edge cases (missing version, non-SPDX license, local path source, extra purls), and
 check specific fields.</p>
 <h3 id="the-minimum-supported-rust-version">The minimum supported Rust version<a class="headerlink" href="#the-minimum-supported-rust-version" title="Permanent link">&para;</a></h3>
-<p><code>rust-version</code> in <code>Cargo.toml</code> is <strong>1.88</strong>, and the <code>msrv</code> environment pins exactly that toolchain so the claim is
+<p><code>rust-version</code> in <code>Cargo.toml</code> is <strong>1.89</strong>, and the <code>msrv</code> environment pins exactly that toolchain so the claim is
 checked rather than asserted: <code>pixi run -e msrv msrv-check</code>, which CI runs on every pull request.</p>
 <p>It was 1.85 until someone looked. That number came from edition 2024 and was never true — this crate uses
 let-chains in <code>kev.rs</code> and <code>osv.rs</code>, and those did not stabilize until 1.88. Nothing caught it because every job
-built on the toolchain <code>pixi.toml</code> pins, which is far newer.</p>
+built on the toolchain <code>pixi.toml</code> pins, which is far newer. It rose to 1.89 in 1.14.0 for <code>serde-saphyr</code>, the pure-Rust YAML
+reader that replaced <code>serde_yaml</code> (#21).</p>
 <p>Raising the MSRV is a breaking change for anyone pinned to an older toolchain, so after 1.0 it belongs in a minor
 release at the earliest, with the new number in the changelog. Lowering it is free. Either way the <code>msrv</code>
 environment and <code>Cargo.toml</code> change together, or the check is measuring the wrong thing.</p>

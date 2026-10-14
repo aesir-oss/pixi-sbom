@@ -495,6 +495,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#1132" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.13.2
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#1131" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1626,6 +1637,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#1132" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.13.2
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#1131" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1970,6 +1992,12 @@ has every commit.</p>
 <li><strong>Learned tab completion</strong> in bash, zsh, fish and PowerShell, for <code>pixi-sbom</code> and <code>pixi sbom</code>.</li>
 </ul>
 <h2 id="unreleased">Unreleased<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
+<p><strong>YAML is read by a parser written in safe Rust.</strong> <code>conda-lock.yml</code>, <code>environment.yml</code>, <code>pnpm-lock.yaml</code>,
+<code>pnpm-workspace.yaml</code> and yarn berry's <code>yarn.lock</code> are now parsed with
+<a href="https://crates.io/crates/serde-saphyr">serde-saphyr</a> instead of <code>serde_yaml</code>, which is deprecated and built on an
+unmaintained C translation (RUSTSEC-2024-0449). The SBOMs it writes are unchanged. <strong>Building from source now needs
+Rust 1.89</strong> (it was 1.88); the binaries, wheels and conda package are not affected.</p>
+<h2 id="1132">1.13.2<a class="headerlink" href="#1132" title="Permanent link">&para;</a></h2>
 <p><strong>pixi-sbom has its own repository again,
 <a href="https://github.com/aesir-oss/pixi-sbom">aesir-oss/pixi-sbom</a>,</strong> with its documentation at
 <a href="https://aesir-oss.github.io/pixi-sbom/">aesir-oss.github.io/pixi-sbom</a>. Releases are tagged <code>vX.Y.Z</code> there, as they
