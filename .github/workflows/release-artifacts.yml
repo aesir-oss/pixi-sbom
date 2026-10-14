@@ -509,6 +509,7 @@ jobs:
           ref: ${{ needs.tag.outputs.tag }}
           path: source
       - name: Copy, commit and tag
+        id: copy
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           REPO: ${{ github.repository_owner }}/pixi-sbom-action
@@ -555,6 +556,44 @@ jobs:
             echo
             echo "\`${REPO}\` is at \`${action_tag}\`; floating tag: ${moved}."
           } >> "$GITHUB_STEP_SUMMARY"
+          echo "moved=${moved}" >> "$GITHUB_OUTPUT"
+      # The Marketplace lists the action from its repository's releases, so every final release gets one there
+      # too; a release candidate stays a tag. Latest only when vX moved, so an older line's fix release does
+      # not take Latest from the newest one.
+      - name: Release the action
+        if: needs.tag.outputs.prerelease != 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository_owner }}/pixi-sbom-action
+          SOURCE: ${{ github.repository }}
+          MOVED: ${{ steps.copy.outputs.moved }}
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" --repo "$REPO" > /dev/null 2>&1; then
+            echo "::notice::${REPO} already has a ${TAG} release"
+            exit 0
+          fi
+          version="${TAG#v}"
+          docs="https://aesir-oss.github.io/pixi-sbom/latest"
+          latest="--latest=false"
+          [ "$MOVED" != "no" ] && latest="--latest"
+          cat > notes.md <<EOF
+          The GitHub Action for [pixi-sbom](https://github.com/${SOURCE}) ${version}: CycloneDX or SPDX SBOMs from \`pixi.lock\` and other lockfiles, with licenses, PyPI identities, a license policy gate and an optional vulnerability gate. It needs no pixi setup.
+
+          \`\`\`yaml
+          - uses: ${REPO}@v1
+          \`\`\`
+
+          \`@v1\` always runs the newest 1.x release; pin \`@${TAG}\` for this one.
+
+          - What ${version} changes: [What's new](${docs}/whats-new/#${version//./})
+          - pixi-sbom release: [${TAG}](https://github.com/${SOURCE}/releases/tag/${TAG})
+          - Documentation: [the GitHub Action](${docs}/github-action/)
+
+          This repository is generated from [\`actions/pixi-sbom/\`](https://github.com/${SOURCE}/tree/main/actions/pixi-sbom) in ${SOURCE} on every release: open issues and pull requests there.
+          EOF
+          gh release create "$TAG" --repo "$REPO" --verify-tag --title "$TAG" --notes-file notes.md "$latest"
+          echo "Released \`${REPO}\` ${TAG} (${latest#--})." >> "$GITHUB_STEP_SUMMARY"
 
   # The pre-commit hooks live in a mirror repository, aesir-oss/pixi-sbom-pre-commit, the way ruff's
   # do: pre-commit installs a `language: python` hook by `pip install .` of the hook repository,
