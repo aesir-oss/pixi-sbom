@@ -1952,11 +1952,12 @@ edges, error variants). <code>format/*</code> tests run each writer over <code>f
 covering every package kind plus edge cases (missing version, non-SPDX license, local path source, extra purls), and
 check specific fields.</p>
 <h3 id="the-minimum-supported-rust-version">The minimum supported Rust version<a class="headerlink" href="#the-minimum-supported-rust-version" title="Permanent link">&para;</a></h3>
-<p><code>rust-version</code> in <code>Cargo.toml</code> is <strong>1.88</strong>, and the <code>msrv</code> environment pins exactly that toolchain so the claim is
+<p><code>rust-version</code> in <code>Cargo.toml</code> is <strong>1.89</strong>, and the <code>msrv</code> environment pins exactly that toolchain so the claim is
 checked rather than asserted: <code>pixi run -e msrv msrv-check</code>, which CI runs on every pull request.</p>
 <p>It was 1.85 until someone looked. That number came from edition 2024 and was never true — this crate uses
 let-chains in <code>kev.rs</code> and <code>osv.rs</code>, and those did not stabilize until 1.88. Nothing caught it because every job
-built on the toolchain <code>pixi.toml</code> pins, which is far newer.</p>
+built on the toolchain <code>pixi.toml</code> pins, which is far newer. It rose to 1.89 in 1.14.0 for <code>serde-saphyr</code>, the pure-Rust YAML
+reader that replaced <code>serde_yaml</code> (#21).</p>
 <p>Raising the MSRV is a breaking change for anyone pinned to an older toolchain, so after 1.0 it belongs in a minor
 release at the earliest, with the new number in the changelog. Lowering it is free. Either way the <code>msrv</code>
 environment and <code>Cargo.toml</code> change together, or the check is measuring the wrong thing.</p>
@@ -2299,7 +2300,7 @@ with <a href="https://github.com/jimporter/mike">mike</a> the way pixi's own doc
 as the Pages artifact; the repository's Pages source stays "GitHub Actions" and the <code>github-pages</code> environment, which
 allows <code>main</code> and <code>v*</code> tags, records every deployment. <code>gh workflow run docs.yml -f ref=&lt;tag&gt;</code> redeploys a release's
 docs; any other ref (or none) redeploys <code>dev</code>. <code>pixi run -e docs mike serve</code> previews every deployed version locally
-from <code>gh-pages</code>. Docs for 1.12.0 to 1.13.1 stay on aesir-oss/pixi-ext-contrib's site, where they were published.</p>
+from <code>gh-pages</code>. Docs for 1.12.0 to 1.13.1 were published on aesir-oss/pixi-ext-contrib's site, which is gone.</p>
 <p>The <code>github-pages</code> environment's deployment branch policy must allow the <code>v*</code> tag pattern as well as <code>main</code>
 (Settings → Environments → github-pages), because a release event runs on the tag; without it the deploy job fails
 with "Branch ... is not allowed to deploy to github-pages".</p>
@@ -2353,11 +2354,14 @@ the second run of anything looks like.</p>
 <p>Two workflows. <code>release.yml</code> is run by hand from the Actions tab (<em>Release</em> → <em>Run workflow</em> on <code>main</code>) and ends at
 the tag push; that tag then starts <code>release-artifacts.yml</code>, which builds, signs and publishes everything: the archives
 (<code>pixi-sbom-vX.Y.Z-&lt;platform&gt;</code>), the wheels, the GitHub release, PyPI (TestPyPI for a release candidate), and, for a
-final, the action repository and the pre-commit mirror. One operator action, two runs. A final release is this
+final, the action repository (tagged <code>vX.Y.Z</code>, <code>v1</code> moved, and a release there that the Marketplace listing follows)
+and the pre-commit mirror. One operator action, two runs. A final release is this
 repository's <em>Latest</em>; a release candidate never is.</p>
 <p>Releases are tagged <code>vX.Y.Z</code>. Those up to 1.11.x were made in millsks/pixi-sbom and those from 1.12.0 to 1.13.1 in
 aesir-oss/pixi-ext-contrib (tagged <code>pixi-sbom-vX.Y.Z</code> there); their tags are carried here as <code>vX.Y.Z</code>, and their
-GitHub releases, archives and attestations stay in those repositories. The action reads all three release lists.</p>
+GitHub releases were copied here with every asset, the signed <code>.sigstore.json</code> bundles included, so this repository
+is the only release source the action and the install docs use. Their attestations still name the repository that
+built them; <a href="../installation/">Installation</a> shows the offline check against the bundle.</p>
 <p><code>release.yml</code> inputs:</p>
 <table>
 <thead>

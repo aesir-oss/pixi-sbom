@@ -484,6 +484,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#1140" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.14.0
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#1132" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1615,6 +1626,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#1140" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.14.0
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#1132" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1969,6 +1991,17 @@ has every commit.</p>
   credentials are used, and <code>--doctor</code> says which host is the problem.</li>
 <li><strong>Learned tab completion</strong> in bash, zsh, fish and PowerShell, for <code>pixi-sbom</code> and <code>pixi sbom</code>.</li>
 </ul>
+<h2 id="1140">1.14.0<a class="headerlink" href="#1140" title="Permanent link">&para;</a></h2>
+<p><strong>YAML is read by a parser written in safe Rust.</strong> <code>conda-lock.yml</code>, <code>environment.yml</code>, <code>pnpm-lock.yaml</code>,
+<code>pnpm-workspace.yaml</code> and yarn berry's <code>yarn.lock</code> are now parsed with
+<a href="https://crates.io/crates/serde-saphyr">serde-saphyr</a> instead of <code>serde_yaml</code>, which is deprecated and built on an
+unmaintained C translation (RUSTSEC-2024-0449). The SBOMs it writes are unchanged. <strong>Building from source now needs
+Rust 1.89</strong> (it was 1.88); the binaries, wheels and conda package are not affected.</p>
+<p><strong>Every release is downloadable from aesir-oss/pixi-sbom.</strong> Releases first made in millsks/pixi-sbom (up to 1.11.x) and
+aesir-oss/pixi-ext-contrib (1.12.0 to 1.13.1) were copied to its releases page with all their files, and the GitHub
+Action now installs every version from there, so pinning an old <code>version</code> keeps working whatever happens to those
+repositories. Their provenance still names the repository that built them; <a href="../installation/">Installation</a> shows how to
+check it offline.</p>
 <h2 id="1132">1.13.2<a class="headerlink" href="#1132" title="Permanent link">&para;</a></h2>
 <p><strong>pixi-sbom has its own repository again,
 <a href="https://github.com/aesir-oss/pixi-sbom">aesir-oss/pixi-sbom</a>,</strong> with its documentation at
