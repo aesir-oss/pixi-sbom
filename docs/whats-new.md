@@ -23,7 +23,7 @@ Since 1.0, pixi-sbom has:
   credentials are used, and `--doctor` says which host is the problem.
 - **Learned tab completion** in bash, zsh, fish and PowerShell, for `pixi-sbom` and `pixi sbom`.
 
-## Unreleased
+## 1.14.0
 
 **YAML is read by a parser written in safe Rust.** `conda-lock.yml`, `environment.yml`, `pnpm-lock.yaml`,
 `pnpm-workspace.yaml` and yarn berry's `yarn.lock` are now parsed with
