@@ -1,20 +1,24 @@
 ---
 name: marketplace-listing
-description: Where the pixi-sbom GitHub Action is listed and published, and the name clash the new listing must avoid
+description: Where the pixi-sbom GitHub Action is listed, how the old millsks/pixi-sbom listing was retired, and the manual Marketplace step
 metadata:
   type: project
 ---
 
-The action was listed on the GitHub Marketplace from `millsks/pixi-sbom`'s v1.0.0 release (millsks/pixi-sbom#234)
-as "pixi-sbom". Since 2026-10-11 its source is `actions/pixi-sbom/` in this repository, and the `action-repo` job in
-`release-artifacts.yml` copies it to `aesir-oss/pixi-sbom-action` on every release, tags `vX.Y.Z` and moves `vX`.
-`uses: millsks/pixi-sbom@v1` keeps working; that repository is to be archived after 1.12.0, once its action.yml
-looks up releases in both repositories.
+The action's source is `actions/pixi-sbom/` here. The `action-repo` job in `release-artifacts.yml` copies it to
+`aesir-oss/pixi-sbom-action` on every release, tags `vX.Y.Z`, and on a final moves `vX` and creates a GitHub release
+there (Latest only when `vX` moved). The Marketplace listing `pixi-sbom` (github.com/marketplace/actions/pixi-sbom) has
+been published from that repository since v1.13.2 (2026-10-14).
 
-**Why:** the Marketplace lists one action per repository, with `action.yml` at its root, and action names are
-unique: the new listing cannot be called "pixi-sbom" while the old one exists.
+`millsks/pixi-sbom` held the original listing. Its v1.11.1 (2026-10-14) made its action.yml a wrapper named
+`pixi-sbom (deprecated)` that warns and forwards every input and output to `aesir-oss/pixi-sbom-action@v1`; `v1` points
+there, and the old listing now lives at /marketplace/actions/pixi-sbom-deprecated. Its release, release-artifacts,
+publish-crate and docs workflows are disabled so a tag there publishes nothing. Never delete that repository: workflows
+still resolve `uses: millsks/pixi-sbom@v1` from it.
 
-**How to apply:** publishing the new listing is a manual step on a release page of `aesir-oss/pixi-sbom-action`
-(tick "Publish this Action to the GitHub Marketplace"; no API). Change `name:` in `actions/pixi-sbom/action.yml`
-first, or delist the old one. Docs say `uses: aesir-oss/pixi-sbom-action@v1`. pixi-policy gets the same shape in
-`aesir-oss/pixi-policy-action`.
+**Why:** action names are unique on the Marketplace and its URL is the name's slug; renaming the old action freed the
+name without delisting it, so people who find the old listing are pointed at the new one.
+
+**How to apply:** ticking "Publish this Action to the GitHub Marketplace" has no API. The release job creates the
+release; if the listing does not follow a new final on its own, the maintainer ticks the box on that release's edit
+page. Docs say `uses: aesir-oss/pixi-sbom-action@v1`.

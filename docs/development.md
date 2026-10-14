@@ -429,7 +429,8 @@ the second run of anything looks like.
 Two workflows. `release.yml` is run by hand from the Actions tab (*Release* → *Run workflow* on `main`) and ends at
 the tag push; that tag then starts `release-artifacts.yml`, which builds, signs and publishes everything: the archives
 (`pixi-sbom-vX.Y.Z-<platform>`), the wheels, the GitHub release, PyPI (TestPyPI for a release candidate), and, for a
-final, the action repository and the pre-commit mirror. One operator action, two runs. A final release is this
+final, the action repository (tagged `vX.Y.Z`, `v1` moved, and a release there that the Marketplace listing follows)
+and the pre-commit mirror. One operator action, two runs. A final release is this
 repository's *Latest*; a release candidate never is.
 
 Releases are tagged `vX.Y.Z`. Those up to 1.11.x were made in millsks/pixi-sbom and those from 1.12.0 to 1.13.1 in
