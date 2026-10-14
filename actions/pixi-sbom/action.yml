@@ -295,16 +295,9 @@ runs:
       run: |
         set -euo pipefail
         name="pixi-sbom-v${VERSION}-${PLATFORM}"
-        # Where each release lives: aesir-oss/pixi-sbom from 1.13.2 (tags vX.Y.Z), aesir-oss/pixi-ext-contrib for 1.12.0
-        # to 1.13.1 (tags pixi-sbom-vX.Y.Z), millsks/pixi-sbom before that (tags vX.Y.Z).
-        at_least() { [ "$(printf '%s\n' "$1" "$VERSION" | sort -V | head -n 1)" = "$1" ]; }
-        if at_least 1.13.2; then
-          base="https://github.com/aesir-oss/pixi-sbom/releases/download/v${VERSION}"
-        elif at_least 1.12.0; then
-          base="https://github.com/aesir-oss/pixi-ext-contrib/releases/download/pixi-sbom-v${VERSION}"
-        else
-          base="https://github.com/millsks/pixi-sbom/releases/download/v${VERSION}"
-        fi
+        # Every release, including those first made in millsks/pixi-sbom and aesir-oss/pixi-ext-contrib, is in
+        # aesir-oss/pixi-sbom, tagged vX.Y.Z.
+        base="https://github.com/aesir-oss/pixi-sbom/releases/download/v${VERSION}"
         dir="${RUNNER_TEMP}/pixi-sbom-install/${name}"
         # The action may run several times in one job; reuse an install of the same version.
         if ls "$dir/bin"/pixi-sbom* >/dev/null 2>&1; then

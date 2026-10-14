@@ -9,7 +9,7 @@ runs it when you type `pixi <name>`. There is no plugin registration; installing
 | Method | Command |
 |---|---|
 | pixi global (recommended) | `pixi global install pixi-sbom` |
-| Prebuilt binary | Download `pixi-sbom-<version>-<platform>.tar.gz` (or `.zip` on Windows) from the [releases page](https://github.com/aesir-oss/pixi-sbom/releases) (1.12.0 to 1.13.1: [aesir-oss/pixi-ext-contrib](https://github.com/aesir-oss/pixi-ext-contrib/releases); up to 1.11.x: [millsks/pixi-sbom](https://github.com/millsks/pixi-sbom/releases)), check its provenance (below), and put `pixi-sbom` on your `PATH` |
+| Prebuilt binary | Download `pixi-sbom-<version>-<platform>.tar.gz` (or `.zip` on Windows) from the [releases page](https://github.com/aesir-oss/pixi-sbom/releases), which has every version, check its provenance (below), and put `pixi-sbom` on your `PATH` |
 | PyPI | `uvx pixi-sbom` runs it without installing; `uv tool install pixi-sbom` or `pip install pixi-sbom` installs it. The wheels hold the same binary as the release archives (no Python code), for Linux (glibc and musl) x86_64/aarch64, macOS x86_64/arm64 and Windows x86_64, from 1.7.0 on |
 | From source | `pixi run build` in a clone, then copy `target/release/pixi-sbom` to `~/.pixi/bin/` |
 
@@ -73,11 +73,20 @@ gh attestation verify pixi-sbom-<version>-linux-64.tar.gz --repo aesir-oss/pixi-
   --deny-self-hosted-runners
 ```
 
-Releases from 1.12.0 to 1.13.1 were built in `aesir-oss/pixi-ext-contrib` and tagged `pixi-sbom-v<version>`: verify
-those with `--repo aesir-oss/pixi-sbom`, and in the strict form
-`--signer-workflow aesir-oss/pixi-ext-contrib/.github/workflows/release-artifacts.yml` and
-`--source-ref refs/tags/pixi-sbom-v<version>`. Releases up to 1.11.x were built in `millsks/pixi-sbom` and tagged
-`v<version>`: verify those with `--repo millsks/pixi-sbom`, and in the strict form
+Older releases were built, and signed, in the repositories pixi-sbom lived in before: 1.12.0 to 1.13.1 in
+`aesir-oss/pixi-ext-contrib` (tagged `pixi-sbom-v<version>` there), up to 1.11.x in `millsks/pixi-sbom`. Their releases
+here carry each archive's signed bundle (`<archive>.sigstore.json`, from 0.11.0 on), so verify against the bundle and
+name the repository that built it. This checks the signature offline and does not need that repository to exist:
+
+```sh
+gh attestation verify pixi-sbom-v1.12.0-linux-64.tar.gz \
+  --bundle pixi-sbom-v1.12.0-linux-64.tar.gz.sigstore.json \
+  --repo aesir-oss/pixi-ext-contrib \
+  --signer-workflow aesir-oss/pixi-ext-contrib/.github/workflows/release-artifacts.yml \
+  --source-ref refs/tags/pixi-sbom-v1.12.0
+```
+
+For 1.11.x and older, use `--repo millsks/pixi-sbom`,
 `--signer-workflow millsks/pixi-sbom/.github/workflows/release-artifacts.yml` and `--source-ref refs/tags/v<version>`.
 
 | Flag | Refuses |

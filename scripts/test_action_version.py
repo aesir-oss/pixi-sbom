@@ -72,28 +72,28 @@ class ActionVersionTest(unittest.TestCase):
     def test_prefixed_major_tag_resolves_within_its_major(self) -> None:
         self.assertEqual(self.version(ACTION_REF="pixi-sbom-v0"), "0.12.0")
 
-    def test_both_release_lists_and_tag_formats_are_read(self) -> None:
-        # 1.11.x and older live in millsks/pixi-sbom as vX.Y.Z; 1.12.0 and newer in the workspace
-        # repository as pixi-sbom-vX.Y.Z. The newest across both wins, in either format.
-        workspace = Path(self.api.removeprefix("file://")).with_name("workspace")
-        workspace.write_text(json.dumps([{"tag_name": "pixi-sbom-v1.2.0"}, {"tag_name": "pixi-sbom-v1.3.0-rc.1"}]))
-        both = f"file://{workspace} {self.api}"
-        self.assertEqual(self.version(RELEASES_API=both, ACTION_REF="v1"), "1.2.0")
-        self.assertEqual(self.version(RELEASES_API=both, ACTION_REF="pixi-sbom-v1"), "1.2.0")
-        self.assertEqual(self.version(RELEASES_API=both, ACTION_REF="v0"), "0.12.0")
-        self.assertEqual(self.version(RELEASES_API=both), "1.2.0")
-
-    def test_the_standalone_repository_is_read_with_the_other_two(self) -> None:
-        # From 1.13.2 releases live in aesir-oss/pixi-sbom, tagged vX.Y.Z again; 1.12.0 to 1.13.1 stay in
-        # aesir-oss/pixi-ext-contrib as pixi-sbom-vX.Y.Z. The newest across all three lists wins.
+    def test_every_release_is_read_from_one_repository(self) -> None:
+        # aesir-oss/pixi-sbom holds every release as vX.Y.Z, those first made in millsks/pixi-sbom and
+        # aesir-oss/pixi-ext-contrib included, so one list answers for every era.
         root = Path(self.api.removeprefix("file://")).parent
-        (root / "standalone").write_text(json.dumps([{"tag_name": "v1.13.2"}, {"tag_name": "v1.14.0-rc.1"}]))
-        (root / "workspace").write_text(json.dumps([{"tag_name": "pixi-sbom-v1.13.1"}, {"tag_name": "pixi-sbom-v1.12.0"}]))
-        three = f"file://{root}/standalone file://{root}/workspace {self.api}"
-        self.assertEqual(self.version(RELEASES_API=three), "1.13.2")
-        self.assertEqual(self.version(RELEASES_API=three, ACTION_REF="v1"), "1.13.2")
-        self.assertEqual(self.version(RELEASES_API=three, ACTION_REF="v1.13.1"), "1.13.1")
-        self.assertEqual(self.version(RELEASES_API=three, ACTION_REF="v0"), "0.12.0")
+        (root / "all").write_text(
+            json.dumps([{"tag_name": t} for t in ["v1.14.0-rc.1", "v1.13.2", "v1.13.1", "v1.12.0", "v1.11.0", "v0.12.0"]])
+        )
+        one = f"file://{root}/all"
+        self.assertEqual(self.version(RELEASES_API=one), "1.13.2")
+        self.assertEqual(self.version(RELEASES_API=one, ACTION_REF="v1"), "1.13.2")
+        self.assertEqual(self.version(RELEASES_API=one, ACTION_REF="v1.12.0"), "1.12.0")
+        self.assertEqual(self.version(RELEASES_API=one, INPUT_VERSION="pixi-sbom-v1.13.1"), "1.13.1")
+        self.assertEqual(self.version(RELEASES_API=one, ACTION_REF="v0"), "0.12.0")
+
+    def test_the_default_list_is_aesir_oss_pixi_sbom_only(self) -> None:
+        text = SCRIPT.read_text()
+        self.assertIn('RELEASES_API:-https://api.github.com/repos/aesir-oss/pixi-sbom/releases}"', text)
+        self.assertNotIn("api.github.com/repos/millsks", text)
+        self.assertNotIn("api.github.com/repos/aesir-oss/pixi-ext-contrib", text)
+        action = (SCRIPT.parent / "action.yml").read_text()
+        self.assertIn('base="https://github.com/aesir-oss/pixi-sbom/releases/download/v${VERSION}"', action)
+        self.assertNotIn("releases/download/pixi-sbom-v", action)
 
     def test_branch_takes_latest(self) -> None:
         self.assertEqual(self.version(ACTION_REF="main"), "1.0.0")

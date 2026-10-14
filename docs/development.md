@@ -360,7 +360,7 @@ with [mike](https://github.com/jimporter/mike) the way pixi's own docs are: each
 as the Pages artifact; the repository's Pages source stays "GitHub Actions" and the `github-pages` environment, which
 allows `main` and `v*` tags, records every deployment. `gh workflow run docs.yml -f ref=<tag>` redeploys a release's
 docs; any other ref (or none) redeploys `dev`. `pixi run -e docs mike serve` previews every deployed version locally
-from `gh-pages`. Docs for 1.12.0 to 1.13.1 stay on aesir-oss/pixi-ext-contrib's site, where they were published.
+from `gh-pages`. Docs for 1.12.0 to 1.13.1 were published on aesir-oss/pixi-ext-contrib's site, which is gone.
 
 The `github-pages` environment's deployment branch policy must allow the `v*` tag pattern as well as `main`
 (Settings → Environments → github-pages), because a release event runs on the tag; without it the deploy job fails
@@ -435,7 +435,9 @@ repository's *Latest*; a release candidate never is.
 
 Releases are tagged `vX.Y.Z`. Those up to 1.11.x were made in millsks/pixi-sbom and those from 1.12.0 to 1.13.1 in
 aesir-oss/pixi-ext-contrib (tagged `pixi-sbom-vX.Y.Z` there); their tags are carried here as `vX.Y.Z`, and their
-GitHub releases, archives and attestations stay in those repositories. The action reads all three release lists.
+GitHub releases were copied here with every asset, the signed `.sigstore.json` bundles included, so this repository
+is the only release source the action and the install docs use. Their attestations still name the repository that
+built them; [Installation](installation.md) shows the offline check against the bundle.
 
 `release.yml` inputs:
 

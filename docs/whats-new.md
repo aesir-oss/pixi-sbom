@@ -31,6 +31,12 @@ Since 1.0, pixi-sbom has:
 unmaintained C translation (RUSTSEC-2024-0449). The SBOMs it writes are unchanged. **Building from source now needs
 Rust 1.89** (it was 1.88); the binaries, wheels and conda package are not affected.
 
+**Every release is downloadable from aesir-oss/pixi-sbom.** Releases first made in millsks/pixi-sbom (up to 1.11.x) and
+aesir-oss/pixi-ext-contrib (1.12.0 to 1.13.1) were copied to its releases page with all their files, and the GitHub
+Action now installs every version from there, so pinning an old `version` keeps working whatever happens to those
+repositories. Their provenance still names the repository that built them; [Installation](installation.md) shows how to
+check it offline.
+
 ## 1.13.2
 
 **pixi-sbom has its own repository again,
