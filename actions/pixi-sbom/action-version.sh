@@ -2,17 +2,17 @@
 # Prints the pixi-sbom version the action should install, without the leading `v`.
 #
 #   INPUT_VERSION  the action's `version` input; wins when set
-#   ACTION_REF     github.action_ref: `v1.0.0` or `pixi-sbom-v1.0.0` pins that release, `v1` or
-#                  `pixi-sbom-v1` the newest 1.x.y release, anything else (a branch, a sha, `./`)
-#                  the newest release
+#   ACTION_REF     github.action_ref: `v1.0.0` pins that release, `v1` the newest 1.x.y release,
+#                  anything else (a branch, a sha, `./`) the newest release. A `pixi-sbom-` prefix,
+#                  how 1.12.0 to 1.13.1 were tagged in aesir-oss/pixi-ext-contrib, is still accepted.
 #   GH_TOKEN       optional, for the GitHub API rate limit
 #   RELEASES_API   space-separated release-list URLs, overridable so the test can use fixtures
 #
-# Releases up to 1.11.x are tagged vX.Y.Z in millsks/pixi-sbom; 1.12.0 to 1.13.1 are tagged pixi-sbom-vX.Y.Z in
-# aesir-oss/pixi-ext-contrib; from 1.13.2 they are tagged vX.Y.Z in aesir-oss/pixi-sbom. All three lists are read.
+# Every release is in aesir-oss/pixi-sbom, tagged vX.Y.Z: those first made in millsks/pixi-sbom (up to 1.11.x) and
+# aesir-oss/pixi-ext-contrib (1.12.0 to 1.13.1) were copied there, assets and all.
 set -euo pipefail
 
-apis="${RELEASES_API:-https://api.github.com/repos/aesir-oss/pixi-sbom/releases https://api.github.com/repos/aesir-oss/pixi-ext-contrib/releases https://api.github.com/repos/millsks/pixi-sbom/releases}"
+apis="${RELEASES_API:-https://api.github.com/repos/aesir-oss/pixi-sbom/releases}"
 
 fetch() {
   if [ -n "${GH_TOKEN:-}" ]; then
