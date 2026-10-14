@@ -253,7 +253,7 @@ struct PdmTool {
 struct EnvironmentYml {
     name: Option<String>,
     #[serde(default)]
-    dependencies: Vec<serde_yaml::Value>,
+    dependencies: Vec<serde_json::Value>,
 }
 
 /// Read the manifest describing a lockfile.
@@ -578,7 +578,7 @@ fn expand_group(groups: &BTreeMap<String, Vec<toml::Value>>, name: &str, seen: &
 /// What an `environment.yml` declares: conda specs, and the requirements of its `pip:` list.
 fn read_environment_yml(path: &Path) -> Option<Manifest> {
     let text = std::fs::read_to_string(path).ok()?;
-    let file: EnvironmentYml = match serde_yaml::from_str(&text) {
+    let file: EnvironmentYml = match crate::yaml::from_str(&text) {
         Ok(file) => file,
         Err(err) => {
             tracing::warn!(path = %path.display(), %err, "cannot parse environment.yml; leaving declarations out");
@@ -588,7 +588,7 @@ fn read_environment_yml(path: &Path) -> Option<Manifest> {
     let mut declared = Vec::new();
     for entry in &file.dependencies {
         match entry {
-            serde_yaml::Value::String(spec) => {
+            serde_json::Value::String(spec) => {
                 // `conda-forge::numpy>=2`, `python=3.11`, `pip`: the name is what precedes the
                 // version, after any channel.
                 let spec = spec.rsplit("::").next().unwrap_or(spec).trim();
@@ -605,10 +605,10 @@ fn read_environment_yml(path: &Path) -> Option<Manifest> {
                     });
                 }
             }
-            serde_yaml::Value::Mapping(map) => {
+            serde_json::Value::Object(map) => {
                 for requirement in map
                     .get("pip")
-                    .and_then(serde_yaml::Value::as_sequence)
+                    .and_then(serde_json::Value::as_array)
                     .into_iter()
                     .flatten()
                 {

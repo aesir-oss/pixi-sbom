@@ -93,12 +93,13 @@ check specific fields.
 
 ### The minimum supported Rust version
 
-`rust-version` in `Cargo.toml` is **1.88**, and the `msrv` environment pins exactly that toolchain so the claim is
+`rust-version` in `Cargo.toml` is **1.89**, and the `msrv` environment pins exactly that toolchain so the claim is
 checked rather than asserted: `pixi run -e msrv msrv-check`, which CI runs on every pull request.
 
 It was 1.85 until someone looked. That number came from edition 2024 and was never true — this crate uses
 let-chains in `kev.rs` and `osv.rs`, and those did not stabilize until 1.88. Nothing caught it because every job
-built on the toolchain `pixi.toml` pins, which is far newer.
+built on the toolchain `pixi.toml` pins, which is far newer. It rose to 1.89 in 1.14.0 for `serde-saphyr`, the pure-Rust YAML
+reader that replaced `serde_yaml` (#21).
 
 Raising the MSRV is a breaking change for anyone pinned to an older toolchain, so after 1.0 it belongs in a minor
 release at the earliest, with the new number in the changelog. Lowering it is free. Either way the `msrv`

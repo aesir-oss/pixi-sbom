@@ -198,7 +198,7 @@ fn pnpm_workspace_globs(dir: &Path) -> Vec<String> {
     }
     std::fs::read_to_string(dir.join("pnpm-workspace.yaml"))
         .ok()
-        .and_then(|text| serde_yaml::from_str::<Workspace>(&text).ok())
+        .and_then(|text| crate::yaml::from_str::<Workspace>(&text).ok())
         .map(|w| w.packages.into_iter().filter(|p| !p.starts_with('!')).collect())
         .unwrap_or_default()
 }

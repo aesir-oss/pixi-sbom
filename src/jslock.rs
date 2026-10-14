@@ -505,7 +505,7 @@ fn split_dependency(text: &str) -> Option<(String, String)> {
 #[derive(Deserialize)]
 struct BerryEntry {
     #[serde(default)]
-    version: Option<serde_yaml::Value>,
+    version: Option<serde_json::Value>,
     #[serde(default)]
     resolution: Option<String>,
     #[serde(default)]
@@ -515,8 +515,8 @@ struct BerryEntry {
 }
 
 fn yarn_berry_entries(contents: &str, origin: &str) -> Result<Vec<YarnEntry>, JsLockError> {
-    let raw: BTreeMap<String, serde_yaml::Value> =
-        serde_yaml::from_str(contents).map_err(|err| JsLockError::Parse {
+    let raw: BTreeMap<String, serde_json::Value> =
+        crate::yaml::from_str(contents).map_err(|err| JsLockError::Parse {
             path: origin.to_string(),
             kind: "yarn.lock",
             message: err.to_string(),
@@ -526,13 +526,13 @@ fn yarn_berry_entries(contents: &str, origin: &str) -> Result<Vec<YarnEntry>, Js
         if key == "__metadata" {
             continue;
         }
-        let Ok(entry) = serde_yaml::from_value::<BerryEntry>(value) else {
+        let Ok(entry) = serde_json::from_value::<BerryEntry>(value) else {
             continue;
         };
         let resolution = entry.resolution.unwrap_or_default();
         let version = match entry.version {
-            Some(serde_yaml::Value::String(s)) => s,
-            Some(serde_yaml::Value::Number(n)) => n.to_string(),
+            Some(serde_json::Value::String(s)) => s,
+            Some(serde_json::Value::Number(n)) => n.to_string(),
             _ => String::new(),
         };
         let workspace = resolution.split_once("@workspace:").map(|(_, path)| path.to_string());
@@ -682,7 +682,7 @@ fn yarn(contents: &str, origin: &str, dir: &Path) -> Result<JsLock, JsLockError>
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct PnpmLock {
-    lockfile_version: serde_yaml::Value,
+    lockfile_version: serde_json::Value,
     #[serde(default)]
     importers: BTreeMap<String, PnpmImporter>,
     #[serde(default)]
@@ -781,14 +781,14 @@ fn join_relative(importer: &str, path: &str) -> String {
 fn pnpm(contents: &str, origin: &str, dir: &Path) -> Result<JsLock, JsLockError> {
     let manifest = |path: &str| manifest(dir, path);
     const KIND: &str = "pnpm-lock.yaml";
-    let lock: PnpmLock = serde_yaml::from_str(contents).map_err(|err| JsLockError::Parse {
+    let lock: PnpmLock = crate::yaml::from_str(contents).map_err(|err| JsLockError::Parse {
         path: origin.to_string(),
         kind: KIND,
         message: err.to_string(),
     })?;
     let version = match &lock.lockfile_version {
-        serde_yaml::Value::String(s) => s.clone(),
-        serde_yaml::Value::Number(n) => n.to_string(),
+        serde_json::Value::String(s) => s.clone(),
+        serde_json::Value::Number(n) => n.to_string(),
         _ => String::new(),
     };
     let major: u32 = version.split('.').next().and_then(|m| m.parse().ok()).unwrap_or(0);
