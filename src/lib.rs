@@ -134,6 +134,8 @@ pub mod vulnpolicy;
 #[doc(hidden)]
 pub mod wheel;
 #[doc(hidden)]
+pub mod yaml;
+#[doc(hidden)]
 pub mod zipread;
 
 /// Assert that a diagnostic tells the user both what it is and what to do next.

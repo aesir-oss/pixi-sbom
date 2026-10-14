@@ -156,7 +156,7 @@ pub fn load(path: &Path) -> Result<Loaded, CondaLockError> {
 
 /// Parse lockfile text; `origin` names it in errors.
 pub fn parse(contents: &str, origin: &str) -> Result<CondaLock, CondaLockError> {
-    let version = serde_yaml::from_str::<serde_yaml::Value>(contents)
+    let version = crate::yaml::from_str::<serde_json::Value>(contents)
         .ok()
         .and_then(|value| value.get("version")?.as_u64());
     if let Some(found) = version.filter(|v| *v != u64::from(SUPPORTED_VERSION)) {
@@ -164,7 +164,7 @@ pub fn parse(contents: &str, origin: &str) -> Result<CondaLock, CondaLockError> 
             found: u32::try_from(found).unwrap_or(u32::MAX),
         });
     }
-    serde_yaml::from_str(contents).map_err(|err| CondaLockError::Parse {
+    crate::yaml::from_str(contents).map_err(|err| CondaLockError::Parse {
         path: origin.to_string(),
         message: err.to_string(),
     })

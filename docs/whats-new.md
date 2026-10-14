@@ -23,6 +23,14 @@ Since 1.0, pixi-sbom has:
   credentials are used, and `--doctor` says which host is the problem.
 - **Learned tab completion** in bash, zsh, fish and PowerShell, for `pixi-sbom` and `pixi sbom`.
 
+## Unreleased
+
+**YAML is read by a parser written in safe Rust.** `conda-lock.yml`, `environment.yml`, `pnpm-lock.yaml`,
+`pnpm-workspace.yaml` and yarn berry's `yarn.lock` are now parsed with
+[serde-saphyr](https://crates.io/crates/serde-saphyr) instead of `serde_yaml`, which is deprecated and built on an
+unmaintained C translation (RUSTSEC-2024-0449). The SBOMs it writes are unchanged. **Building from source now needs
+Rust 1.89** (it was 1.88); the binaries, wheels and conda package are not affected.
+
 ## 1.13.2
 
 **pixi-sbom has its own repository again,
