@@ -2300,7 +2300,7 @@ with <a href="https://github.com/jimporter/mike">mike</a> the way pixi's own doc
 as the Pages artifact; the repository's Pages source stays "GitHub Actions" and the <code>github-pages</code> environment, which
 allows <code>main</code> and <code>v*</code> tags, records every deployment. <code>gh workflow run docs.yml -f ref=&lt;tag&gt;</code> redeploys a release's
 docs; any other ref (or none) redeploys <code>dev</code>. <code>pixi run -e docs mike serve</code> previews every deployed version locally
-from <code>gh-pages</code>. Docs for 1.12.0 to 1.13.1 stay on aesir-oss/pixi-ext-contrib's site, where they were published.</p>
+from <code>gh-pages</code>. Docs for 1.12.0 to 1.13.1 were published on aesir-oss/pixi-ext-contrib's site, which is gone.</p>
 <p>The <code>github-pages</code> environment's deployment branch policy must allow the <code>v*</code> tag pattern as well as <code>main</code>
 (Settings → Environments → github-pages), because a release event runs on the tag; without it the deploy job fails
 with "Branch ... is not allowed to deploy to github-pages".</p>
@@ -2359,7 +2359,9 @@ and the pre-commit mirror. One operator action, two runs. A final release is thi
 repository's <em>Latest</em>; a release candidate never is.</p>
 <p>Releases are tagged <code>vX.Y.Z</code>. Those up to 1.11.x were made in millsks/pixi-sbom and those from 1.12.0 to 1.13.1 in
 aesir-oss/pixi-ext-contrib (tagged <code>pixi-sbom-vX.Y.Z</code> there); their tags are carried here as <code>vX.Y.Z</code>, and their
-GitHub releases, archives and attestations stay in those repositories. The action reads all three release lists.</p>
+GitHub releases were copied here with every asset, the signed <code>.sigstore.json</code> bundles included, so this repository
+is the only release source the action and the install docs use. Their attestations still name the repository that
+built them; <a href="../installation/">Installation</a> shows the offline check against the bundle.</p>
 <p><code>release.yml</code> inputs:</p>
 <table>
 <thead>
