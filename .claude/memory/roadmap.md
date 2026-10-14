@@ -349,5 +349,8 @@ crate could be taken for prefix.dev's), so it went back to `pixi-ext-common`, in
 its own so either can be handed to a new owner by transferring one repository: pixi-policy went first (0.1.1 from
 aesir-oss/pixi-policy), then pixi-sbom to aesir-oss/pixi-sbom, with its full history (millsks/pixi-sbom's included),
 the crate back at the root and the shared code folded back in. Releases are tagged `vX.Y.Z` again, the first from the
-new repository being 1.13.2; 1.12.0 to 1.13.1 stay in aesir-oss/pixi-ext-contrib, which is archived. Issue numbers in
-this file from 2026-10-11 to the split refer to aesir-oss/pixi-ext-contrib.
+new repository being 1.13.2. Every earlier release was copied here, and aesir-oss/pixi-ext-contrib was deleted
+(2026-10-14). Issue numbers in this file from 2026-10-11 to the split refer to aesir-oss/pixi-ext-contrib.
+
+1.14.0 (2026-10-14): YAML read with serde-saphyr instead of serde_yaml, MSRV 1.89 (#23; rattler's own serde_yaml
+keeps #21 open), and the action installs every version from this repository's releases alone (#25).

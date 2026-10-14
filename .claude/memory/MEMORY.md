@@ -8,7 +8,7 @@ aesir-oss/pixi-ext-contrib.
 - [Minimal enrichment defaults](feedback-minimal-defaults.md) — the fact by default, bulky payloads behind their own flag
 - [Issue delivery loop](issue-delivery-loop.md) — "guardrail"/"harness" = global CLAUDE.md §6 loop; merge with --squash --admin --delete-branch; never cut a release unasked
 - [Releases](releases.md) — vX.Y.Z tags, rc to TestPyPI and final to PyPI, the action and pre-commit mirrors, where each era's releases live
-- [Split from pixi-ext-contrib](split-from-pixi-ext-contrib.md) — what came with the history, what stayed in the earlier repositories
+- [Split from pixi-ext-contrib](split-from-pixi-ext-contrib.md) — what came with the history; pixi-ext-contrib deleted, millsks/pixi-sbom kept archived
 - [Force-push permission](force-push-permission.md) — own feature branches, and the stale-check trap behind it
 - [Changelog generation](release-notes-span-last-tag.md) — anchored tag_pattern; each release prepends its section, earlier ones are never regenerated
 - [Marketplace listing](marketplace-listing.md) — the action ships from aesir-oss/pixi-sbom-action; its listing needs a new name

@@ -10,13 +10,17 @@ pixi-sbom started in millsks/pixi-sbom, moved into the aesir-oss/pixi-ext-contri
 aesir-oss/pixi-ext-contrib#131). Its whole history came with it, so commit messages reference both earlier
 repositories' issues and PRs by number.
 
-- The tags of every release are here as `vX.Y.Z`, but the GitHub releases, archives and attestations of 1.12.0 to
-  1.13.1 stay in pixi-ext-contrib (archived) and those up to 1.11.x in millsks/pixi-sbom (which still serves
-  `uses: millsks/pixi-sbom@v1`; never delete or rename it).
+- Every release is here as `vX.Y.Z`: the GitHub releases of 1.12.0 to 1.13.1 (from pixi-ext-contrib) and up to
+  1.11.x (from millsks/pixi-sbom) were copied with their assets and `.sigstore.json` bundles. Their attestations still
+  name the repository that built them, so verify old archives offline with `gh attestation verify --bundle`.
+- aesir-oss/pixi-ext-contrib was deleted after the split; its issues were moved here and to aesir-oss/pixi-policy
+  (workspace-only ones in the closed `pixi-ext-contrib` and `pixi-ext-common` milestones), its PRs were lost.
+- millsks/pixi-sbom stays, archived, because it still serves `uses: millsks/pixi-sbom@v1` (a deprecated wrapper
+  forwarding to aesir-oss/pixi-sbom-action@v1); never delete or rename it. Its issues stay there: GitHub cannot
+  transfer issues from a user repository to an organization's.
 - The code once shared with pixi-policy is this crate's own again (see [[architecture-decisions]]); pixi-policy keeps
   its own copy, and nothing keeps the two in step.
-- The docs for 1.12.0 to 1.13.1 stay on aesir-oss.github.io/pixi-ext-contrib/pixi-sbom/; this repository's site starts
-  with 1.13.2.
+- The docs for 1.12.0 to 1.13.1 went with pixi-ext-contrib's site; this repository's site starts with 1.13.2.
 
 **Why:** the maintainer wanted each extension in its own repository, so either can be handed to a new owner by
 transferring one repository.

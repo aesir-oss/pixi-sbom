@@ -56,5 +56,7 @@ Everything runs through pixi.
   `pre-commit-mirror/` instead.
 - `examples/projects/` lockfiles are regenerated with `pixi run -e examples examples`, not edited.
 - `.claude/memory/` is public. Nothing private, personal or about the maintainer's employer goes in it.
-- `millsks/pixi-sbom` still serves `uses: millsks/pixi-sbom@v1`; never delete it or reuse its name. Releases 1.12.0
-  to 1.13.1 live in `aesir-oss/pixi-ext-contrib`; the action reads both, and this repository's, release lists.
+- `millsks/pixi-sbom` still serves `uses: millsks/pixi-sbom@v1`; never delete it or reuse its name. Every release,
+  including those first made there and in the deleted `aesir-oss/pixi-ext-contrib`, is in this repository's release
+  list, which is the only one the action reads.
+- Work happens on the fork `millsks/aesir-pixi-sbom` (`origin`); PRs go to `aesir-oss/pixi-sbom` (`upstream`).
