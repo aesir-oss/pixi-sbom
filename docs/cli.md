@@ -1841,7 +1841,9 @@ pixi-sbom 1.0.0 (aarch64 macos)
 features: rustls, gzip, platform-verifier, socks-proxy, win-system-proxy: n/a
 caches:   /Users/u/Library/Caches/rattler/cache/pixi-sbom (exists)
 pixi:     pixi 0.81.0
-offline:  false   proxy: HTTPS_PROXY=http://user:***@proxy.corp:8080   no-proxy: none
+offline:  false
+proxy:    HTTPS_PROXY=http://user:***@proxy.corp:8080
+no-proxy: none
 TLS:      the platform verifier (the operating system trust store)
 ```
 

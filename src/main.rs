@@ -1556,7 +1556,9 @@ fn environment_banner() -> String {
             if cache.is_dir() { "exists" } else { "not created yet" }
         ),
         format!("pixi:     {pixi}"),
-        format!("offline:  {}   proxy: {proxy}   no-proxy: {no_proxy}", http::offline()),
+        format!("offline:  {}", http::offline()),
+        format!("proxy:    {proxy}"),
+        format!("no-proxy: {no_proxy}"),
         format!("TLS:      {}", http::TlsRoots::from_env(None).describe()),
         String::new(),
     ]

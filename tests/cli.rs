@@ -142,14 +142,17 @@ fn version_details_prints_what_a_bug_report_needs() {
     );
     assert!(text.contains("platform-verifier"), "{text}");
     assert!(text.contains("caches:"), "{text}");
-    assert!(text.contains("offline:  true"), "{text}");
+    // One value per line, so a long proxy URL or NO_PROXY list does not wrap the others away (#58).
+    let lines: Vec<&str> = text.lines().collect();
+    assert!(lines.contains(&"offline:  true"), "{text}");
     assert!(
-        text.contains("proxy: HTTPS_PROXY=http://someone:***@proxy.corp:8080"),
+        lines.contains(&"proxy:    HTTPS_PROXY=http://someone:***@proxy.corp:8080"),
         "{text}"
     );
+    assert!(lines.iter().any(|line| line.starts_with("no-proxy: ")), "{text}");
     assert!(!text.contains("hunter2"), "a pasted banner must not carry a password");
     // It answers without a workspace and without touching the network.
-    assert_eq!(text.lines().count(), 6, "{text}");
+    assert_eq!(lines.len(), 8, "{text}");
 
     // The alias is the name people guess.
     pixi_sbom().arg("--build-info").assert().success();

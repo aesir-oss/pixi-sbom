@@ -18,7 +18,9 @@ body:
         features: rustls, gzip, platform-verifier, socks-proxy: no, win-system-proxy: no
         caches:   /home/u/.cache/rattler/pixi-sbom (exists)
         pixi:     pixi 0.81.0
-        offline:  false   proxy: none   no-proxy: none
+        offline:  false
+        proxy:    none
+        no-proxy: none
         TLS:      the platform verifier (the operating system trust store)
     validations:
       required: true

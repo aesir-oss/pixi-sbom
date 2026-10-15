@@ -23,6 +23,12 @@ Since 1.0, pixi-sbom has:
   credentials are used, and `--doctor` says which host is the problem.
 - **Learned tab completion** in bash, zsh, fish and PowerShell, for `pixi-sbom` and `pixi sbom`.
 
+## Unreleased
+
+**`--version-details` gives each proxy setting its own line.** `offline`, `proxy` and `no-proxy` used to share one
+line, which wrapped once a real proxy URL and `NO_PROXY` list were in it; each now has a line of its own, aligned with
+the rest.
+
 ## 1.14.0
 
 **YAML is read by a parser written in safe Rust.** `conda-lock.yml`, `environment.yml`, `pnpm-lock.yaml`,
