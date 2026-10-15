@@ -495,6 +495,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#1140" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.14.0
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#1132" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1637,6 +1648,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#1140" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.14.0
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#1132" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1992,6 +2014,10 @@ has every commit.</p>
 <li><strong>Learned tab completion</strong> in bash, zsh, fish and PowerShell, for <code>pixi-sbom</code> and <code>pixi sbom</code>.</li>
 </ul>
 <h2 id="unreleased">Unreleased<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
+<p><strong><code>--version-details</code> gives each proxy setting its own line.</strong> <code>offline</code>, <code>proxy</code> and <code>no-proxy</code> used to share one
+line, which wrapped once a real proxy URL and <code>NO_PROXY</code> list were in it; each now has a line of its own, aligned with
+the rest.</p>
+<h2 id="1140">1.14.0<a class="headerlink" href="#1140" title="Permanent link">&para;</a></h2>
 <p><strong>YAML is read by a parser written in safe Rust.</strong> <code>conda-lock.yml</code>, <code>environment.yml</code>, <code>pnpm-lock.yaml</code>,
 <code>pnpm-workspace.yaml</code> and yarn berry's <code>yarn.lock</code> are now parsed with
 <a href="https://crates.io/crates/serde-saphyr">serde-saphyr</a> instead of <code>serde_yaml</code>, which is deprecated and built on an
