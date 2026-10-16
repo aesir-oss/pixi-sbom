@@ -33,6 +33,10 @@ the rest.
 tool, it now gets the standard route first: `uv pip compile pyproject.toml -o pylock.toml` or `pip lock .` (pip
 25.1+) writes a PEP 751 lock pixi-sbom reads; `uv lock`, `poetry lock` and `pdm lock` follow.
 
+**Why an SBOM comes from a lock.** [It never resolves](without-pixi.md#it-never-resolves) now says what an SBOM
+written from ranges would lose (exact versions, the transitive graph, hashes and sources) and what the manifest beside
+a lock still adds.
+
 **TLS is on rustls 0.23.46**, which fixes four advisories published against 0.23.45 (RUSTSEC-2026-0346 to 0349),
 among them one where an unauthenticated server could steer later connections to the same host onto classical key
 exchange.

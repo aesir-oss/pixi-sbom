@@ -22,8 +22,8 @@ uvx pixi-sbom --lockfile uv.lock
 | only `pyproject.toml` or `environment.yml` | nothing yet | lock it with the project's tool; pixi-sbom names the command |
 | a virtualenv, no lockfile | `--prefix .venv` | what is installed, not what was asked for |
 
-pixi-sbom never resolves: given a manifest or a list of ranges, it refuses and names the command that makes a
-lock. A requirements file with one unpinned line is refused at that line.
+pixi-sbom [never resolves](../without-pixi.md#it-never-resolves): given a manifest or a list of ranges, it
+refuses and names the command that makes a lock. A requirements file with one unpinned line is refused at that line.
 
 ## Check it reads what you think
 

@@ -118,6 +118,28 @@ of anything. So these are not inputs, and each has a tool that turns it into one
 
 A manifest beside a lockfile is still read, for what it declares; only resolving is ruled out.
 
+An SBOM written from ranges would be missing what makes one useful downstream:
+
+- **Exact versions.** `django>=4` is not a version, so there is no purl or CPE a scanner can match: Grype matches
+  advisories against the version a package is at, and a range has none.
+- **The graph.** A manifest names the direct dependencies; what they pull in is only known once something resolves
+  it. The transitive packages, usually most of an environment, would not be in the document at all.
+- **Hashes and sources.** A lock records each artifact's hash and where it came from, which is what an SBOM is
+  verified against and what `--fetch-licenses` reads. A range points at no file.
+
+What the manifest beside the lock does add, each described where it is written:
+
+- which packages the project declared itself rather than pulled in, as `pixi:direct`
+  ([`pixi:*` properties](output-format.md#pixi-properties); what is read from each kind of manifest is in
+  [What a project without pixi declared](cli.md#what-a-project-without-pixi-declared));
+- whether a package is for running, for development or for an extra
+  ([Runtime, development and optional](output-format.md#runtime-development-and-optional),
+  [Python extras](cli.md#python-extras));
+- the project's own name, version and URLs on [the root component](output-format.md#the-root-component).
+
+The declared ranges themselves stay out of the document. They answer remediation questions (can this package be
+upgraded without touching the manifest?), not inventory ones, and an SBOM is an inventory.
+
 Given one of these instead of a lockfile, pixi-sbom says which command makes the lock rather than failing to parse it
 (`pixi_sbom::input::not_a_lock`). It tells a Poetry, PDM, uv or pixi `pyproject.toml` apart by its `[tool.*]` tables,
 and `conda env export` output from a hand-written `environment.yml` by its `prefix:` line:
