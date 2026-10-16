@@ -1769,7 +1769,7 @@ of anything. So these are not inputs, and each has a tool that turns it into one
 <tr>
 <td><code>pyproject.toml</code> alone</td>
 <td>the same: declarations, not a lock</td>
-<td><code>uv lock</code>, <code>poetry lock</code>, <code>pdm lock</code>, or <code>uv export --format pylock.toml</code></td>
+<td><code>uv pip compile pyproject.toml -o pylock.toml</code> or <code>pip lock .</code> for the standard <code>pylock.toml</code>; <code>uv lock</code>, <code>poetry lock</code> or <code>pdm lock</code> with that tool</td>
 </tr>
 <tr>
 <td><code>environment.yml</code> alone</td>
@@ -1795,7 +1795,7 @@ and <code>conda env export</code> output from a hand-written <code>environment.y
 <tbody>
 <tr>
 <td><code>pyproject.toml</code></td>
-<td><code>uv lock</code>, <code>poetry lock</code>, <code>pdm lock</code> or <code>pixi lock</code>, by its <code>[tool.*]</code> tables; all three Python tools when it has none</td>
+<td><code>uv lock</code>, <code>poetry lock</code>, <code>pdm lock</code> or <code>pixi lock</code>, by its <code>[tool.*]</code> tables; when it has none, <code>uv pip compile pyproject.toml -o pylock.toml</code> or <code>pip lock .</code> first, then the three Python tools</td>
 </tr>
 <tr>
 <td><code>pixi.toml</code></td>

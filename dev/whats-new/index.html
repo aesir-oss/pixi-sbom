@@ -2017,6 +2017,9 @@ has every commit.</p>
 <p><strong><code>--version-details</code> gives each proxy setting its own line.</strong> <code>offline</code>, <code>proxy</code> and <code>no-proxy</code> used to share one
 line, which wrapped once a real proxy URL and <code>NO_PROXY</code> list were in it; each now has a line of its own, aligned with
 the rest.</p>
+<p><strong>A plain <code>pyproject.toml</code> is pointed at <code>pylock.toml</code>.</strong> Given as <code>--lockfile</code> with no <code>[tool.*]</code> table naming its
+tool, it now gets the standard route first: <code>uv pip compile pyproject.toml -o pylock.toml</code> or <code>pip lock .</code> (pip
+25.1+) writes a PEP 751 lock pixi-sbom reads; <code>uv lock</code>, <code>poetry lock</code> and <code>pdm lock</code> follow.</p>
 <p><strong>TLS is on rustls 0.23.46</strong>, which fixes four advisories published against 0.23.45 (RUSTSEC-2026-0346 to 0349),
 among them one where an unauthenticated server could steer later connections to the same host onto classical key
 exchange.</p>
