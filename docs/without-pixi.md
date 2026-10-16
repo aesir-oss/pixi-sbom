@@ -113,7 +113,7 @@ of anything. So these are not inputs, and each has a tool that turns it into one
 | Not an input | Why | Run instead |
 |---|---|---|
 | `requirements.txt` with ranges (`django>=4`) | it names ranges, not versions | `uv pip compile requirements.txt -o pylock.toml`, or `pip lock -r requirements.txt -o pylock.toml` |
-| `pyproject.toml` alone | the same: declarations, not a lock | `uv lock`, `poetry lock`, `pdm lock`, or `uv export --format pylock.toml` |
+| `pyproject.toml` alone | the same: declarations, not a lock | `uv pip compile pyproject.toml -o pylock.toml` or `pip lock .` for the standard `pylock.toml`; `uv lock`, `poetry lock` or `pdm lock` with that tool |
 | `environment.yml` alone | conda specs, not builds | `conda-lock -f environment.yml`, or `conda list --explicit --md5 > explicit.txt` in the environment |
 
 A manifest beside a lockfile is still read, for what it declares; only resolving is ruled out.
@@ -129,7 +129,7 @@ and `conda env export` output from a hand-written `environment.yml` by its `pref
 
 | Given | It says |
 |---|---|
-| `pyproject.toml` | `uv lock`, `poetry lock`, `pdm lock` or `pixi lock`, by its `[tool.*]` tables; all three Python tools when it has none |
+| `pyproject.toml` | `uv lock`, `poetry lock`, `pdm lock` or `pixi lock`, by its `[tool.*]` tables; when it has none, `uv pip compile pyproject.toml -o pylock.toml` or `pip lock .` first, then the three Python tools |
 | `pixi.toml` | `pixi lock` |
 | `environment.yml` | `conda-lock -f environment.yml -p …`, or `conda list --explicit --md5` in the environment |
 | `conda env export` output | `conda list --explicit --md5`, or `--prefix` on the environment |
