@@ -2017,6 +2017,9 @@ has every commit.</p>
 <p><strong><code>--version-details</code> gives each proxy setting its own line.</strong> <code>offline</code>, <code>proxy</code> and <code>no-proxy</code> used to share one
 line, which wrapped once a real proxy URL and <code>NO_PROXY</code> list were in it; each now has a line of its own, aligned with
 the rest.</p>
+<p><strong>TLS is on rustls 0.23.46</strong>, which fixes four advisories published against 0.23.45 (RUSTSEC-2026-0346 to 0349),
+among them one where an unauthenticated server could steer later connections to the same host onto classical key
+exchange.</p>
 <h2 id="1140">1.14.0<a class="headerlink" href="#1140" title="Permanent link">&para;</a></h2>
 <p><strong>YAML is read by a parser written in safe Rust.</strong> <code>conda-lock.yml</code>, <code>environment.yml</code>, <code>pnpm-lock.yaml</code>,
 <code>pnpm-workspace.yaml</code> and yarn berry's <code>yarn.lock</code> are now parsed with
