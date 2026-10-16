@@ -107,8 +107,9 @@ fn pyproject(text: &str) -> (String, String) {
     }
     (
         "a Python project's manifest".to_string(),
-        "run your project's tool beside it: `uv lock` (uv.lock), `poetry lock` (poetry.lock) or `pdm lock` (pdm.lock); \
-         then pass the lockfile, or leave --lockfile out"
+        "lock it to the standard pylock.toml (PEP 751) with `uv pip compile pyproject.toml -o pylock.toml` or \
+         `pip lock .` (pip 25.1+), then pass pylock.toml; or run your project's tool beside it: `uv lock` (uv.lock), \
+         `poetry lock` (poetry.lock) or `pdm lock` (pdm.lock), and pass that lockfile or leave --lockfile out"
             .to_string(),
     )
 }
@@ -176,7 +177,7 @@ mod tests {
                 "pyproject.toml",
                 "[project]\nname = \"x\"\n",
                 "Python project's manifest",
-                "`uv lock` (uv.lock), `poetry lock`",
+                "pylock.toml (PEP 751) with `uv pip compile pyproject.toml -o pylock.toml` or `pip lock .`",
             ),
             ("Pipfile", "[packages]\n", "Pipenv's Pipfile", "pipenv requirements"),
             (
