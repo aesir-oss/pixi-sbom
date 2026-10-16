@@ -29,6 +29,10 @@ Since 1.0, pixi-sbom has:
 line, which wrapped once a real proxy URL and `NO_PROXY` list were in it; each now has a line of its own, aligned with
 the rest.
 
+**TLS is on rustls 0.23.46**, which fixes four advisories published against 0.23.45 (RUSTSEC-2026-0346 to 0349),
+among them one where an unauthenticated server could steer later connections to the same host onto classical key
+exchange.
+
 ## 1.14.0
 
 **YAML is read by a parser written in safe Rust.** `conda-lock.yml`, `environment.yml`, `pnpm-lock.yaml`,
