@@ -23,7 +23,7 @@ Since 1.0, pixi-sbom has:
   credentials are used, and `--doctor` says which host is the problem.
 - **Learned tab completion** in bash, zsh, fish and PowerShell, for `pixi-sbom` and `pixi sbom`.
 
-## Unreleased
+## 1.15.0
 
 **`--version-details` gives each proxy setting its own line.** `offline`, `proxy` and `no-proxy` used to share one
 line, which wrapped once a real proxy URL and `NO_PROXY` list were in it; each now has a line of its own, aligned with
