@@ -484,6 +484,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#1150" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.15.0
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#1140" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1626,6 +1637,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#1150" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.15.0
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#1140" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1991,6 +2013,19 @@ has every commit.</p>
   credentials are used, and <code>--doctor</code> says which host is the problem.</li>
 <li><strong>Learned tab completion</strong> in bash, zsh, fish and PowerShell, for <code>pixi-sbom</code> and <code>pixi sbom</code>.</li>
 </ul>
+<h2 id="1150">1.15.0<a class="headerlink" href="#1150" title="Permanent link">&para;</a></h2>
+<p><strong><code>--version-details</code> gives each proxy setting its own line.</strong> <code>offline</code>, <code>proxy</code> and <code>no-proxy</code> used to share one
+line, which wrapped once a real proxy URL and <code>NO_PROXY</code> list were in it; each now has a line of its own, aligned with
+the rest.</p>
+<p><strong>A plain <code>pyproject.toml</code> is pointed at <code>pylock.toml</code>.</strong> Given as <code>--lockfile</code> with no <code>[tool.*]</code> table naming its
+tool, it now gets the standard route first: <code>uv pip compile pyproject.toml -o pylock.toml</code> or <code>pip lock .</code> (pip
+25.1+) writes a PEP 751 lock pixi-sbom reads; <code>uv lock</code>, <code>poetry lock</code> and <code>pdm lock</code> follow.</p>
+<p><strong>Why an SBOM comes from a lock.</strong> <a href="../without-pixi/#it-never-resolves">It never resolves</a> now says what an SBOM
+written from ranges would lose (exact versions, the transitive graph, hashes and sources) and what the manifest beside
+a lock still adds.</p>
+<p><strong>TLS is on rustls 0.23.46</strong>, which fixes four advisories published against 0.23.45 (RUSTSEC-2026-0346 to 0349),
+among them one where an unauthenticated server could steer later connections to the same host onto classical key
+exchange.</p>
 <h2 id="1140">1.14.0<a class="headerlink" href="#1140" title="Permanent link">&para;</a></h2>
 <p><strong>YAML is read by a parser written in safe Rust.</strong> <code>conda-lock.yml</code>, <code>environment.yml</code>, <code>pnpm-lock.yaml</code>,
 <code>pnpm-workspace.yaml</code> and yarn berry's <code>yarn.lock</code> are now parsed with

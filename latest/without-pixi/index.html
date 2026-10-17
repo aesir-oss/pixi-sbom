@@ -1769,7 +1769,7 @@ of anything. So these are not inputs, and each has a tool that turns it into one
 <tr>
 <td><code>pyproject.toml</code> alone</td>
 <td>the same: declarations, not a lock</td>
-<td><code>uv lock</code>, <code>poetry lock</code>, <code>pdm lock</code>, or <code>uv export --format pylock.toml</code></td>
+<td><code>uv pip compile pyproject.toml -o pylock.toml</code> or <code>pip lock .</code> for the standard <code>pylock.toml</code>; <code>uv lock</code>, <code>poetry lock</code> or <code>pdm lock</code> with that tool</td>
 </tr>
 <tr>
 <td><code>environment.yml</code> alone</td>
@@ -1779,6 +1779,27 @@ of anything. So these are not inputs, and each has a tool that turns it into one
 </tbody>
 </table>
 <p>A manifest beside a lockfile is still read, for what it declares; only resolving is ruled out.</p>
+<p>An SBOM written from ranges would be missing what makes one useful downstream:</p>
+<ul>
+<li><strong>Exact versions.</strong> <code>django&gt;=4</code> is not a version, so there is no purl or CPE a scanner can match: Grype matches
+  advisories against the version a package is at, and a range has none.</li>
+<li><strong>The graph.</strong> A manifest names the direct dependencies; what they pull in is only known once something resolves
+  it. The transitive packages, usually most of an environment, would not be in the document at all.</li>
+<li><strong>Hashes and sources.</strong> A lock records each artifact's hash and where it came from, which is what an SBOM is
+  verified against and what <code>--fetch-licenses</code> reads. A range points at no file.</li>
+</ul>
+<p>What the manifest beside the lock does add, each described where it is written:</p>
+<ul>
+<li>which packages the project declared itself rather than pulled in, as <code>pixi:direct</code>
+  (<a href="../output-format/#pixi-properties"><code>pixi:*</code> properties</a>; what is read from each kind of manifest is in
+  <a href="../cli/#what-a-project-without-pixi-declared">What a project without pixi declared</a>);</li>
+<li>whether a package is for running, for development or for an extra
+  (<a href="../output-format/#runtime-development-and-optional">Runtime, development and optional</a>,
+  <a href="../cli/#python-extras">Python extras</a>);</li>
+<li>the project's own name, version and URLs on <a href="../output-format/#the-root-component">the root component</a>.</li>
+</ul>
+<p>The declared ranges themselves stay out of the document. They answer remediation questions (can this package be
+upgraded without touching the manifest?), not inventory ones, and an SBOM is an inventory.</p>
 <p>Given one of these instead of a lockfile, pixi-sbom says which command makes the lock rather than failing to parse it
 (<code>pixi_sbom::input::not_a_lock</code>). It tells a Poetry, PDM, uv or pixi <code>pyproject.toml</code> apart by its <code>[tool.*]</code> tables,
 and <code>conda env export</code> output from a hand-written <code>environment.yml</code> by its <code>prefix:</code> line:</p>
@@ -1795,7 +1816,7 @@ and <code>conda env export</code> output from a hand-written <code>environment.y
 <tbody>
 <tr>
 <td><code>pyproject.toml</code></td>
-<td><code>uv lock</code>, <code>poetry lock</code>, <code>pdm lock</code> or <code>pixi lock</code>, by its <code>[tool.*]</code> tables; all three Python tools when it has none</td>
+<td><code>uv lock</code>, <code>poetry lock</code>, <code>pdm lock</code> or <code>pixi lock</code>, by its <code>[tool.*]</code> tables; when it has none, <code>uv pip compile pyproject.toml -o pylock.toml</code> or <code>pip lock .</code> first, then the three Python tools</td>
 </tr>
 <tr>
 <td><code>pixi.toml</code></td>
