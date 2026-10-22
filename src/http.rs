@@ -113,6 +113,35 @@ pub enum CaBundleError {
 /// The trust anchors for this run, parsed once.
 static ROOTS: OnceLock<ureq::tls::RootCerts> = OnceLock::new();
 
+/// Roots the browsers and certifi have stopped trusting, by the SHA-256 of their DER. A bundle
+/// still carrying one predates the distrust, and trusts whatever the compromised intermediates
+/// under it signed, for any host. Matched by fingerprint, never by name: certifi 2026.10.19 keeps
+/// eMudhra's other emSign roots.
+const DISTRUSTED_ROOTS: &[(&str, &str, &str)] = &[(
+    "emSign ECC Root CA - G3",
+    "86a1ecba089c4a8d3bbe2734c612ba341d813e043cf9e8a862cd5c57a36bbe6b",
+    "https://bugzilla.mozilla.org/show_bug.cgi?id=2083449",
+)];
+
+/// The distrusted roots among a bundle's certificates, as `(name, reference)`.
+fn distrusted_roots(certificates: &[ureq::tls::Certificate<'_>]) -> Vec<(&'static str, &'static str)> {
+    use sha2::{Digest, Sha256};
+    let fingerprints: Vec<String> = certificates
+        .iter()
+        .map(|certificate| {
+            Sha256::digest(certificate.der())
+                .iter()
+                .map(|byte| format!("{byte:02x}"))
+                .collect()
+        })
+        .collect();
+    DISTRUSTED_ROOTS
+        .iter()
+        .filter(|(_, sha256, _)| fingerprints.iter().any(|seen| seen == sha256))
+        .map(|(name, _, reference)| (*name, *reference))
+        .collect()
+}
+
 /// Read the bundle, if there is one, and keep its certificates for every later request. Called
 /// once, before anything is fetched, so the diagnostic names the file rather than the
 /// handshake. Later calls are ignored, which keeps the tests honest.
@@ -145,6 +174,16 @@ pub fn init_tls(roots: &TlsRoots) -> Result<(), CaBundleError> {
         certificates = certificates.len(),
         "using a CA bundle instead of the platform trust store"
     );
+    // A warning rather than a refusal: the bundle is still the user's to choose, but a stale one
+    // fails open, so nothing else would ever say so.
+    for (root, reference) in distrusted_roots(&certificates) {
+        tracing::warn!(
+            path = %path.display(),
+            source = *source,
+            reference,
+            "the CA bundle still trusts {root}, which browsers and certifi no longer do; refresh it (certifi 2026.10.19 or later, or ca-certificates of the same date)"
+        );
+    }
     let _ = ROOTS.set(ureq::tls::RootCerts::Specific(std::sync::Arc::new(certificates)));
     // The agent is built once and keeps whatever trust anchors it was built with. Setting them
     // afterwards would leave the bundle silently unused, which is the kind of failure that looks
@@ -980,6 +1019,36 @@ mod tests {
             TlsRoots::resolve(None, |name| (name == CA_BUNDLE_ENV).then(String::new)),
             TlsRoots::Platform
         );
+    }
+
+    #[test]
+    fn a_bundle_still_holding_a_distrusted_root_is_named() {
+        let parse = |pem: &str| -> Vec<ureq::tls::Certificate<'static>> {
+            ureq::tls::parse_pem(pem.as_bytes())
+                .filter_map(|item| match item {
+                    Ok(ureq::tls::PemItem::Certificate(certificate)) => Some(certificate),
+                    _ => None,
+                })
+                .collect()
+        };
+        let g3 = include_str!("../tests/fixtures/tls/emsign-ecc-root-ca-g3.pem");
+        let g1 = include_str!("../tests/fixtures/tls/emsign-root-ca-g1.pem");
+
+        // certifi 2026.07.22 carried both; the root eMudhra's weak intermediates chain to is named.
+        let stale = parse(&format!("{PEM}{g1}{g3}"));
+        assert_eq!(stale.len(), 3);
+        assert_eq!(
+            distrusted_roots(&stale),
+            [(
+                "emSign ECC Root CA - G3",
+                "https://bugzilla.mozilla.org/show_bug.cgi?id=2083449"
+            )]
+        );
+
+        // 2026.10.19 kept G1, another emSign root from the same issuer: the match is the
+        // fingerprint, so it and a private CA pass quietly.
+        assert!(distrusted_roots(&parse(&format!("{PEM}{g1}"))).is_empty());
+        assert!(distrusted_roots(&[]).is_empty());
     }
 
     #[test]
