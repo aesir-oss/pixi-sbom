@@ -88,6 +88,10 @@ Error: pixi_sbom::http::ca_bundle
         a DER file must be converted first (openssl x509 -inform der -in ca.der -out ca.pem)
 ```
 
+A warning that the bundle "still trusts" a root means the file is older than that root's distrust and should be
+refreshed: an old certifi `cacert.pem` behind `SSL_CERT_FILE` is the usual case. See
+[When a root is distrusted](cli.md#when-a-root-is-distrusted).
+
 ### A channel that needs credentials
 
 A private channel or index answers 401, usually on `--fetch-licenses`, which reads each archive

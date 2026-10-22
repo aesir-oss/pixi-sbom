@@ -32,6 +32,7 @@ emSign ECC Root CA - G3, whose intermediates had trivially weak keys
 `cacert.pem` keeps trusting that root. pixi-sbom now warns when the bundle it loads still contains it, matched by
 fingerprint, so certifi 2026.10.19, which keeps eMudhra's other roots, passes quietly. The run, its output and its exit
 code are unchanged. With no bundle set, the platform store is used and the operating system's update covers it.
+[When a root is distrusted](cli.md#when-a-root-is-distrusted) says what to do in either case.
 
 ## 1.15.0
 

@@ -27,6 +27,8 @@ PIXI_SBOM_PYPI_URL=https://artifactory.example.com/api/pypi/pypi/pypi pixi sbom 
 The full list, with defaults, is under [Every upstream it can reach](../cli.md#every-upstream-it-can-reach). A
 private certificate authority goes in `--ca-bundle` or `PIXI_SBOM_CA_BUNDLE`; credentials for a private channel
 are read from where pixi keeps them ([A channel that needs credentials](../troubleshooting.md#a-channel-that-needs-credentials)).
+A bundle replaces the system's trust store, so keep it current: pixi-sbom warns when it still trusts a distrusted
+root ([When a root is distrusted](../cli.md#when-a-root-is-distrusted)).
 
 ## 3. Or warm the cache somewhere else
 
