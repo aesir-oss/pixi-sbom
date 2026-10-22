@@ -2044,6 +2044,11 @@ emSign ECC Root CA - G3, whose intermediates had trivially weak keys
 fingerprint, so certifi 2026.10.19, which keeps eMudhra's other roots, passes quietly. The run, its output and its exit
 code are unchanged. With no bundle set, the platform store is used and the operating system's update covers it.
 <a href="../cli/#when-a-root-is-distrusted">When a root is distrusted</a> says what to do in either case.</p>
+<p><strong>TLS rejects the eight compromised emSign intermediates.</strong> rustls-webpki 0.103.16 refuses any certificate path through
+them, whatever the trust anchors say (RUSTSEC-2026-0382), so a stale bundle no longer lets them through. That covers
+every connection with a bundle, and every connection on Linux. On macOS and Windows the platform verifier uses the
+system's own verification, and the system update covers it. The <code>webpki-roots</code> crate in the dependency tree moves to
+1.0.10, which drops emSign ECC Root CA - G3 (RUSTSEC-2026-0381). pixi-sbom never trusts those built-in roots.</p>
 <h2 id="1150">1.15.0<a class="headerlink" href="#1150" title="Permanent link">&para;</a></h2>
 <p><strong><code>--version-details</code> gives each proxy setting its own line.</strong> <code>offline</code>, <code>proxy</code> and <code>no-proxy</code> used to share one
 line, which wrapped once a real proxy URL and <code>NO_PROXY</code> list were in it; each now has a line of its own, aligned with

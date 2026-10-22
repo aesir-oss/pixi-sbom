@@ -5384,7 +5384,7 @@ whose intermediates had trivially weak keys (<a href="https://bugzilla.mozilla.o
 What to do depends on where the anchors come from:</p>
 <ul>
 <li><strong>The platform verifier.</strong> Update the operating system, or the base image and rebuild. pixi-sbom has no root store
-  of its own, so there is no pixi-sbom release to wait for.</li>
+  of its own, so a distrusted root needs no pixi-sbom release.</li>
 <li><strong>A bundle.</strong> The bundle <em>is</em> the trust store, and nothing updates it for you. Refresh the file: certifi
   2026.10.19 or later, the <code>ca-certificates</code> package of the same date, or your own CA's bundle rebuilt from a current
   one. Rebuild any image that copies it in.</li>
@@ -5392,6 +5392,10 @@ What to do depends on where the anchors come from:</p>
 <p>A bundle that still holds a root known to be distrusted is named in a warning when it is loaded, on every run. The
 match is the certificate's SHA-256 fingerprint, not its name, so a current bundle that keeps the same issuer's other
 roots passes. The warning changes nothing else: the bundle is still used, and the output and exit code are the same.</p>
+<p>An intermediate is a different matter. When an intermediate's key is compromised, rustls-webpki can block it by key
+whatever the trust anchors say, and does so for eMudhra's eight from pixi-sbom 1.15.1 (RUSTSEC-2026-0382). That
+protection covers a bundle on any system, and the platform verifier on Linux. It arrives in a pixi-sbom release, so
+keep pixi-sbom current as well.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-60-1" name="__codelineno-60-1" href="#__codelineno-60-1"></a> WARN pixi_sbom::http: the CA bundle still trusts emSign ECC Root CA - G3, which browsers and certifi no longer do;
 <a id="__codelineno-60-2" name="__codelineno-60-2" href="#__codelineno-60-2"></a>      refresh it (certifi 2026.10.19 or later, or ca-certificates of the same date)
 <a id="__codelineno-60-3" name="__codelineno-60-3" href="#__codelineno-60-3"></a>      path=/opt/conda/lib/python3.14/site-packages/certifi/cacert.pem source="SSL_CERT_FILE"
