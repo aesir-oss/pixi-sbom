@@ -23,6 +23,16 @@ Since 1.0, pixi-sbom has:
   credentials are used, and `--doctor` says which host is the problem.
 - **Learned tab completion** in bash, zsh, fish and PowerShell, for `pixi-sbom` and `pixi sbom`.
 
+## Unreleased
+
+**A CA bundle from before the eMudhra distrust is called out.** On 2026-10-20 browsers and certifi stopped trusting
+emSign ECC Root CA - G3, whose intermediates had trivially weak keys
+([Mozilla bug 2083449](https://bugzilla.mozilla.org/show_bug.cgi?id=2083449)). A bundle given by `--ca-bundle`,
+`PIXI_SBOM_CA_BUNDLE` or `SSL_CERT_FILE` replaces the operating system's trust store, so an older certifi
+`cacert.pem` keeps trusting that root. pixi-sbom now warns when the bundle it loads still contains it, matched by
+fingerprint, so certifi 2026.10.19, which keeps eMudhra's other roots, passes quietly. The run, its output and its exit
+code are unchanged. With no bundle set, the platform store is used and the operating system's update covers it.
+
 ## 1.15.0
 
 **`--version-details` gives each proxy setting its own line.** `offline`, `proxy` and `no-proxy` used to share one

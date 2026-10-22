@@ -6511,6 +6511,28 @@ fn a_private_ca_bundle_is_checked_before_the_first_request() {
         .assert();
     let text = String::from_utf8(assert.get_output().stdout.clone()).unwrap();
     assert!(text.contains("TLS roots  the platform verifier"), "{text}");
+
+    // A bundle from before the eMudhra distrust still works, but says it is stale (#64).
+    let tls = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/tls");
+    let run = |bundle: &str| {
+        pixi_sbom()
+            .current_dir(dir.path())
+            .env("PIXI_SBOM_OFFLINE", "1")
+            .env("SSL_CERT_FILE", tls.join(bundle))
+            .args(["-p", "linux-64", "--output", "-"])
+            .assert()
+            .success()
+    };
+    let stale = run("emsign-ecc-root-ca-g3.pem");
+    let stderr = String::from_utf8(stale.get_output().stderr.clone()).unwrap();
+    assert!(
+        stderr.contains("the CA bundle still trusts emSign ECC Root CA - G3"),
+        "{stderr}"
+    );
+    assert!(stderr.contains("certifi 2026.10.19 or later"), "{stderr}");
+    let current = run("emsign-root-ca-g1.pem");
+    let stderr = String::from_utf8(current.get_output().stderr.clone()).unwrap();
+    assert!(!stderr.contains("still trusts"), "{stderr}");
 }
 
 #[test]
