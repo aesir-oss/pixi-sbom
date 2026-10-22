@@ -1960,7 +1960,7 @@ whose intermediates had trivially weak keys ([Mozilla bug 2083449](https://bugzi
 What to do depends on where the anchors come from:
 
 - **The platform verifier.** Update the operating system, or the base image and rebuild. pixi-sbom has no root store
-  of its own, so there is no pixi-sbom release to wait for.
+  of its own, so a distrusted root needs no pixi-sbom release.
 - **A bundle.** The bundle *is* the trust store, and nothing updates it for you. Refresh the file: certifi
   2026.10.19 or later, the `ca-certificates` package of the same date, or your own CA's bundle rebuilt from a current
   one. Rebuild any image that copies it in.
@@ -1968,6 +1968,11 @@ What to do depends on where the anchors come from:
 A bundle that still holds a root known to be distrusted is named in a warning when it is loaded, on every run. The
 match is the certificate's SHA-256 fingerprint, not its name, so a current bundle that keeps the same issuer's other
 roots passes. The warning changes nothing else: the bundle is still used, and the output and exit code are the same.
+
+An intermediate is a different matter. When an intermediate's key is compromised, rustls-webpki can block it by key
+whatever the trust anchors say, and does so for eMudhra's eight from pixi-sbom 1.15.1 (RUSTSEC-2026-0382). That
+protection covers a bundle on any system, and the platform verifier on Linux. It arrives in a pixi-sbom release, so
+keep pixi-sbom current as well.
 
 ```text
  WARN pixi_sbom::http: the CA bundle still trusts emSign ECC Root CA - G3, which browsers and certifi no longer do;
