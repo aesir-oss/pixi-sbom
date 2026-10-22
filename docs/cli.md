@@ -1953,6 +1953,29 @@ missing or holds no certificate is reported before the first request, naming the
 that gave it, rather than arriving later as a handshake failure. The file must be PEM; convert a DER file first
 (`openssl x509 -inform der -in ca.der -out ca.pem`).
 
+### When a root is distrusted
+
+Now and then the browsers and certifi stop trusting a root, as they did on 2026-10-20 with emSign ECC Root CA - G3,
+whose intermediates had trivially weak keys ([Mozilla bug 2083449](https://bugzilla.mozilla.org/show_bug.cgi?id=2083449)).
+What to do depends on where the anchors come from:
+
+- **The platform verifier.** Update the operating system, or the base image and rebuild. pixi-sbom has no root store
+  of its own, so there is no pixi-sbom release to wait for.
+- **A bundle.** The bundle *is* the trust store, and nothing updates it for you. Refresh the file: certifi
+  2026.10.19 or later, the `ca-certificates` package of the same date, or your own CA's bundle rebuilt from a current
+  one. Rebuild any image that copies it in.
+
+A bundle that still holds a root known to be distrusted is named in a warning when it is loaded, on every run. The
+match is the certificate's SHA-256 fingerprint, not its name, so a current bundle that keeps the same issuer's other
+roots passes. The warning changes nothing else: the bundle is still used, and the output and exit code are the same.
+
+```text
+ WARN pixi_sbom::http: the CA bundle still trusts emSign ECC Root CA - G3, which browsers and certifi no longer do;
+      refresh it (certifi 2026.10.19 or later, or ca-certificates of the same date)
+      path=/opt/conda/lib/python3.14/site-packages/certifi/cacert.pem source="SSL_CERT_FILE"
+      reference="https://bugzilla.mozilla.org/show_bug.cgi?id=2083449"
+```
+
 Proxies come from `ALL_PROXY`, `HTTPS_PROXY`, `HTTP_PROXY` and `NO_PROXY` in either case, including `socks5://`
 and `socks5h://`; on Windows a proxy set only in the system settings is used as well. See
 [troubleshooting](troubleshooting.md) for what `--doctor` prints when one of these is the problem.
