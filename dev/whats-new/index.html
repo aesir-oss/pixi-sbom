@@ -495,6 +495,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#1150" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.15.0
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#1140" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1648,6 +1659,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#1150" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.15.0
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#1140" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2014,6 +2036,14 @@ has every commit.</p>
 <li><strong>Learned tab completion</strong> in bash, zsh, fish and PowerShell, for <code>pixi-sbom</code> and <code>pixi sbom</code>.</li>
 </ul>
 <h2 id="unreleased">Unreleased<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
+<p><strong>A CA bundle from before the eMudhra distrust is called out.</strong> On 2026-10-20 browsers and certifi stopped trusting
+emSign ECC Root CA - G3, whose intermediates had trivially weak keys
+(<a href="https://bugzilla.mozilla.org/show_bug.cgi?id=2083449">Mozilla bug 2083449</a>). A bundle given by <code>--ca-bundle</code>,
+<code>PIXI_SBOM_CA_BUNDLE</code> or <code>SSL_CERT_FILE</code> replaces the operating system's trust store, so an older certifi
+<code>cacert.pem</code> keeps trusting that root. pixi-sbom now warns when the bundle it loads still contains it, matched by
+fingerprint, so certifi 2026.10.19, which keeps eMudhra's other roots, passes quietly. The run, its output and its exit
+code are unchanged. With no bundle set, the platform store is used and the operating system's update covers it.</p>
+<h2 id="1150">1.15.0<a class="headerlink" href="#1150" title="Permanent link">&para;</a></h2>
 <p><strong><code>--version-details</code> gives each proxy setting its own line.</strong> <code>offline</code>, <code>proxy</code> and <code>no-proxy</code> used to share one
 line, which wrapped once a real proxy URL and <code>NO_PROXY</code> list were in it; each now has a line of its own, aligned with
 the rest.</p>
