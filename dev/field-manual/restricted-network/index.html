@@ -1416,7 +1416,9 @@ then ask again:</p>
 </code></pre></div>
 <p>The full list, with defaults, is under <a href="../../cli/#every-upstream-it-can-reach">Every upstream it can reach</a>. A
 private certificate authority goes in <code>--ca-bundle</code> or <code>PIXI_SBOM_CA_BUNDLE</code>; credentials for a private channel
-are read from where pixi keeps them (<a href="../../troubleshooting/#a-channel-that-needs-credentials">A channel that needs credentials</a>).</p>
+are read from where pixi keeps them (<a href="../../troubleshooting/#a-channel-that-needs-credentials">A channel that needs credentials</a>).
+A bundle replaces the system's trust store, so keep it current: pixi-sbom warns when it still trusts a distrusted
+root (<a href="../../cli/#when-a-root-is-distrusted">When a root is distrusted</a>).</p>
 <h2 id="3-or-warm-the-cache-somewhere-else">3. Or warm the cache somewhere else<a class="headerlink" href="#3-or-warm-the-cache-somewhere-else" title="Permanent link">&para;</a></h2>
 <p>When nothing can be reached, run once where the network is, then carry the cache across:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nv">PIXI_SBOM_CACHE_DIR</span><span class="o">=</span>./sbom-cache<span class="w"> </span>pixi<span class="w"> </span>sbom<span class="w"> </span>-p<span class="w"> </span>linux-64<span class="w"> </span>--pypi-mapping<span class="w"> </span>prefix<span class="w"> </span>--fetch-licenses<span class="w"> </span>--vulnerabilities<span class="w"> </span>osv<span class="w"> </span>--kev<span class="w"> </span>--epss<span class="w"> </span>--output<span class="w"> </span>-<span class="w">   </span><span class="c1"># needs the network</span>

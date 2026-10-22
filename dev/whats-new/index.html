@@ -2042,7 +2042,8 @@ emSign ECC Root CA - G3, whose intermediates had trivially weak keys
 <code>PIXI_SBOM_CA_BUNDLE</code> or <code>SSL_CERT_FILE</code> replaces the operating system's trust store, so an older certifi
 <code>cacert.pem</code> keeps trusting that root. pixi-sbom now warns when the bundle it loads still contains it, matched by
 fingerprint, so certifi 2026.10.19, which keeps eMudhra's other roots, passes quietly. The run, its output and its exit
-code are unchanged. With no bundle set, the platform store is used and the operating system's update covers it.</p>
+code are unchanged. With no bundle set, the platform store is used and the operating system's update covers it.
+<a href="../cli/#when-a-root-is-distrusted">When a root is distrusted</a> says what to do in either case.</p>
 <h2 id="1150">1.15.0<a class="headerlink" href="#1150" title="Permanent link">&para;</a></h2>
 <p><strong><code>--version-details</code> gives each proxy setting its own line.</strong> <code>offline</code>, <code>proxy</code> and <code>no-proxy</code> used to share one
 line, which wrapped once a real proxy URL and <code>NO_PROXY</code> list were in it; each now has a line of its own, aligned with
