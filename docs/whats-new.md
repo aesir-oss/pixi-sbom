@@ -40,6 +40,11 @@ every connection with a bundle, and every connection on Linux. On macOS and Wind
 system's own verification, and the system update covers it. The `webpki-roots` crate in the dependency tree moves to
 1.0.10, which drops emSign ECC Root CA - G3 (RUSTSEC-2026-0381). pixi-sbom never trusts those built-in roots.
 
+**Reading a `.conda` archive uses a patched zstd.** pixi-sbom decompresses a `.conda` file's `info` member when it reads
+an archive. zstd-safe 8.2.0 no longer exposes uninitialised memory when a legacy frame fails part way
+(RUSTSEC-2026-0403); zstd 0.14.3, zstd-sys 2.1.2 and ctutils 0.4.6 fix the rest of the batch (RUSTSEC-2026-0391,
+RUSTSEC-2026-0398, RUSTSEC-2026-0410, RUSTSEC-2026-0385), none of which pixi-sbom's own use reaches.
+
 ## 1.15.0
 
 **`--version-details` gives each proxy setting its own line.** `offline`, `proxy` and `no-proxy` used to share one
