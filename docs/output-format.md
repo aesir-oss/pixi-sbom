@@ -166,7 +166,7 @@ purl matches nothing, so a conda-only Python environment scans as clean whatever
 | Lockfile `purls:` | pixi writes them for environments that have `pypi-dependencies`; an empty list means "not on PyPI" | `pixi:purl` property / extra `externalRefs` entry |
 | `--pypi-mapping prefix` | the [conda-forge mapping](https://conda-mapping.prefix.dev/compressed-v0/compressed_mapping.json) pixi itself uses, downloaded and cached for a day | as above, plus `pixi:pypi-mapping=prefix` |
 | `--pypi-mapping-file <PATH>` | an offline copy of that mapping (`{"<conda name>": "<pypi name>" \| ["..."] \| null}`) | as above, plus `pixi:pypi-mapping=file` |
-| The installed `dist-info` (`--prefix` only) | the conda record's `files` list the `site-packages/<name>-<version>.dist-info/METADATA` the package installed; its `Name` and `Version` are the PyPI project's. Read from disk, no network, no flag | as above, plus `pixi:pypi-mapping=dist-info` and `pixi:pypi-dist-info` (the directory, relative to the prefix) |
+| The installed `dist-info` (`--prefix` only) | the conda record's `files` list the `site-packages/<name>-<version>.dist-info/METADATA` the package installed; its `Name` and `Version` are the PyPI project's. A dist-info a package vendors deeper down does not count; with none, its `site-packages/<name>-<version>.egg-info/PKG-INFO` answers (setuptools). Read from disk, no network, no flag | as above, plus `pixi:pypi-mapping=dist-info` and `pixi:pypi-dist-info` (the directory, relative to the prefix) |
 
 What a package installed outranks a name mapping: one with an identity from its `dist-info` is left alone by
 `--pypi-mapping`, which still answers for the packages that installed none. The mapping is applied only to
@@ -184,6 +184,11 @@ the conda purl to `pixi:purl`, because scanners only read the primary identity. 
 `osv-scanner` report advisories for conda-installed Python packages. Without it, a run that leaves PyPI identities
 where scanners cannot see them warns once on stderr; [Scanning with Grype](ci-recipes.md#scanning-with-grype) has the
 recommended commands and the configuration key.
+
+Grype looks a Python package up by its name, not its purl, so `--primary-purl pypi` also gives a conda package the PyPI
+project's name when the two differ by more than spelling: `nbconvert-core` is named `nbconvert`, `pytorch` `torch`,
+with the conda name in `pixi:conda-name`. `jupyter_client` keeps its name, since PEP 503 makes it `jupyter-client`
+anyway. The `bom-ref` / `SPDXID` and the reports keep the conda name.
 
 ### CRAN identities for R packages
 

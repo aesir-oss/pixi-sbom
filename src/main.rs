@@ -950,6 +950,11 @@ fn main() -> Result<()> {
         if let Input::Prefix { dir, .. } = input {
             prefix::make_portable(&mut sbom, dir);
         }
+        // Last, since enrichment and the reports look conda packages up by their conda names.
+        if args.primary_purl == cli::PrimaryPurl::Pypi {
+            let renamed = mapping::name_by_pypi_purl(&mut sbom);
+            tracing::info!(renamed, "named conda packages after their PyPI projects");
+        }
         let ctx = format::WriteContext::for_document(&contents, &sbom, args.format, spec_version);
         let written = timings::time(timings::Phase::Write, || write_output(output, args.format, &sbom, &ctx))?;
         tracing::info!(

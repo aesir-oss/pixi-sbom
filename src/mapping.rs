@@ -302,6 +302,37 @@ pub fn prefer_pypi_purl(sbom: &mut Sbom) -> usize {
     switched
 }
 
+/// The conda name of a package [`name_by_pypi_purl`] gave its PyPI project's name.
+pub const CONDA_NAME_PROPERTY: &str = "pixi:conda-name";
+
+/// Give a conda package whose primary purl is PyPI's the PyPI project's name, keeping the conda one in
+/// [`CONDA_NAME_PROPERTY`]: Grype looks a Python package up by its name, not its purl, so `nbconvert-core`
+/// never meets nbconvert's advisories. Names that differ only in PEP 503 spelling are left alone. Run once
+/// nothing more looks a package up by its conda name. Returns how many were renamed.
+pub fn name_by_pypi_purl(sbom: &mut Sbom) -> usize {
+    let mut renamed = 0;
+    for package in &mut sbom.packages {
+        if package.kind == PackageKind::Pypi {
+            continue;
+        }
+        let Some(pypi) = package
+            .purl
+            .strip_prefix("pkg:pypi/")
+            .and_then(|rest| rest.split(['@', '?', '#']).next())
+            .filter(|name| !name.is_empty())
+        else {
+            continue;
+        };
+        if purl::normalize_pypi_name(&package.name) == purl::normalize_pypi_name(pypi) {
+            continue;
+        }
+        let conda = std::mem::replace(&mut package.name, pypi.to_string());
+        package.properties.insert(CONDA_NAME_PROPERTY.to_string(), conda);
+        renamed += 1;
+    }
+    renamed
+}
+
 /// Conda packages whose PyPI purl is only an extra reference, so a scanner, which reads the primary
 /// purl alone, cannot match them by it: what `prefer_pypi_purl` would switch.
 pub fn hidden_pypi_identities(sbom: &Sbom) -> usize {
@@ -464,6 +495,28 @@ mod tests {
         );
         assert_eq!(sample.packages[1].purl, "pkg:pypi/zlib@1.3.1");
         assert_eq!(sample.packages[3].purl, "pkg:pypi/six@1.17.0");
+    }
+
+    #[test]
+    fn name_by_pypi_purl_renames_only_packages_whose_project_has_another_name() {
+        let mut sbom = conda_python_sbom();
+        enrich(&mut sbom, &fixture_mapping());
+        assert_eq!(
+            name_by_pypi_purl(&mut sbom),
+            0,
+            "nothing is renamed while the conda purl is primary"
+        );
+        prefer_pypi_purl(&mut sbom);
+        assert_eq!(name_by_pypi_purl(&mut sbom), 1);
+        let torch = sbom.packages.iter().find(|p| p.purl == "pkg:pypi/torch@2.7.1").unwrap();
+        assert_eq!(torch.name, "torch");
+        assert_eq!(torch.properties[CONDA_NAME_PROPERTY], "pytorch");
+        assert!(torch.id.starts_with("pkg:conda/pytorch@2.7.1"), "id unchanged");
+        for spelled_alike in ["numpy", "typing_extensions"] {
+            let package = sbom.packages.iter().find(|p| p.name == spelled_alike).unwrap();
+            assert!(!package.properties.contains_key(CONDA_NAME_PROPERTY), "{spelled_alike}");
+        }
+        assert_eq!(name_by_pypi_purl(&mut sbom), 0, "already named");
     }
 
     #[test]

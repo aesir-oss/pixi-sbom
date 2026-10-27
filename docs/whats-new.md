@@ -45,6 +45,16 @@ an archive. zstd-safe 8.2.0 no longer exposes uninitialised memory when a legacy
 (RUSTSEC-2026-0403); zstd 0.14.3, zstd-sys 2.1.2 and ctutils 0.4.6 fix the rest of the batch (RUSTSEC-2026-0391,
 RUSTSEC-2026-0398, RUSTSEC-2026-0410, RUSTSEC-2026-0385), none of which pixi-sbom's own use reaches.
 
+**`--primary-purl pypi` names a conda package after its PyPI project.** Grype matches a Python package by name, not
+purl, so `nbconvert-core` with purl `pkg:pypi/nbconvert` never met nbconvert's advisories, and neither did
+`brotli-python`, `matplotlib-base` or `pytorch`. With `--primary-purl pypi` they are now named `nbconvert`, `brotli`,
+`matplotlib` and `torch`, and `pixi:conda-name` keeps the conda name. Without the flag nothing changes.
+
+**setuptools no longer takes a vendored project's identity.** With `--prefix`, a conda package's PyPI purl was read
+from the first `dist-info` it installed, and setuptools installs only an egg-info of its own beside the dist-infos of
+what it vendors, so it was given `pkg:pypi/autocommand`. Only a dist-info directly in `site-packages` counts now, and
+a package with none is read from its own `egg-info`, so setuptools is `pkg:pypi/setuptools` and meets its advisories.
+
 ## 1.15.0
 
 **`--version-details` gives each proxy setting its own line.** `offline`, `proxy` and `no-proxy` used to share one

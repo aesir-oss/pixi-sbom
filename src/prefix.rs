@@ -727,18 +727,26 @@ pub const DIST_INFO_PROPERTY: &str = "pixi:pypi-dist-info";
 
 /// A conda package's PyPI identity from the `dist-info` it installed: the record's `files` name
 /// the `METADATA`, and its `Name` and `Version` are the PyPI project's. No network, and no name
-/// mapping that could be out of date. Returns the purl and the dist-info directory.
+/// mapping that could be out of date. Returns the purl and the dist-info directory. Only a dist-info
+/// directly in `site-packages` counts: one under `setuptools/_vendor/` is a vendored project's, not
+/// the package's own. With none, an `egg-info`'s `PKG-INFO` answers, as setuptools installs.
 fn installed_pypi_identity(prefix: &Path, record: &Record) -> Option<(String, String)> {
-    let mut metadata: Vec<&String> = record
+    let in_site_packages = |file: &str, metadata: &str, suffix: &str| {
+        file.strip_suffix(metadata)
+            .and_then(|dir| dir.rsplit_once('/'))
+            .is_some_and(|(parent, name)| parent.ends_with("site-packages") && name.ends_with(suffix))
+    };
+    let mut metadata: Vec<(bool, String)> = record
         .files
         .iter()
-        .filter(|file| {
-            let file = file.replace('\\', "/");
-            file.ends_with(".dist-info/METADATA") && file.contains("site-packages/")
+        .map(|file| file.replace('\\', "/"))
+        .filter_map(|file| {
+            let egg = in_site_packages(&file, "/PKG-INFO", ".egg-info");
+            (egg || in_site_packages(&file, "/METADATA", ".dist-info")).then_some((egg, file))
         })
         .collect();
     metadata.sort();
-    let file = metadata.first()?;
+    let (_, file) = metadata.first()?;
     let text = std::fs::read_to_string(prefix.join(file)).ok()?;
     let headers = wheel::parse_headers(&text);
     let first = |name: &str| {
@@ -749,8 +757,8 @@ fn installed_pypi_identity(prefix: &Path, record: &Record) -> Option<(String, St
             .filter(|v| !v.is_empty())
     };
     let purl = purl::pypi(&first("name")?, &first("version")?).ok()?;
-    let dist_info = file.replace('\\', "/").trim_end_matches("/METADATA").to_string();
-    Some((purl, dist_info))
+    let (dist_info, _) = file.rsplit_once('/')?;
+    Some((purl, dist_info.to_string()))
 }
 
 /// Take the machine out of an installed environment's document, once nothing more reads the
@@ -1483,6 +1491,23 @@ mod tests {
         let record = serde_json::json!({"name": "zlib", "version": "1.3.1", "build": "h0", "subdir": "linux-64",
             "files": ["lib/libz.so.1"]});
         std::fs::write(env.join("conda-meta/zlib-1.3.1-h0.json"), record.to_string()).unwrap();
+        // setuptools installs an egg-info of its own and the dist-infos of what it vendors.
+        let vendored = "lib/python3.12/site-packages/setuptools/_vendor/autocommand-2.2.2.dist-info";
+        let egg = "lib/python3.12/site-packages/setuptools-84.0.0-py3.10.egg-info";
+        for (dir, file, name, version) in [
+            (vendored, "METADATA", "autocommand", "2.2.2"),
+            (egg, "PKG-INFO", "setuptools", "84.0.0"),
+        ] {
+            std::fs::create_dir_all(env.join(dir)).unwrap();
+            std::fs::write(
+                env.join(dir).join(file),
+                format!("Metadata-Version: 2.1\nName: {name}\nVersion: {version}\n"),
+            )
+            .unwrap();
+        }
+        let record = serde_json::json!({"name": "setuptools", "version": "84.0.0", "build": "pyh0", "subdir": "noarch",
+            "files": [format!("{vendored}/METADATA"), format!("{egg}/PKG-INFO")]});
+        std::fs::write(env.join("conda-meta/setuptools-84.0.0-pyh0.json"), record.to_string()).unwrap();
 
         let sbom = build_sbom(env, Root::default(), None).unwrap();
         let names: Vec<&str> = sbom.packages.iter().map(|p| p.name.as_str()).collect();
@@ -1505,6 +1530,14 @@ mod tests {
         let zlib = sbom.packages.iter().find(|p| p.name == "zlib").unwrap();
         assert!(zlib.extra_purls.is_empty(), "no dist-info, no PyPI identity");
         assert!(!zlib.purls_from_lock, "so a mapping may still answer for it");
+
+        let setuptools = sbom.packages.iter().find(|p| p.name == "setuptools").unwrap();
+        assert_eq!(
+            setuptools.extra_purls,
+            ["pkg:pypi/setuptools@84.0.0"],
+            "its own egg-info, not a vendored dist-info"
+        );
+        assert_eq!(setuptools.properties[DIST_INFO_PROPERTY], egg);
     }
 
     /// A Linux arm64 container's `/usr/local`, scanned from any machine: the platform is the

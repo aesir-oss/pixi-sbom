@@ -491,6 +491,16 @@ fn pypi_mapping_file_adds_purls_and_primary_purl_pypi_swaps_them() {
         .unwrap();
     assert_eq!(numpy["purl"], "pkg:pypi/numpy@2.3.1");
     assert!(numpy["bom-ref"].as_str().unwrap().starts_with("pkg:conda/numpy@2.3.1"));
+    // Grype looks a Python package up by name: pytorch is named torch, its conda name kept.
+    let torch = doc["components"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["name"] == "torch")
+        .unwrap();
+    assert_eq!(torch["purl"], "pkg:pypi/torch@2.7.1");
+    assert_eq!(props(torch, "pixi:conda-name"), ["pytorch"]);
+    assert!(props(numpy, "pixi:conda-name").is_empty(), "same name on PyPI");
     assert!(
         doc["dependencies"]
             .as_array()
