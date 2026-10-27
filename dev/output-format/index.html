@@ -2557,7 +2557,7 @@ purl matches nothing, so a conda-only Python environment scans as clean whatever
 </tr>
 <tr>
 <td>The installed <code>dist-info</code> (<code>--prefix</code> only)</td>
-<td>the conda record's <code>files</code> list the <code>site-packages/&lt;name&gt;-&lt;version&gt;.dist-info/METADATA</code> the package installed; its <code>Name</code> and <code>Version</code> are the PyPI project's. Read from disk, no network, no flag</td>
+<td>the conda record's <code>files</code> list the <code>site-packages/&lt;name&gt;-&lt;version&gt;.dist-info/METADATA</code> the package installed; its <code>Name</code> and <code>Version</code> are the PyPI project's. A dist-info a package vendors deeper down does not count; with none, its <code>site-packages/&lt;name&gt;-&lt;version&gt;.egg-info/PKG-INFO</code> answers (setuptools). Read from disk, no network, no flag</td>
 <td>as above, plus <code>pixi:pypi-mapping=dist-info</code> and <code>pixi:pypi-dist-info</code> (the directory, relative to the prefix)</td>
 </tr>
 </tbody>
@@ -2576,6 +2576,10 @@ the conda purl to <code>pixi:purl</code>, because scanners only read the primary
 <code>osv-scanner</code> report advisories for conda-installed Python packages. Without it, a run that leaves PyPI identities
 where scanners cannot see them warns once on stderr; <a href="../ci-recipes/#scanning-with-grype">Scanning with Grype</a> has the
 recommended commands and the configuration key.</p>
+<p>Grype looks a Python package up by its name, not its purl, so <code>--primary-purl pypi</code> also gives a conda package the PyPI
+project's name when the two differ by more than spelling: <code>nbconvert-core</code> is named <code>nbconvert</code>, <code>pytorch</code> <code>torch</code>,
+with the conda name in <code>pixi:conda-name</code>. <code>jupyter_client</code> keeps its name, since PEP 503 makes it <code>jupyter-client</code>
+anyway. The <code>bom-ref</code> / <code>SPDXID</code> and the reports keep the conda name.</p>
 <h3 id="cran-identities-for-r-packages">CRAN identities for R packages<a class="headerlink" href="#cran-identities-for-r-packages" title="Permanent link">&para;</a></h3>
 <p>An <code>r-*</code> conda package is usually a <a href="https://cran.r-project.org/">CRAN</a> package, and OSV indexes CRAN advisories.
 Each one that is on CRAN gets a <code>pkg:cran</code> purl beside its <code>pkg:conda</code> one, by default and offline, the way a conda
